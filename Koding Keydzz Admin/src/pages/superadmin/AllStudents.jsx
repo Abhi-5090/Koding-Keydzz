@@ -1,0 +1,310 @@
+import { useMemo, useState } from 'react';
+import {
+  Ban,
+  CheckCircle2,
+  KeyRound,
+  Search,
+  Users as UsersIcon,
+  AlertTriangle,
+  Copy,
+  Check,
+} from 'lucide-react';
+import {
+  useGetSuperStudentsQuery,
+  useSuspendSuperStudentMutation,
+  useResetSuperStudentPasswordMutation,
+} from '../../features/superadmin/superadminApi';
+import DataTable from '../../components/ui/DataTable';
+import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import Button from '../../components/ui/Button';
+import PageHeader from '../../components/ui/PageHeader';
+import QueryState from '../../components/ui/QueryState';
+
+function StatusBadge({ status }) {
+  const map = {
+    active: 'bg-success/15 text-success border-success/30',
+    idle: 'bg-turmeric/15 text-turmeric border-turmeric/30',
+    suspended: 'bg-error/15 text-error border-error/30',
+  };
+  return (
+    <span
+      className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${map[status] || map.idle}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function asList(data) {
+  if (Array.isArray(data)) return data;
+  return data?.students || data?.items || [];
+}
+
+export default function AllStudents() {
+  const [search, setSearch] = useState('');
+  const [org, setOrg] = useState('');
+
+  const { data, isError, isLoading, error, refetch } = useGetSuperStudentsQuery({
+    search: search || undefined,
+    org: org || undefined,
+  });
+  const [suspendStudent, { isLoading: suspending }] = useSuspendSuperStudentMutation();
+  const [resetPassword, { isLoading: resetting }] = useResetSuperStudentPasswordMutation();
+
+  const students = asList(data);
+
+  const orgOptions = useMemo(() => {
+    const set = new Map();
+    students.forEach((s) => {
+      const name = s.org?.name || s.orgName || (typeof s.org === 'string' ? s.org : '');
+      if (name) set.set(name, name);
+    });
+    return Array.from(set.values()).sort();
+  }, [students]);
+
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetResult, setResetResult] = useState(null);
+  const [resetError, setResetError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const doSuspend = async () => {
+    const t = confirmTarget;
+    try {
+      await suspendStudent({ id: t.id, suspended: !t.suspended }).unwrap();
+    } catch {
+      /* table reflects server state */
+    }
+    setConfirmTarget(null);
+  };
+
+  const openReset = (student) => {
+    setResetTarget(student);
+    setResetResult(null);
+    setResetError('');
+    setCopied(false);
+  };
+
+  const handleReset = async () => {
+    setResetError('');
+    try {
+      const res = await resetPassword({ id: resetTarget.id }).unwrap();
+      setResetResult({
+        student: res?.student || resetTarget,
+        password: res?.password,
+      });
+    } catch (err) {
+      setResetError(err?.data?.message || 'Could not reset the password. Please try again.');
+    }
+  };
+
+  const copyPassword = () => {
+    if (!resetResult?.password) return;
+    navigator.clipboard?.writeText(resetResult.password).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const orgName = (r) =>
+    r.org?.name || r.orgName || (typeof r.org === 'string' ? r.org : '') || '—';
+
+  const columns = [
+    {
+      key: 'name',
+      header: 'Student',
+      render: (r) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-turmeric/20 text-xs font-bold text-turmeric">
+            {(r.name || '?').charAt(0)}
+          </div>
+          <div>
+            <p className="font-medium text-text-primary">{r.name}</p>
+            <p className="text-xs text-text-secondary/60">{r.email}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'org',
+      header: 'Organization',
+      sortValue: (r) => orgName(r),
+      render: (r) => <span className="text-text-secondary">{orgName(r)}</span>,
+    },
+    {
+      key: 'xp',
+      header: 'XP',
+      render: (r) => <span className="font-semibold text-turmeric">{(r.xp ?? 0).toLocaleString()}</span>,
+    },
+    { key: 'level', header: 'Level', render: (r) => `Lv ${r.level ?? 1}` },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (r) => <StatusBadge status={r.status} />,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      sortable: false,
+      searchable: false,
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openReset(r)}
+            title="Reset password"
+            aria-label={`Reset password for ${r.name}`}
+            className="rounded-lg p-1.5 text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-turmeric active:scale-95"
+          >
+            <KeyRound size={16} />
+          </button>
+          <button
+            onClick={() => setConfirmTarget(r)}
+            title={r.suspended ? 'Reinstate' : 'Suspend'}
+            aria-label={`${r.suspended ? 'Reinstate' : 'Suspend'} ${r.name}`}
+            className={`rounded-lg p-1.5 transition-colors duration-150 ease-out active:scale-95 hover:bg-surface ${
+              r.suspended ? 'text-success' : 'text-error'
+            }`}
+          >
+            {r.suspended ? <CheckCircle2 size={16} /> : <Ban size={16} />}
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="All Students"
+        subtitle={isLoading ? 'Loading…' : `${students.length} students across all organizations`}
+      />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:max-w-xs">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/60" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or email…"
+            className="k-input pl-9"
+          />
+        </div>
+        {orgOptions.length > 0 && (
+          <select value={org} onChange={(e) => setOrg(e.target.value)} className="k-input w-full sm:w-56">
+            <option value="">All organizations</option>
+            {orgOptions.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <QueryState
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        refetch={refetch}
+        isEmpty={students.length === 0}
+        loadingLabel="Loading students…"
+        emptyTitle="No students found"
+        emptyMessage="No students match the current filters."
+        emptyIcon={UsersIcon}
+      >
+        <DataTable
+          columns={columns}
+          data={students}
+          searchKeys={['name', 'email']}
+          pageSize={10}
+        />
+      </QueryState>
+
+      <ConfirmDialog
+        open={!!confirmTarget}
+        onClose={() => setConfirmTarget(null)}
+        onConfirm={doSuspend}
+        loading={suspending}
+        title={confirmTarget?.suspended ? 'Reinstate account?' : 'Suspend account?'}
+        confirmLabel={confirmTarget?.suspended ? 'Reinstate' : 'Suspend'}
+        variant={confirmTarget?.suspended ? 'primary' : 'danger'}
+        message={
+          confirmTarget?.suspended
+            ? `Restore access for ${confirmTarget?.name}?`
+            : `${confirmTarget?.name} will lose access to the platform until reinstated.`
+        }
+      />
+
+      <Modal
+        open={!!resetTarget}
+        onClose={() => setResetTarget(null)}
+        title="Reset Password"
+        size="md"
+        footer={
+          resetResult ? (
+            <Button icon={CheckCircle2} onClick={() => setResetTarget(null)}>
+              Done
+            </Button>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={() => setResetTarget(null)} disabled={resetting}>
+                Cancel
+              </Button>
+              <Button icon={KeyRound} onClick={handleReset} loading={resetting}>
+                Reset Password
+              </Button>
+            </>
+          )
+        }
+      >
+        {resetTarget && !resetResult && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-turmeric/20 text-base font-bold text-turmeric">
+                {(resetTarget.name || '?').charAt(0)}
+              </div>
+              <div>
+                <p className="font-medium text-text-primary">{resetTarget.name}</p>
+                <p className="text-xs text-text-secondary/60">
+                  {resetTarget.email} · {orgName(resetTarget)}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-text-secondary/80">
+              A new secure password will be generated for this student to share.
+            </p>
+            {resetError && (
+              <p className="flex items-center gap-2 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+                <AlertTriangle size={16} /> {resetError}
+              </p>
+            )}
+          </div>
+        )}
+
+        {resetResult && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+              <CheckCircle2 size={16} /> Password reset for {resetResult.student?.name}.
+            </div>
+            {resetResult.password && (
+              <div>
+                <p className="k-label mb-1.5">New password</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 select-all rounded-xl border border-k-border bg-malt/60 px-4 py-3 font-mono text-lg font-bold tracking-wide text-turmeric">
+                    {resetResult.password}
+                  </code>
+                  <Button variant="secondary" icon={copied ? Check : Copy} onClick={copyPassword}>
+                    {copied ? 'Copied' : 'Copy'}
+                  </Button>
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-text-secondary/70">
+              Share this password securely. It will not be shown again after you close this dialog.
+            </p>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}

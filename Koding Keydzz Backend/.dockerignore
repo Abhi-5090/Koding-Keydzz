@@ -1,0 +1,29 @@
+# Keep the build context small and never bake secrets/host artifacts into the image.
+node_modules
+npm-debug.log*
+yarn-error.log*
+
+# Secrets — never copy any real env file into the image (env is injected at runtime).
+.env
+.env.*
+!.env.example
+
+# VCS / meta
+.git
+.gitignore
+.github
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Docs / tests / coverage (not needed at runtime)
+README.md
+tests
+vitest.config.js
+coverage
+
+# Logs & OS cruft
+*.log
+logs
+.DS_Store

@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+
+  /* Global motion system — strong custom easings (Emil Kowalski).
+     Built-in CSS easings are too weak; these give animations intent. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #001621;
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 800;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer base {
+  body {
+    @apply bg-malt text-text-primary;
+  }
+
+  /* Consistent focus-visible ring on interactive elements. We remove the
+     default outline only because we replace it with a stronger brand ring. */
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  [tabindex] {
+    outline: none;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #001621, 0 0 0 4px rgba(255, 96, 47, 0.6);
+    border-radius: 0.5rem;
+  }
+
+  /* World-scoped surfaces (world page + lesson modal) set `--tint` on a
+     `.tint-scope` wrapper so the focus-visible ring adopts that world's accent
+     instead of the global Ember. Global chrome never carries `.tint-scope`. */
+  .tint-scope a:focus-visible,
+  .tint-scope button:focus-visible,
+  .tint-scope input:focus-visible,
+  .tint-scope select:focus-visible,
+  .tint-scope textarea:focus-visible,
+  .tint-scope [tabindex]:focus-visible {
+    box-shadow: 0 0 0 2px #001621, 0 0 0 4px var(--tint, rgba(255, 96, 47, 0.6));
+  }
+}
+
+@layer components {
+  .golden-glow {
+    box-shadow: 0 0 24px rgba(255, 96, 47, 0.5);
+  }
+
+  .golden-text {
+    background: linear-gradient(90deg, #FF602F, #FF6A3D, #FF602F);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradient-shift 6s ease infinite;
+  }
+
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-md border border-k-border rounded-2xl;
+  }
+
+  .game-text {
+    font-family: 'Fredoka', sans-serif;
+  }
+
+  /* Crisp press feedback for any pressable element that opts in. */
+  .pressable {
+    transition: transform 150ms var(--ease-out);
+  }
+  .pressable:active {
+    transform: scale(0.97);
+  }
+
+  /* Game-board sizing context. The board measures itself against THIS wrapper
+     (its container/column), never the viewport — so a grid always fits its
+     column at any width. `cqi`/`cqw` units inside resolve to concrete lengths,
+     which keeps the absolutely-positioned token math correct. */
+  .board-fit {
+    container-type: inline-size;
+  }
+}
+
+@layer utilities {
+  .text-shadow-glow {
+    text-shadow: 0 0 18px rgba(255, 96, 47, 0.7);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: #001621;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #FF602F66;
+    border-radius: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #FF602F;
+  }
+}
+
+/* Keyframe animations (mirrors of tailwind config for raw CSS usage) */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 16px rgba(255, 96, 47, 0.35); }
+  50% { box-shadow: 0 0 40px rgba(255, 96, 47, 0.7); }
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+.animate-confetti {
+  animation: confetti-fall linear forwards;
+}
+
+/* Monaco container fix */
+.monaco-editor, .monaco-editor .overflow-guard {
+  border-radius: 12px;
+}
+
+/* Reduced motion: keep opacity/color, remove transform/position motion and
+   disable infinite float/pulse/spin loops (Emil: fewer + gentler, not zero). */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-float,
+  .animate-float-slow,
+  .animate-pulse-glow,
+  .animate-spin-slow,
+  .animate-wiggle,
+  .animate-confetti {
+    animation: none !important;
+  }
+
+  .pressable:active {
+    transform: none;
+  }
+}

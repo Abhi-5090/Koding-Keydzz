@@ -1,0 +1,77 @@
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { setCredentials, logout } from '../../features/auth/authSlice';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5500/api/v1';
+
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl: API_URL,
+  // Resolve `fetch` lazily at call time so tests can swap the global mock
+  // after this module has been imported.
+  fetchFn: (...args) => globalThis.fetch(...args),
+  prepareHeaders: (headers, { getState }) => {
+    const token = getState().auth.accessToken;
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    return headers;
+  },
+});
+
+// Wrap to handle 401 -> attempt refresh once, otherwise logout.
+const baseQueryWithReauth = async (args, api, extraOptions) => {
+  let result = await rawBaseQuery(args, api, extraOptions);
+
+  if (result.error && result.error.status === 401) {
+    const refreshToken = api.getState().auth.refreshToken;
+    if (refreshToken) {
+      const refreshResult = await rawBaseQuery(
+        {
+          url: '/auth/refresh',
+          method: 'POST',
+          body: { refreshToken },
+        },
+        api,
+        extraOptions
+      );
+
+      const data = refreshResult.data?.data || refreshResult.data;
+      if (data?.accessToken) {
+        api.dispatch(
+          setCredentials({
+            user: api.getState().auth.user,
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken || refreshToken,
+          })
+        );
+        // retry original
+        result = await rawBaseQuery(args, api, extraOptions);
+      } else {
+        api.dispatch(logout());
+      }
+    } else {
+      api.dispatch(logout());
+    }
+  }
+
+  return result;
+};
+
+export const baseApi = createApi({
+  reducerPath: 'api',
+  baseQuery: baseQueryWithReauth,
+  tagTypes: [
+    'Stats',
+    'Students',
+    'Courses',
+    'Lessons',
+    'Challenges',
+    'Achievements',
+    'ShopItems',
+    'Leaderboard',
+    'Quizzes',
+    'Orgs',
+    'OrgStudents',
+    'SuperStats',
+    'SuperStudents',
+    'Analytics',
+  ],
+  endpoints: () => ({}),
+});

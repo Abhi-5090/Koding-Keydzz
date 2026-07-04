@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  # ---- Backend: install + syntax check + run any tests ----
+  backend:
+    name: Backend (install + check)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: "Koding Keydzz Backend"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: "Koding Keydzz Backend/package-lock.json"
+      - run: npm ci
+      - name: Syntax check entrypoint
+        run: node --check src/server.js
+      - name: Run tests (if defined)
+        run: npm test --if-present
+
+  # ---- Frontends + Admin: install + build ----
+  frontends:
+    name: ${{ matrix.app }} (install + build)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - "Koding Keydzz Frontend"
+          - "Koding Keydzz Admin"
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - run: npm ci
+      - name: Run tests (if defined)
+        run: npm test --if-present
+      - name: Build
+        run: npm run build
