@@ -1,27 +1,31 @@
-// Robot Navigation — 18 hand-authored power-of-two jump puzzles (ids 1..18).
+// Robot Navigation — 16 hand-authored code-writing puzzles (ids 1..16).
 //
-// The robot starts with JUMP POWER 1 (each tap moves 1 cell). Power tiles
-// change the jump distance when LANDED on:
-//   M (×2): jump power becomes 2 — each tap now leaps 2 cells.
-//   D (÷2): jump power halves (2 -> 1). If power is already 1, the robot falls
-//           out and the level is lost.
+// SAME format + engine as Maze Coding: the student writes real Python
+// (up()/down()/left()/right() and `for i in range(n):` loops) that compiles
+// into the robot's move sequence, guiding it to the charging pad / delivery
+// point (the goal). Distinct level designs — a robot "reach the pad" flavor
+// with straight runs, corridors that reward loops, turns and dead-ends.
 //
 // Level shape:
-//   { id, name, difficulty:'easy'|'medium'|'hard', grid:[ 'S.#.G', ... ], hint? }
+//   { id, name, difficulty:'easy'|'medium'|'hard',
+//     grid:[ 'S..#', '.#.G' ], allowLoops:boolean, hint?:string }
 //
-// Grid chars: S=start, G=goal, #=wall, .=open, M=×2 tile, D=÷2 tile.
+// Grid chars: S=start, G=goal (the charging pad), #=wall, .=open.
 // Coords x=col, y=row.  up=y-1, down=y+1, left=x-1, right=x+1.
 //
-// EVERY level is validated solvable (finite optimalClicks) by
-// src/games/robot/engine.test.js.
+// Difficulty ramp: 7 easy -> 6 medium -> 3 hard. The first easy levels have
+// allowLoops:false to teach plain sequencing, then loops are rewarded.
+// Every level is validated solvable (finite bfsOptimalSteps + optimalBlocks)
+// by src/games/robot/levels.test.js.
 
 const levels = [
-  // ===== EASY 1–8 — learn the controls, then the ×2 jump =====
+  // ===== EASY 1–7 — power on, learn to sequence, then meet loops =====
   {
     id: 1,
-    name: 'First Steps',
+    name: 'Power On',
     difficulty: 'easy',
-    hint: 'Tap right to roll over to the goal — one cell per tap.',
+    allowLoops: false,
+    hint: 'The charging pad is straight to your right — step over to it.',
     grid: [
       'S..G',
       '....',
@@ -29,187 +33,207 @@ const levels = [
   },
   {
     id: 2,
-    name: 'Drop In',
+    name: 'Roll Down',
     difficulty: 'easy',
-    hint: 'The goal is straight down.',
+    allowLoops: false,
+    hint: 'Head down the lane to reach the pad below.',
     grid: [
       'S.',
+      '..',
       '..',
       'G.',
     ],
   },
   {
     id: 3,
-    name: 'Double Up',
+    name: 'First Turn',
     difficulty: 'easy',
-    hint: 'Land on the ×2 tile to power up, then leap two cells at a time.',
+    allowLoops: false,
+    hint: 'Roll across, then drop down onto the pad.',
     grid: [
-      'S.M.G',
-      '.....',
+      'S..',
+      '..G',
     ],
   },
   {
     id: 4,
-    name: 'Leap the Wall',
+    name: 'Charge Corner',
     difficulty: 'easy',
-    hint: 'Grab ×2 first — a power-2 jump can clear the wall in one bound.',
+    allowLoops: false,
+    hint: 'Two moves right and two down (in any order) lands the robot home.',
     grid: [
-      'SM#G',
-      '....',
+      'S..',
+      '...',
+      '..G',
     ],
   },
   {
     id: 5,
-    name: 'Mind the Gap',
+    name: 'Long Charge',
     difficulty: 'easy',
-    hint: 'Power up, then jump the wall to reach the bay below.',
+    allowLoops: true,
+    hint: 'A long straight run — a for loop repeats right() so you type it once.',
     grid: [
-      'SM#.',
-      '...G',
-    ],
-  },
-  {
-    id: 6,
-    name: 'Long Bound',
-    difficulty: 'easy',
-    hint: 'One ×2 turns a long corridor into a few big leaps.',
-    grid: [
-      'S.M...G',
+      'S.....G',
       '.......',
     ],
   },
   {
-    id: 7,
-    name: 'Corner Power',
+    id: 6,
+    name: 'Around the Post',
     difficulty: 'easy',
-    hint: 'Drop to the ×2, then leap across.',
+    allowLoops: true,
+    hint: 'A post blocks the top-right — drop down first, then roll across.',
     grid: [
-      'S....',
-      '.....',
-      'M..#G',
+      'S.#',
+      '..#',
+      '..G',
     ],
   },
   {
-    id: 8,
-    name: 'Over and Down',
+    id: 7,
+    name: 'Delivery Bay',
     difficulty: 'easy',
-    hint: 'Power up, jump the wall, then line up the goal.',
+    allowLoops: true,
+    hint: 'Skirt the shelving block — hug one wall down and around to the bay.',
     grid: [
-      'SM#..',
+      'S....',
+      '.###.',
+      '.###.',
       '....G',
-      '.....',
     ],
   },
 
-  // ===== MEDIUM 9–14 — collect ×2, and use ÷2 to land exactly =====
+  // ===== MEDIUM 8–13 — longer corridors that reward loops, some turns =====
+  {
+    id: 8,
+    name: 'Corridor Sprint',
+    difficulty: 'medium',
+    allowLoops: true,
+    hint: 'One long dash — loop right() with range() instead of typing nine of them.',
+    grid: [
+      'S........G',
+      '..........',
+    ],
+  },
   {
     id: 9,
-    name: 'Exact Landing',
+    name: 'Zigzag Route',
     difficulty: 'medium',
-    hint: 'A ×2 jump would overshoot the goal — step on ÷2 first to slow down.',
+    allowLoops: true,
+    hint: 'Barriers force a zigzag: right, down, back left, then down to the pad.',
     grid: [
-      'SM.DG',
+      'S....',
+      '####.',
       '.....',
+      '.####',
+      'G....',
     ],
   },
   {
     id: 10,
-    name: 'Two Walls',
+    name: 'Depot Detour',
     difficulty: 'medium',
-    hint: 'Power up and leap each wall in turn.',
+    allowLoops: true,
+    hint: 'Only one lane threads down to the pad — feel your way around the dead-ends.',
     grid: [
-      'SM#.#G',
-      '......',
+      'S...#',
+      '##..#',
+      '#...#',
+      '#.###',
+      '#...G',
     ],
   },
   {
     id: 11,
-    name: 'Reset to One',
+    name: 'Supply Line',
     difficulty: 'medium',
-    hint: 'Jump the wall with ×2, then ÷2 back to power 1 to dock exactly.',
+    allowLoops: true,
+    hint: 'Run to the far side, drop down, and run all the way back — loops save typing.',
     grid: [
-      'SM#.DG',
-      '......',
+      'S.......',
+      '#######.',
+      'G.......',
     ],
   },
   {
     id: 12,
-    name: 'L Route',
+    name: 'Warehouse Wind',
     difficulty: 'medium',
-    hint: 'Leap the wall across the top, then drop down and slow to land.',
+    allowLoops: true,
+    hint: 'Wind through the aisles: across the top, step down, tuck left, then down.',
     grid: [
-      'SM#.',
-      '...D',
-      '...G',
+      'S....#',
+      '.###.#',
+      '.#...#',
+      '.#.###',
+      '.#...G',
     ],
   },
   {
     id: 13,
-    name: 'Around the Block',
+    name: 'The Long Haul',
     difficulty: 'medium',
-    hint: 'Power up, clear the gaps, then ÷2 to align the final cell.',
+    allowLoops: true,
+    hint: 'A three-lane snake — each straight leg is a perfect job for a for loop.',
     grid: [
-      'SM#.#.',
-      '.....D',
-      '....#G',
-    ],
-  },
-  {
-    id: 14,
-    name: 'Snake Power',
-    difficulty: 'medium',
-    hint: 'Use the ×2 to bound across each open lane, ÷2 to finish exactly.',
-    grid: [
-      'S.M..#',
-      '####..',
-      'D....#',
-      '.####.',
-      'G....#',
+      'S......',
+      '######.',
+      '.......',
+      '.######',
+      '.......',
+      '......G',
     ],
   },
 
-  // ===== HARD 15–18 — alternate power, dodge ÷2 traps =====
+  // ===== HARD 14–16 — bigger grids, many turns, tight optimal paths =====
+  {
+    id: 14,
+    name: 'Circuit Board',
+    difficulty: 'hard',
+    allowLoops: true,
+    hint: 'Serpentine the board: right, down, left, down, right, down to the pad.',
+    grid: [
+      'S.......',
+      '#######.',
+      '........',
+      '.#######',
+      '........',
+      '#######.',
+      'G.......',
+    ],
+  },
   {
     id: 15,
-    name: 'Power Swap',
+    name: 'Maze Depot',
     difficulty: 'hard',
-    hint: 'Bound across, ÷2 to step down precisely, then power up again.',
+    allowLoops: true,
+    hint: 'Drop through the near gap first, then weave the aisles to the far pad.',
     grid: [
-      'SM#.M.',
-      '...D.#',
-      '....#G',
+      'S.......',
+      '.#######',
+      '........',
+      '#######.',
+      '........',
+      '.#######',
+      '.......G',
     ],
   },
   {
     id: 16,
-    name: 'Twin Leaps',
+    name: 'Grand Delivery',
     difficulty: 'hard',
-    hint: 'Power up, leap both walls, then ÷2 back to power 1 to dock exactly.',
+    allowLoops: true,
+    hint: 'The grand circuit — five long legs. Loop every straight and plan each turn.',
     grid: [
-      'SM#.#DG',
-    ],
-  },
-  {
-    id: 17,
-    name: 'Trap Lane',
-    difficulty: 'hard',
-    hint: 'A power-2 jump leaps clean over the ÷2 trap — never land on it at 1.',
-    grid: [
-      'SM..D.',
-      '..#.#.',
-      'M...DG',
-    ],
-  },
-  {
-    id: 18,
-    name: 'Grand Circuit',
-    difficulty: 'hard',
-    hint: 'Alternate ×2 and ÷2 to thread the whole circuit and dock exactly.',
-    grid: [
-      'SM#.#DM',
-      '######.',
-      'M#.#D..',
-      '.....#G',
+      'S........',
+      '########.',
+      '.........',
+      '.########',
+      '.........',
+      '########.',
+      '.........',
+      'G........',
     ],
   },
 ]

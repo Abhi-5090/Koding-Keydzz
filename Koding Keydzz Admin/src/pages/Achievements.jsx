@@ -148,10 +148,10 @@ export default function Achievements() {
               <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-turmeric/15 text-turmeric shadow-glow">
                 <AnimatedIcon icon={iconFor(a.icon)} size={28} animation="pulse" glow className="text-turmeric" />
               </div>
-              <h3 className="font-heading font-bold text-text-primary">{a.title}</h3>
+              <h3 className="truncate font-heading font-bold text-text-primary">{a.title}</h3>
               <p className="mt-1 text-sm text-text-secondary/70">{a.description}</p>
               <div className="mt-3 space-y-1.5">
-                <code className="block rounded-lg border border-k-border bg-malt/50 px-2 py-1 text-xs text-turmeric">
+                <code className="block truncate rounded-lg border border-k-border bg-malt/50 px-2 py-1 text-xs text-turmeric">
                   {a.key}
                 </code>
                 <p className="text-xs text-text-secondary/50">

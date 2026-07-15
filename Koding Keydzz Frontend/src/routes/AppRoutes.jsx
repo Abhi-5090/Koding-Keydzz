@@ -28,9 +28,11 @@ import SpaceAdventure from '../pages/games/SpaceAdventure'
 import CodingBattleArena from '../pages/games/CodingBattleArena'
 import LogicPuzzleKingdom from '../pages/games/LogicPuzzleKingdom'
 import Sudoku from '../pages/games/Sudoku'
+import TicTacToe from '../pages/games/TicTacToe'
 import NQueens from '../pages/games/NQueens'
 import TowersOfHanoi from '../pages/games/TowersOfHanoi'
 import Zip from '../pages/games/Zip'
+import Patches from '../pages/games/Patches'
 
 // Heavy editor — lazy loaded.
 const Playground = lazy(() => import('../pages/Playground'))
@@ -90,10 +92,12 @@ export default function AppRoutes() {
         <Route path="/games/space-adventure" element={<SpaceAdventure />} />
         <Route path="/games/battle-arena" element={<CodingBattleArena />} />
         <Route path="/games/logic-puzzle" element={<LogicPuzzleKingdom />} />
+        <Route path="/games/tic-tac-toe" element={<TicTacToe />} />
         <Route path="/games/sudoku" element={<Sudoku />} />
         <Route path="/games/n-queens" element={<NQueens />} />
         <Route path="/games/towers-of-hanoi" element={<TowersOfHanoi />} />
         <Route path="/games/zip" element={<Zip />} />
+        <Route path="/games/patches" element={<Patches />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

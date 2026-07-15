@@ -184,9 +184,9 @@ export default function Notifications() {
               <div className="space-y-3">
                 {log.map((n) => (
                   <div key={n.id} className="rounded-lg border border-k-border/60 bg-malt/40 p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-text-primary">{n.title}</span>
-                      <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-secondary/70">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-sm font-medium text-text-primary">{n.title}</span>
+                      <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-secondary/70">
                         {n.type}
                       </span>
                     </div>

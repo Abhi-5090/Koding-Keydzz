@@ -93,10 +93,10 @@ export default function TryItEditor({
   return (
     <div className="tint-scope rounded-2xl border border-k-border bg-surface/40 p-4 sm:p-5" style={{ '--tint': tint, borderColor: `${tint}40` }}>
       <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: `${tint}22`, color: tint }}>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${tint}22`, color: tint }}>
           <Target size={16} />
         </span>
-        <div>
+        <div className="min-w-0">
           <h4 className="game-text text-sm font-bold" style={{ color: tint }}>
             Try it yourself
           </h4>

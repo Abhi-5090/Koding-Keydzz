@@ -70,18 +70,20 @@ export default function OrgCard({
       <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-turmeric/5 transition-transform duration-300 ease-out [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-125" />
 
       <div className="relative flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-turmeric/20 text-turmeric shadow-glow">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-turmeric/20 text-turmeric shadow-glow">
             <AnimatedIcon icon={Building2} size={22} animation="pop" className="text-turmeric" />
           </div>
-          <div>
-            <p className="font-heading text-base font-bold leading-tight text-text-primary">
+          <div className="min-w-0">
+            <p className="truncate font-heading text-base font-bold leading-tight text-text-primary">
               {org.name}
             </p>
-            <p className="font-mono text-xs text-text-secondary/60">{org.code}</p>
+            <p className="truncate font-mono text-xs text-text-secondary/60">{org.code}</p>
           </div>
         </div>
-        <OrgStatusBadge status={org.status} />
+        <span className="shrink-0">
+          <OrgStatusBadge status={org.status} />
+        </span>
       </div>
 
       <div className="relative mt-4 space-y-3">

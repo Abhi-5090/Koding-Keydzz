@@ -1,26 +1,10 @@
 // Mini-game catalog metadata for the Games Hub.
 // `icon` is a lucide-react component resolved via iconMap.
+// Order + `difficulty` define the hub arrangement: Easy (4) → Medium (4) → Hard (4).
 import { gameIcon } from './iconMap'
 
 export const GAMES = [
-  {
-    slug: 'maze-coding',
-    title: 'Maze Coding',
-    icon: gameIcon('maze-coding'),
-    tagline: 'Sequence commands to reach the treasure',
-    concept: 'Sequencing & Loops',
-    tint: '#1FB6A6',
-    difficulty: 'Easy',
-  },
-  {
-    slug: 'robot-navigation',
-    title: 'Robot Navigation',
-    icon: gameIcon('robot-navigation'),
-    tagline: 'Power up your jumps and plan the route',
-    concept: 'Power jumps & planning',
-    tint: '#2DD4BF',
-    difficulty: 'Easy',
-  },
+  // ─── Easy ───
   {
     slug: 'treasure-hunt',
     title: 'Treasure Hunt',
@@ -28,16 +12,7 @@ export const GAMES = [
     tagline: 'Choose the right path with if / else',
     concept: 'Conditionals',
     tint: '#FF8A4D',
-    difficulty: 'Medium',
-  },
-  {
-    slug: 'bug-fix',
-    title: 'Bug Fix Challenge',
-    icon: gameIcon('bug-fix'),
-    tagline: 'Spot the bug and pick the fix',
-    concept: 'Debugging',
-    tint: '#E8623C',
-    difficulty: 'Medium',
+    difficulty: 'Easy',
   },
   {
     slug: 'space-adventure',
@@ -46,16 +21,7 @@ export const GAMES = [
     tagline: 'Order the algorithm steps to launch',
     concept: 'Algorithms',
     tint: '#5BC0BE',
-    difficulty: 'Medium',
-  },
-  {
-    slug: 'battle-arena',
-    title: 'Coding Battle Arena',
-    icon: gameIcon('battle-arena'),
-    tagline: 'Beat the clock and your rival',
-    concept: 'Speed Problem-Solving',
-    tint: '#FF602F',
-    difficulty: 'Hard',
+    difficulty: 'Easy',
   },
   {
     slug: 'logic-puzzle',
@@ -64,8 +30,19 @@ export const GAMES = [
     tagline: 'Crack patterns and true/false riddles',
     concept: 'Logic',
     tint: '#FF6A3D',
-    difficulty: 'Hard',
+    difficulty: 'Easy',
   },
+  {
+    slug: 'tic-tac-toe',
+    title: 'Tic Tac Toe',
+    icon: gameIcon('tic-tac-toe'),
+    tagline: 'Beat the unbeatable bot… or draw trying',
+    concept: 'Game AI & Strategy',
+    tint: '#9E86F5',
+    difficulty: 'Easy',
+  },
+
+  // ─── Medium ───
   {
     slug: 'sudoku',
     title: 'Sudoku',
@@ -76,22 +53,13 @@ export const GAMES = [
     difficulty: 'Medium',
   },
   {
-    slug: 'n-queens',
-    title: 'N-Queens',
-    icon: gameIcon('n-queens'),
-    tagline: 'Place queens so none can attack',
-    concept: 'Backtracking & Constraints',
-    tint: '#FF8A4D',
-    difficulty: 'Hard',
-  },
-  {
     slug: 'towers-of-hanoi',
     title: 'Towers of Hanoi',
     icon: gameIcon('towers-of-hanoi'),
     tagline: 'Move the stack one disk at a time',
     concept: 'Recursion & planning',
     tint: '#FF8A4D',
-    difficulty: 'Hard',
+    difficulty: 'Medium',
   },
   {
     slug: 'zip',
@@ -101,6 +69,62 @@ export const GAMES = [
     concept: 'Path logic & planning',
     tint: '#2DD4BF',
     difficulty: 'Medium',
+  },
+  {
+    slug: 'patches',
+    title: 'Patches',
+    icon: gameIcon('patches'),
+    tagline: 'Split the grid into number-sized boxes',
+    concept: 'Spatial Logic',
+    tint: '#8B7CF6',
+    difficulty: 'Medium',
+  },
+  {
+    slug: 'n-queens',
+    title: 'N-Queens',
+    icon: gameIcon('n-queens'),
+    tagline: 'Place queens so none can attack',
+    concept: 'Backtracking & Constraints',
+    tint: '#FF8A4D',
+    difficulty: 'Medium',
+  },
+
+  // ─── Hard ───
+  {
+    slug: 'bug-fix',
+    title: 'Bug Fix Challenge',
+    icon: gameIcon('bug-fix'),
+    tagline: 'Spot the bug and pick the fix',
+    concept: 'Debugging',
+    tint: '#E8623C',
+    difficulty: 'Hard',
+  },
+  {
+    slug: 'maze-coding',
+    title: 'Maze Coding',
+    icon: gameIcon('maze-coding'),
+    tagline: 'Write code to reach the treasure',
+    concept: 'Sequencing & Loops',
+    tint: '#1FB6A6',
+    difficulty: 'Hard',
+  },
+  {
+    slug: 'robot-navigation',
+    title: 'Robot Navigation',
+    icon: gameIcon('robot-navigation'),
+    tagline: 'Write code to guide the robot to the pad',
+    concept: 'Write code to navigate',
+    tint: '#2DD4BF',
+    difficulty: 'Hard',
+  },
+  {
+    slug: 'battle-arena',
+    title: 'Coding Battle Arena',
+    icon: gameIcon('battle-arena'),
+    tagline: 'Beat the clock and your rival',
+    concept: 'Speed Problem-Solving',
+    tint: '#FF602F',
+    difficulty: 'Hard',
   },
 ]
 

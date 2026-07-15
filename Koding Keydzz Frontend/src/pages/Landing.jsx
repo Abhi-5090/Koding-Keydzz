@@ -216,14 +216,16 @@ export default function Landing() {
             {MARKETING_WORLDS.map((w) => (
               <Card key={w.id} className="group relative overflow-hidden">
                 <div
-                  className="absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40"
+                  className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-20 blur-2xl transition-opacity group-hover:opacity-40"
                   style={{ background: w.tint }}
                 />
                 <div className="mb-3 flex items-center gap-3">
-                  <AnimatedIcon icon={w.icon} size={36} animation="float" style={{ color: w.tint }} />
-                  <div>
+                  <span className="shrink-0">
+                    <AnimatedIcon icon={w.icon} size={36} animation="float" style={{ color: w.tint }} />
+                  </span>
+                  <div className="min-w-0">
                     <span className="text-xs text-text-secondary">World {w.id}</span>
-                    <h3 className="game-text text-lg font-bold" style={{ color: w.tint }}>{w.name}</h3>
+                    <h3 className="game-text truncate text-lg font-bold" style={{ color: w.tint }}>{w.name}</h3>
                   </div>
                 </div>
                 <p className="mb-3 text-sm text-text-secondary">{w.description}</p>

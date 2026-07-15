@@ -57,8 +57,17 @@ export async function registerStudent({ name, grade, school, email, password }) 
   return { user: await buildAuthUser(user), ...tokens };
 }
 
-export async function login({ email, password }) {
-  const user = await userRepository.findByEmail(email, true);
+export async function login({ identifier, email, password }) {
+  // Accept a username OR email. Body may be { identifier, password } (preferred)
+  // or the legacy { email, password } — the email value is used as the
+  // identifier when `identifier` is absent. Resolution is case-insensitive and
+  // matches either field (see userRepository.findByLogin).
+  const loginId = identifier != null && String(identifier).trim() !== '' ? identifier : email;
+  if (loginId == null || String(loginId).trim() === '') {
+    throw ApiError.unauthorized('Invalid credentials');
+  }
+
+  const user = await userRepository.findByLogin(loginId, true);
   if (!user) {
     throw ApiError.unauthorized('Invalid credentials');
   }

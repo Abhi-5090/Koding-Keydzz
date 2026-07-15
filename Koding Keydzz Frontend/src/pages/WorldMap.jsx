@@ -124,9 +124,9 @@ export default function WorldMap() {
                         <AnimatedIcon icon={Lock} size={28} animation="none" className="text-text-secondary" />
                       )}
                     </div>
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1">
                       <span className="text-xs text-text-secondary">World {w.order}</span>
-                      <h3 className="game-text text-lg font-bold" style={{ color: w.unlocked ? w.tint : '#9DB8C4' }}>
+                      <h3 className="game-text truncate text-lg font-bold" style={{ color: w.unlocked ? w.tint : '#9DB8C4' }}>
                         {w.name}
                       </h3>
                       {w.unlocked ? (

@@ -42,24 +42,26 @@ export default function OrgDetail() {
         emptyIcon={Building2}
       >
         <div className="k-card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-turmeric/20 text-turmeric shadow-glow">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-turmeric/20 text-turmeric shadow-glow">
               <AnimatedIcon icon={Building2} size={26} animation="pop" className="text-turmeric" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-heading text-2xl font-extrabold text-text-primary">
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <h1 className="truncate font-heading text-2xl font-extrabold text-text-primary">
                   {org.name}
                 </h1>
-                <OrgStatusBadge status={org.status} />
+                <span className="shrink-0">
+                  <OrgStatusBadge status={org.status} />
+                </span>
               </div>
-              <p className="mt-0.5 text-sm text-text-secondary/70">
+              <p className="mt-0.5 truncate text-sm text-text-secondary/70">
                 Code <span className="font-mono text-turmeric">{org.code || '—'}</span> · Admin{' '}
                 <span className="text-turmeric">{org.admin?.email || '—'}</span>
               </p>
             </div>
           </div>
-          <div className="rounded-2xl border border-k-border bg-malt/40 px-6 py-3 text-center">
+          <div className="shrink-0 rounded-2xl border border-k-border bg-malt/40 px-6 py-3 text-center">
             <p className="font-heading text-4xl font-extrabold text-turmeric">
               {Number(studentCount).toLocaleString()}
             </p>

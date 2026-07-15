@@ -180,7 +180,7 @@ function AchievementCard({ a, i }) {
           <p className="text-xs text-text-secondary">{a.desc}</p>
         </div>
         {unlocked && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-turmeric/50 bg-turmeric/10 px-2 py-0.5 text-[10px] font-bold uppercase text-turmeric game-text">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-turmeric/50 bg-turmeric/10 px-2 py-0.5 text-[10px] font-bold uppercase text-turmeric game-text">
             <Trophy size={11} /> Earned
           </span>
         )}

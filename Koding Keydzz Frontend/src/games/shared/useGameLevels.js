@@ -97,6 +97,11 @@ export default function useGameLevels(gameKey, levels = []) {
   return {
     progress,
     bestStars,
+    // recordStars(levelId, stars) -> persists the local best only (keeps the
+    // max), WITHOUT calling the backend. Use this when a play screen already
+    // performs its own reward award via gameKey (e.g. the shared code-writing
+    // PlayScreen). completeLevel bundles both; recordStars is the local half.
+    recordStars: recordLocal,
     isUnlocked,
     totalStars,
     completedCount,

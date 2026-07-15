@@ -251,14 +251,14 @@ export default function Quizzes() {
             className="k-card p-5"
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-turmeric/15 p-2.5 text-turmeric">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="shrink-0 rounded-xl bg-turmeric/15 p-2.5 text-turmeric">
                   <HelpCircle size={20} />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-heading font-bold text-text-primary">{quiz.title}</h3>
-                    <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h3 className="truncate font-heading font-bold text-text-primary">{quiz.title}</h3>
+                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold ${
                       quiz.published ? 'border-success/30 bg-success/15 text-success' : 'border-k-border bg-malt text-text-secondary/70'
                     }`}>
                       {quiz.published ? 'Published' : 'Draft'}
@@ -267,7 +267,7 @@ export default function Quizzes() {
                   <p className="mt-1 text-sm text-text-secondary/70">{quiz.description}</p>
                 </div>
               </div>
-              <div className="flex gap-1">
+              <div className="flex shrink-0 gap-1">
                 <button onClick={() => { setFormError(''); setModal({ mode: 'edit', data: { ...quiz, questions: quiz.questions || [] } }); }} className="rounded-lg p-1.5 text-text-secondary hover:text-turmeric">
                   <Pencil size={16} />
                 </button>

@@ -1,5 +1,6 @@
 import { BaseRepository } from './BaseRepository.js';
 import { User } from '../models/User.js';
+import { buildLoginFilter, normalizeIdentifier } from '../utils/username.js';
 
 class UserRepository extends BaseRepository {
   constructor() {
@@ -10,6 +11,26 @@ class UserRepository extends BaseRepository {
     const query = this.model.findOne({ email: String(email).toLowerCase() });
     if (withSecrets) query.select('+passwordHash +refreshTokenHash');
     return query;
+  }
+
+  findByUsername(username, withSecrets = false) {
+    const query = this.model.findOne({ username: normalizeIdentifier(username) });
+    if (withSecrets) query.select('+passwordHash +refreshTokenHash');
+    return query;
+  }
+
+  // Resolve a login identifier that may be EITHER an email OR a username
+  // (case-insensitive). Used by the /auth/login flow.
+  findByLogin(identifier, withSecrets = false) {
+    const query = this.model.findOne(buildLoginFilter(identifier));
+    if (withSecrets) query.select('+passwordHash +refreshTokenHash');
+    return query;
+  }
+
+  // Cheap existence check used by the username generator (batch + single create).
+  async existsByUsername(username) {
+    const doc = await this.model.exists({ username: normalizeIdentifier(username) });
+    return !!doc;
   }
 
   findByIdWithSecrets(id) {
@@ -68,6 +89,7 @@ class UserRepository extends BaseRepository {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } },
         { school: { $regex: search, $options: 'i' } },
       ];
     }

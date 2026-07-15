@@ -40,7 +40,7 @@ export default function Button({
         transition:
           'background-color 140ms cubic-bezier(0.23,1,0.32,1), border-color 140ms cubic-bezier(0.23,1,0.32,1), color 140ms cubic-bezier(0.23,1,0.32,1)',
       }}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl
+      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl
         disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >

@@ -105,9 +105,9 @@ export default function Challenges() {
       key: 'title',
       header: 'Challenge',
       render: (r) => (
-        <div>
-          <p className="font-medium text-text-primary">{r.title}</p>
-          <p className="max-w-xs truncate text-xs text-text-secondary/60">{r.description}</p>
+        <div className="min-w-0 max-w-xs">
+          <p className="truncate font-medium text-text-primary">{r.title}</p>
+          <p className="truncate text-xs text-text-secondary/60">{r.description}</p>
         </div>
       ),
     },

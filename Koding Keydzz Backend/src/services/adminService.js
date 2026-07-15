@@ -79,6 +79,7 @@ export async function listStudents({ search = '', page = 1, limit = 20, org = nu
     countFilter.$or = [
       { name: { $regex: search, $options: 'i' } },
       { email: { $regex: search, $options: 'i' } },
+      { username: { $regex: search, $options: 'i' } },
       { school: { $regex: search, $options: 'i' } },
     ];
   }
@@ -121,7 +122,12 @@ export async function resetStudentPassword(id, password = null, org = null) {
   user.refreshTokenHash = null; // invalidate the student's existing session
   await user.save();
   return {
-    student: { id: String(user._id), name: user.name, email: user.email },
+    student: {
+      id: String(user._id),
+      name: user.name,
+      email: user.email,
+      username: user.username,
+    },
     password: finalPassword,
   };
 }

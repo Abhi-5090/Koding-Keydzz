@@ -30,6 +30,10 @@ import { formatMs } from '../../games/shared/useLevelTimer'
  *   hasNext         boolean
  *   onNext, onReplay, onLevels
  *   confettiKey?    string (change to re-fire the burst)
+ *   confetti?       boolean  (default true) — fire the celebratory burst. Pass
+ *                   false for non-celebratory outcomes (e.g. a loss/draw).
+ *   title?          string   override the star-derived heading (e.g. "You Win!").
+ *   tone?           'good'|'neutral'  heading color (default 'good' = turmeric).
  */
 export default function LevelWinOverlay({
   stars,
@@ -48,12 +52,15 @@ export default function LevelWinOverlay({
   onReplay,
   onLevels,
   confettiKey = 'level-win',
+  confetti = true,
+  title,
+  tone = 'good',
 }) {
   const hasRun = Number.isFinite(runTime) || Number.isFinite(runMoves)
   const showBoard = Boolean(gameKey) && levelId != null
   return (
     <>
-      <Confetti key={confettiKey} pieces={120} />
+      {confetti && <Confetti key={confettiKey} pieces={120} />}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -96,8 +103,12 @@ export default function LevelWinOverlay({
             })}
           </div>
 
-          <h2 className="game-text text-2xl font-extrabold text-turmeric">
-            {stars === 3 ? 'Perfect!' : stars === 2 ? 'Nice work!' : 'Solved!'}
+          <h2
+            className={`game-text text-2xl font-extrabold ${
+              tone === 'neutral' ? 'text-text-primary' : 'text-turmeric'
+            }`}
+          >
+            {title ?? (stars === 3 ? 'Perfect!' : stars === 2 ? 'Nice work!' : 'Solved!')}
           </h2>
           {message && (
             <p className="game-text mx-auto mt-2 max-w-[20rem] text-sm text-text-secondary">

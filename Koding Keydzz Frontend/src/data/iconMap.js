@@ -17,6 +17,8 @@ import {
   Crown,
   Layers,
   Waypoints,
+  Hash,
+  LayoutGrid,
 } from 'lucide-react'
 
 // Per-world icons keyed by backend slug.
@@ -39,10 +41,12 @@ export const GAME_ICONS = {
   'space-adventure': Rocket,
   'battle-arena': Swords,
   'logic-puzzle': Castle,
+  'tic-tac-toe': Hash,
   sudoku: Grid3x3,
   'n-queens': Crown,
   'towers-of-hanoi': Layers,
   zip: Waypoints,
+  patches: LayoutGrid,
 }
 
 export const gameIcon = (slug) => GAME_ICONS[slug] || Gamepad2

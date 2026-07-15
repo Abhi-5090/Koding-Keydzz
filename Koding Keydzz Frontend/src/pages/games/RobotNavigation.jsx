@@ -8,19 +8,24 @@ import levels from '../../data/robotLevels'
 import useGameLevels from '../../games/shared/useGameLevels'
 import LevelSelectGrid from '../../components/games/LevelSelectGrid'
 import GameLeaderboard from '../../components/games/GameLeaderboard'
-import RobotPlayScreen from './robot/RobotPlayScreen'
+import PlayScreen from './maze/PlayScreen'
 
 const GAME_KEY = 'robot-navigation'
+const HELP_SEEN_KEY = 'kk_robot_help_seen'
 const game = getGame(GAME_KEY)
 
 /**
- * Robot Navigation — 18-level real-time power-of-two jump puzzle. Tap arrows to
- * jump one move at a time; ×2 / ÷2 tiles change jump power. Level select ->
- * play -> win -> next. Progress + rewards persist via useGameLevels
- * (localStorage best stars + POST /games/complete).
+ * Robot Navigation — 16-level code-writing puzzle. The student writes real
+ * Python (up()/down()/left()/right() plus for-loops) that compiles into the
+ * robot's move sequence, guiding it to the charging pad / delivery point. It
+ * shares the code-writing PlayScreen with Maze Coding (same maze engine +
+ * pythonParser + board — all grid-agnostic), differing only in level data and
+ * copy. Level select -> play -> win -> next. Progress + rewards persist via
+ * useGameLevels (localStorage best stars) and the PlayScreen's own backend
+ * award (POST /games/complete with gameKey 'robot-navigation').
  */
 export default function RobotNavigation() {
-  const { progress, isUnlocked, completeLevel } = useGameLevels(GAME_KEY, levels)
+  const { progress, isUnlocked, recordStars } = useGameLevels(GAME_KEY, levels)
   const [activeId, setActiveId] = useState(null)
   const [showBoard, setShowBoard] = useState(false)
   const tint = game?.tint || '#FF602F'
@@ -75,13 +80,15 @@ export default function RobotNavigation() {
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
             >
-              <RobotPlayScreen
+              <PlayScreen
                 level={activeLevel}
-                onExit={goToLevels}
+                onBack={goToLevels}
                 onNext={goToNext}
                 hasNext={hasNext}
-                completeLevel={completeLevel}
+                recordStars={recordStars}
                 gameKey={GAME_KEY}
+                title="Robot Navigation"
+                helpSeenKey={HELP_SEEN_KEY}
               />
             </motion.div>
           ) : showBoard ? (

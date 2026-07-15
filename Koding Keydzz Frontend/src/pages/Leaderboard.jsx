@@ -130,7 +130,7 @@ export default function Leaderboard() {
                   className="flex w-24 flex-col items-center sm:w-28"
                 >
                   <span className="mb-1 text-3xl">{p.emoji}</span>
-                  <span className="game-text mb-2 text-center text-xs font-bold text-text-secondary">{p.name}</span>
+                  <span className="game-text mb-2 max-w-full truncate text-center text-xs font-bold text-text-secondary">{p.name}</span>
                   <div className={`flex w-full ${heights[place]} flex-col items-center justify-start rounded-t-2xl border border-k-border bg-gradient-to-b from-surface to-card pt-3 ${place === 1 ? 'shadow-golden-glow' : ''}`}>
                     {medal && (
                       <AnimatedIcon
@@ -163,14 +163,16 @@ export default function Leaderboard() {
                     whileHover={{ x: 4 }}
                     className={`flex items-center gap-4 py-3 ${p.isMe ? 'rounded-xl bg-turmeric/10 px-3' : ''}`}
                   >
-                    <span className="game-text w-8 text-center font-bold text-text-secondary">#{p.rank}</span>
-                    <span className="text-2xl">{p.emoji}</span>
-                    <div className="flex-1">
-                      <span className="game-text font-semibold">{p.name}</span>
-                      {p.isMe && <span className="ml-2 rounded-full bg-turmeric px-2 py-0.5 text-[10px] font-bold text-malt">YOU</span>}
+                    <span className="game-text w-8 shrink-0 text-center font-bold text-text-secondary tabular-nums">#{p.rank}</span>
+                    <span className="shrink-0 text-2xl">{p.emoji}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="game-text min-w-0 truncate font-semibold">{p.name}</span>
+                        {p.isMe && <span className="shrink-0 rounded-full bg-turmeric px-2 py-0.5 text-[10px] font-bold text-malt">YOU</span>}
+                      </div>
                       <p className="text-xs text-text-secondary">Level {p.level}</p>
                     </div>
-                    <span className="game-text font-bold text-turmeric">{(p.xp ?? 0).toLocaleString()} XP</span>
+                    <span className="game-text shrink-0 whitespace-nowrap font-bold text-turmeric tabular-nums">{(p.xp ?? 0).toLocaleString()} XP</span>
                   </motion.li>
                 ))}
               </ul>

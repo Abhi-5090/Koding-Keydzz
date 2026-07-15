@@ -373,6 +373,7 @@ export async function listAllStudents({ search = '', org = null, page = 1, limit
     filter.$or = [
       { name: { $regex: search, $options: 'i' } },
       { email: { $regex: search, $options: 'i' } },
+      { username: { $regex: search, $options: 'i' } },
     ];
   }
 

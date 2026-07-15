@@ -150,11 +150,11 @@ export default function Dashboard() {
                     animation={c.difficulty === 'hard' ? 'pulse' : 'float'}
                     className={c.difficulty === 'hard' ? 'text-error' : c.difficulty === 'medium' ? 'text-text-secondary' : 'text-turmeric'}
                   />
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <p className="game-text font-semibold">{c.title}</p>
                     {c.description && <p className="text-xs text-text-secondary">{c.description}</p>}
                   </div>
-                  <span className="game-text flex items-center gap-1 font-bold text-turmeric">
+                  <span className="game-text flex shrink-0 items-center gap-1 font-bold text-turmeric tabular-nums">
                     +{c.coinReward ?? 0}
                     <AnimatedIcon icon={Coins} size={16} animation="none" className="text-turmeric" />
                   </span>
@@ -224,14 +224,16 @@ export default function Dashboard() {
             <div className="space-y-3">
               {worldProgress.slice(0, 3).map((w) => (
                 <div key={w.id} className="flex items-center gap-3">
-                  <AnimatedIcon icon={w.icon} size={24} animation="float" style={{ color: w.tint }} />
-                  <div className="flex-1">
-                    <p className="game-text text-sm" style={{ color: w.tint }}>{w.name}</p>
+                  <span className="shrink-0">
+                    <AnimatedIcon icon={w.icon} size={24} animation="float" style={{ color: w.tint }} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="game-text truncate text-sm" style={{ color: w.tint }}>{w.name}</p>
                     <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-malt">
                       <div className="h-full rounded-full bg-turmeric" style={{ width: `${w.percent ?? 0}%` }} />
                     </div>
                   </div>
-                  <span className="text-xs text-text-secondary">{w.percent ?? 0}%</span>
+                  <span className="shrink-0 text-xs text-text-secondary tabular-nums">{w.percent ?? 0}%</span>
                 </div>
               ))}
             </div>

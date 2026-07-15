@@ -193,12 +193,12 @@ function Row({ entry, index, isLevel, isMe, emoji, tint, compact }) {
 
       <span className={compact ? 'text-lg' : 'text-2xl'}>{emoji}</span>
 
-      <div className="min-w-0 flex-1">
-        <span className="game-text truncate text-sm font-semibold text-text-primary">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="game-text min-w-0 truncate text-sm font-semibold text-text-primary">
           {entry.name || 'Player'}
         </span>
         {isMe && (
-          <span className="ml-2 rounded-full bg-turmeric px-1.5 py-0.5 text-[9px] font-bold text-malt">
+          <span className="shrink-0 rounded-full bg-turmeric px-1.5 py-0.5 text-[9px] font-bold leading-none text-malt">
             YOU
           </span>
         )}

@@ -126,13 +126,13 @@ export default function Avatar() {
                   return (
                     <div
                       key={s.key}
-                      className="flex items-center justify-between rounded-lg border border-k-border bg-surface/40 px-3 py-1.5"
+                      className="flex items-center justify-between gap-2 rounded-lg border border-k-border bg-surface/40 px-3 py-1.5"
                     >
-                      <span className="game-text inline-flex items-center gap-1.5 text-text-secondary">
+                      <span className="game-text inline-flex shrink-0 items-center gap-1.5 text-text-secondary">
                         {SLOT_ICON[s.key] && <AnimatedIcon icon={SLOT_ICON[s.key]} size={15} className="text-text-secondary" animation="none" />}
                         {s.label}
                       </span>
-                      <span className="game-text text-turmeric">
+                      <span className="game-text min-w-0 truncate text-right text-turmeric">
                         {it ? `${it.icon} ${it.name}` : '—'}
                       </span>
                     </div>

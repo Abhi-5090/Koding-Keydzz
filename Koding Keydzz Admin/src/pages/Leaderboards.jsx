@@ -87,11 +87,11 @@ export default function Leaderboards() {
       key: 'name',
       header: 'Student',
       render: (r) => (
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-turmeric/15 text-sm font-bold text-turmeric">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-turmeric/15 text-sm font-bold text-turmeric">
             {(r.name || '?').charAt(0)}
           </div>
-          <span className="font-medium text-text-primary">{r.name || '—'}</span>
+          <span className="block max-w-[220px] truncate font-medium text-text-primary">{r.name || '—'}</span>
         </div>
       ),
     },

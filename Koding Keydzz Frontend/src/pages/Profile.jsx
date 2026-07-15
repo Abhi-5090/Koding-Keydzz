@@ -117,9 +117,9 @@ export default function Profile() {
             <div className="space-y-3">
               {worldProgress.slice(0, 5).map((w) => (
                 <div key={w.id}>
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span className="game-text" style={{ color: w.tint }}>{w.emoji} {w.name}</span>
-                    <span className="text-text-secondary">{w.percent ?? 0}%</span>
+                  <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                    <span className="game-text min-w-0 truncate" style={{ color: w.tint }}>{w.emoji} {w.name}</span>
+                    <span className="shrink-0 text-text-secondary tabular-nums">{w.percent ?? 0}%</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-malt">
                     <div className="h-full rounded-full" style={{ width: `${w.percent ?? 0}%`, background: w.tint }} />

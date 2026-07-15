@@ -164,6 +164,30 @@ h1, h2, h3, h4, h5, h6 {
   animation: confetti-fall linear forwards;
 }
 
+/* Session-complete prompt glow. Colour comes from `--glow-color` (set inline to
+   the world tint). The base rule paints a steady glow; the pulse variant gently
+   breathes it. Under prefers-reduced-motion the pulse is dropped (below) so only
+   the steady glow remains. */
+@keyframes session-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px var(--glow-color, rgba(255, 96, 47, 0.4));
+    text-shadow: 0 0 6px var(--glow-color, rgba(255, 96, 47, 0.4));
+  }
+  50% {
+    box-shadow: 0 0 20px var(--glow-color, rgba(255, 96, 47, 0.85));
+    text-shadow: 0 0 12px var(--glow-color, rgba(255, 96, 47, 0.85));
+  }
+}
+
+.session-glow {
+  box-shadow: 0 0 12px var(--glow-color, rgba(255, 96, 47, 0.55));
+  text-shadow: 0 0 8px var(--glow-color, rgba(255, 96, 47, 0.55));
+}
+
+.session-glow-pulse {
+  animation: session-glow-pulse 2.2s var(--ease-out) infinite;
+}
+
 /* Monaco container fix */
 .monaco-editor, .monaco-editor .overflow-guard {
   border-radius: 12px;
@@ -190,7 +214,8 @@ h1, h2, h3, h4, h5, h6 {
   .animate-pulse-glow,
   .animate-spin-slow,
   .animate-wiggle,
-  .animate-confetti {
+  .animate-confetti,
+  .session-glow-pulse {
     animation: none !important;
   }
 

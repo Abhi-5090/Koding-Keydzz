@@ -17,7 +17,9 @@ import { bulkUploadStudents, downloadTemplate, downloadBlob } from '../../featur
 
 // The Excel template carries only student attributes. The common password is a
 // separate UI field (applied to every student), NOT a spreadsheet column.
-const TEMPLATE_COLUMNS = ['firstName', 'lastName', 'email', 'phone'];
+// email + username are OPTIONAL — the server auto-generates a unique username
+// when the column is blank. The kids log in with their username, not email.
+const TEMPLATE_COLUMNS = ['firstName', 'lastName', 'email', 'phone', 'username'];
 const ACCEPT = '.xlsx,.xls,.csv';
 
 // Map a few common header spellings (case / spacing) to our canonical keys so
@@ -31,6 +33,9 @@ const HEADER_ALIASES = {
   'e-mail': 'email',
   phone: 'phone',
   mobile: 'phone',
+  username: 'username',
+  'user name': 'username',
+  login: 'username',
 };
 
 function cell(row, key) {
@@ -192,11 +197,17 @@ export default function BulkUploadModal({
   const displayName = (c) =>
     c.name || [c.firstName, c.lastName].filter(Boolean).join(' ').trim();
 
+  // Email / phone columns only appear when at least one created student has them.
+  const createdHasEmail = (result?.created || []).some((c) => c.email);
+  const createdHasPhone = (result?.created || []).some((c) => c.phone);
+
+  // Username is the login id, so it leads the credentials sheet.
   const credentialsCsv = () => {
     if (!result?.created?.length) return '';
-    const header = 'name,email,phone,password';
+    const header = 'name,username,password,email,phone';
     const lines = result.created.map(
-      (c) => `${displayName(c)},${c.email ?? ''},${c.phone ?? ''},${c.password ?? password ?? ''}`
+      (c) =>
+        `${displayName(c)},${c.username ?? ''},${c.password ?? password ?? ''},${c.email ?? ''},${c.phone ?? ''}`
     );
     return [header, ...lines].join('\n');
   };
@@ -220,7 +231,8 @@ export default function BulkUploadModal({
             <div>
               <p className="text-sm font-semibold text-text-primary">1. Download the template</p>
               <p className="text-xs text-text-secondary/70">
-                Columns: {TEMPLATE_COLUMNS.join(', ')} · each student logs in with their email
+                Columns: {TEMPLATE_COLUMNS.join(', ')} · email &amp; username are optional
+                (a username is auto-generated when left blank)
               </p>
             </div>
             <Button variant="secondary" icon={Download} onClick={handleDownloadTemplate}>
@@ -241,12 +253,13 @@ export default function BulkUploadModal({
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 6 characters"
                 aria-label="Common password for all students"
-                className="k-input"
+                className="k-input min-w-0"
               />
-              <Button type="button" size="sm" variant="secondary" onClick={() => setShowPw((s) => !s)}>
+              <Button className="shrink-0" type="button" size="sm" variant="secondary" onClick={() => setShowPw((s) => !s)}>
                 {showPw ? 'Hide' : 'Show'}
               </Button>
               <Button
+                className="shrink-0"
                 type="button"
                 size="sm"
                 variant="outline"
@@ -261,7 +274,8 @@ export default function BulkUploadModal({
             </div>
             <p className="mt-1.5 text-xs text-text-secondary/70">
               Every student in this file is created with this same password. They each log in using
-              their <span className="font-semibold text-turmeric">email</span> as the username.
+              their <span className="font-semibold text-turmeric">username</span> (auto-generated when
+              the column is blank).
             </p>
             {password && !passwordValid && (
               <p className="mt-1 text-xs text-error">Password must be at least 6 characters.</p>
@@ -379,8 +393,14 @@ export default function BulkUploadModal({
           {result.created?.length > 0 && (
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-semibold text-text-primary">Created students</p>
-                <div className="flex items-center gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-text-primary">Created students</p>
+                  <p className="text-xs text-text-secondary/70">
+                    Each student logs in with their{' '}
+                    <span className="font-semibold text-turmeric">username</span>.
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
                   <Button size="sm" variant="secondary" icon={copied ? Check : Copy} onClick={copyCredentials}>
                     {copied ? 'Copied' : 'Copy'}
                   </Button>
@@ -394,18 +414,30 @@ export default function BulkUploadModal({
                   <thead className="sticky top-0 bg-malt/80 text-text-secondary">
                     <tr>
                       <th className="px-3 py-2 font-semibold">Name</th>
-                      <th className="px-3 py-2 font-semibold">Email</th>
-                      <th className="px-3 py-2 font-semibold">Phone</th>
+                      <th className="px-3 py-2 font-semibold">Username</th>
                       <th className="px-3 py-2 font-semibold">Password</th>
+                      {createdHasEmail && <th className="px-3 py-2 font-semibold">Email</th>}
+                      {createdHasPhone && <th className="px-3 py-2 font-semibold">Phone</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {result.created.map((c, i) => (
                       <tr key={i} className="border-t border-k-border/50">
-                        <td className="px-3 py-2 text-text-primary">{displayName(c)}</td>
-                        <td className="px-3 py-2 text-text-secondary">{c.email}</td>
-                        <td className="px-3 py-2 text-text-secondary">{c.phone || '—'}</td>
+                        <td className="max-w-[160px] truncate px-3 py-2 text-text-primary" title={displayName(c)}>
+                          {displayName(c)}
+                        </td>
+                        <td className="max-w-[140px] truncate px-3 py-2 font-mono font-semibold text-turmeric" title={c.username || ''}>
+                          {c.username || '—'}
+                        </td>
                         <td className="px-3 py-2 font-mono text-turmeric">{c.password || password}</td>
+                        {createdHasEmail && (
+                          <td className="max-w-[180px] truncate px-3 py-2 text-text-secondary" title={c.email || ''}>
+                            {c.email || '—'}
+                          </td>
+                        )}
+                        {createdHasPhone && (
+                          <td className="px-3 py-2 text-text-secondary">{c.phone || '—'}</td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

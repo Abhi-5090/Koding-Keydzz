@@ -48,15 +48,15 @@ export default function HowToPlayModal({ open, onClose, title, tint = '#FF602F',
             style={{ borderColor: `${tint}66` }}
           >
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="game-text flex items-center gap-2 text-xl font-extrabold text-text-primary">
-                <HelpCircle size={22} style={{ color: tint }} />
-                {title}
+              <h2 className="game-text flex min-w-0 items-center gap-2 text-xl font-extrabold text-text-primary">
+                <HelpCircle size={22} style={{ color: tint }} className="shrink-0" />
+                <span className="min-w-0 truncate">{title}</span>
               </h2>
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close how to play"
-                className="rounded-lg border border-k-border bg-surface/60 p-1.5 text-text-secondary transition-colors can-hover:hover:text-turmeric"
+                className="shrink-0 rounded-lg border border-k-border bg-surface/60 p-1.5 text-text-secondary transition-colors can-hover:hover:text-turmeric"
               >
                 <X size={18} />
               </button>

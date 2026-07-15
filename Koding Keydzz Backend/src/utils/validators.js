@@ -14,10 +14,21 @@ export const registerStudentSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters').max(128),
 });
 
-export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1, 'Password is required'),
-});
+// Login accepts a username OR email via `identifier` (preferred), and remains
+// backward-compatible with the legacy `{ email, password }` body. Lenient: the
+// identifier is not forced to look like an email (students log in by username).
+export const loginSchema = z
+  .object({
+    identifier: z.string().min(1).max(320).optional(),
+    email: z.string().min(1).max(320).optional(),
+    password: z.string().min(1, 'Password is required'),
+  })
+  .refine(
+    (d) =>
+      (d.identifier != null && d.identifier.trim() !== '') ||
+      (d.email != null && d.email.trim() !== ''),
+    { message: 'A username or email is required', path: ['identifier'] }
+  );
 
 export const refreshSchema = z.object({
   refreshToken: z.string().min(10, 'Refresh token is required'),
@@ -130,11 +141,28 @@ export const updateOrgAdminSchema = z
 
 /* ---- Admin student management schemas ---- */
 
+// Empty-string form fields are coerced to `undefined` so an omitted (blank)
+// email/username doesn't trip the format checks — they are simply absent.
+const blankToUndefined = (v) =>
+  v === '' || v == null ? undefined : v;
+
 export const createStudentSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(80),
   lastName: z.string().max(80).optional().default(''),
-  email: z.string().email(),
+  // Email is now OPTIONAL (young students may have none).
+  email: z.preprocess(blankToUndefined, z.string().email().optional()),
   phone: z.string().max(40).optional().default(''),
+  // Username is OPTIONAL — auto-generated from the name when omitted.
+  username: z.preprocess(
+    blankToUndefined,
+    z
+      .string()
+      .trim()
+      .min(3, 'Username must be at least 3 characters')
+      .max(30)
+      .regex(/^[a-z0-9._-]+$/i, 'Username may use letters, digits, . _ -')
+      .optional()
+  ),
   password: z.string().min(6, 'Password must be at least 6 characters').max(128).optional(),
 });
 

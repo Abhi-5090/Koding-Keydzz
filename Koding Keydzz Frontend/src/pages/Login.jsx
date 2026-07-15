@@ -14,7 +14,7 @@ export default function Login() {
   const location = useLocation()
   const [login, { isLoading }] = useLoginMutation()
 
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [form, setForm] = useState({ identifier: '', password: '' })
   const [error, setError] = useState('')
 
   const from = location.state?.from?.pathname || '/dashboard'
@@ -25,13 +25,13 @@ export default function Login() {
     e.preventDefault()
     setError('')
     try {
-      await login(form).unwrap()
+      await login({ identifier: form.identifier.trim(), password: form.password }).unwrap()
       navigate(from, { replace: true })
     } catch (err) {
       if (err?.status === 'FETCH_ERROR') {
         setError('Could not reach the server. Please try again shortly.')
       } else {
-        setError(err?.data?.message || 'Invalid email or password.')
+        setError(err?.data?.message || 'Invalid username or password.')
       }
     }
   }
@@ -66,7 +66,18 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="Email" name="email" type="email" value={form.email} onChange={handleChange} placeholder="hero@example.com" />
+            <Field
+              label="Username or Email"
+              name="identifier"
+              type="text"
+              value={form.identifier}
+              onChange={handleChange}
+              placeholder="your username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="username"
+            />
             <Field label="Password" name="password" type="password" value={form.password} onChange={handleChange} placeholder="••••••••" />
 
             <Button type="submit" size="lg" disabled={isLoading} className="w-full">

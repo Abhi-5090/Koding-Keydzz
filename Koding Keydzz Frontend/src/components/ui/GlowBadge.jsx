@@ -31,7 +31,7 @@ export default function GlowBadge({
       ) : (
         <span className={`text-4xl ${earned ? 'animate-float' : ''}`}>{icon}</span>
       )}
-      <span className="game-text text-sm font-semibold text-text-primary">{label}</span>
+      <span className="game-text w-full break-words text-sm font-semibold leading-tight text-text-primary">{label}</span>
       <span className="text-[10px] uppercase tracking-wider">{rarity}</span>
     </motion.div>
   )

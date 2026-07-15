@@ -13,6 +13,7 @@ import {
 import CodeReveal from './CodeReveal'
 import TryItEditor from './TryItEditor'
 import Confetti from '../ui/Confetti'
+import { isTopicComplete } from '../../features/lessons/lessonProgress'
 
 const EASE_OUT = [0.23, 1, 0.32, 1]
 
@@ -39,12 +40,15 @@ const EASE_OUT = [0.23, 1, 0.32, 1]
  *   tint              world accent colour
  *   lesson            the authored lesson object (may be null → graceful stub)
  *   layoutId          shared-element id matching the originating card
+ *   onComplete(topic) fired on "Got it!" — parent marks the session complete
  *   onClose()         close handler (parent unmounts via AnimatePresence)
  */
-export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson, layoutId, onClose }) {
+export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson, layoutId, onComplete, onClose }) {
   const reduce = useReducedMotion()
   const [guideStep, setGuideStep] = useState(1)
   const [celebrate, setCelebrate] = useState(false)
+  // Was this session already completed before opening? (Re-reading is harmless.)
+  const [alreadyComplete] = useState(() => isTopicComplete(slug, topic))
 
   // Graceful fallback if a topic has no authored lesson yet.
   const data = lesson || {
@@ -77,6 +81,9 @@ export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson
   }, [onClose])
 
   const handleGotIt = () => {
+    // Finishing the guide via "Got it!" completes the session: notify the
+    // parent (which persists + flips the card's status tag) then celebrate.
+    if (onComplete) onComplete(topic)
     setCelebrate(true)
     window.setTimeout(onClose, reduce ? 0 : 1300)
   }
@@ -149,6 +156,15 @@ export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson
                 {data.title}
               </h2>
               <p className="game-text mt-1 text-base text-text-primary/90">{data.tagline}</p>
+              {alreadyComplete && (
+                <span
+                  className="game-text mt-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
+                  style={{ borderColor: `${tint}66`, background: `${tint}18`, color: tint }}
+                >
+                  <CheckCircle2 size={13} />
+                  Session Completed
+                </span>
+              )}
               <div className="mt-4 h-1 w-24 rounded-full" style={{ background: tint }} />
             </div>
 
@@ -211,10 +227,26 @@ export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson
               {/* COMPLETE LEARNING GUIDE (progressive) */}
               {guide.length > 0 && (
                 <div className="rounded-2xl border border-k-border bg-surface/30 p-5" style={{ borderColor: `${tint}40` }}>
-                  <h3 className="game-text mb-4 flex items-center gap-2 text-lg font-bold text-text-primary">
-                    <ListChecks size={18} style={{ color: tint }} />
-                    Complete Learning Guide
-                  </h3>
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <h3 className="game-text flex min-w-0 items-center gap-2 text-lg font-bold text-text-primary">
+                      <ListChecks size={18} className="shrink-0" style={{ color: tint }} />
+                      Complete Learning Guide
+                    </h3>
+
+                    {/* Glowing prompt (top-right): read the whole guide to finish
+                        the session. Steady glow always; gentle pulse unless the
+                        user prefers reduced motion (handled in index.css). Hidden
+                        once the guide is complete — the "Got it!" button takes over. */}
+                    {!guideComplete && (
+                      <span
+                        className={`game-text session-glow shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold ${reduce ? '' : 'session-glow-pulse'}`}
+                        style={{ '--glow-color': `${tint}99`, borderColor: tint, color: tint, background: `${tint}14` }}
+                      >
+                        Read the full guide to complete this session — tap Continue
+                        <ArrowRight size={12} className="shrink-0" />
+                      </span>
+                    )}
+                  </div>
 
                   <ol className="space-y-3">
                     {guide.slice(0, guideStep).map((g, i) => (

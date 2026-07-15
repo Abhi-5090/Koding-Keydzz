@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Lock, Sparkles, Play, Gamepad2, Brain, ScrollText, GraduationCap, BookOpen } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Lock, Sparkles, Play, Gamepad2, Brain, ScrollText, GraduationCap, BookOpen, CheckCircle2, Circle, Map } from 'lucide-react'
 import { useGetWorldsQuery, useGetDashboardQuery } from '../features/student/studentApi'
 import { worldIcon } from '../data/iconMap'
 import { worldTheme, buildLearnList } from '../data/worldThemes'
 import { getLesson, normalizeTopic } from '../data/lessons'
+import { isTopicComplete, markTopicComplete } from '../features/lessons/lessonProgress'
 import PageTransition from '../components/layout/PageTransition'
 import Button from '../components/ui/Button'
 import AnimatedIcon from '../components/ui/AnimatedIcon'
@@ -70,12 +71,37 @@ export default function WorldDetail() {
   // the fly-to-center animation to the exact card that was tapped.
   const [activeTopic, setActiveTopic] = useState(null)
 
+  // Completed sessions for THIS world, as a Set of NORMALISED topic keys.
+  // Seeded from persisted lesson progress; flips live when a lesson finishes.
+  const [completed, setCompleted] = useState(() => new Set())
+
   const playerLevel = dash?.level ?? 1
 
   const world = useMemo(
     () => (rawWorlds || []).find((w) => w.slug === slug) || null,
     [rawWorlds, slug]
   )
+
+  // Seed / re-seed the completed set from storage whenever the world changes.
+  useEffect(() => {
+    if (!world) return
+    const done = new Set()
+    ;(world.topics || []).forEach((t) => {
+      if (isTopicComplete(world.slug, t)) done.add(normalizeTopic(t))
+    })
+    setCompleted(done)
+  }, [world])
+
+  // Called when a lesson is completed in the modal: persist + flip the tag live.
+  const handleTopicComplete = (topic) => {
+    if (!world) return
+    markTopicComplete(world.slug, topic)
+    setCompleted((prev) => {
+      const next = new Set(prev)
+      next.add(normalizeTopic(topic))
+      return next
+    })
+  }
 
   if (isLoading) {
     return (
@@ -114,6 +140,15 @@ export default function WorldDetail() {
   const requiredLevel = world.requiredLevel ?? 1
   const locked = playerLevel < requiredLevel
   const learnList = buildLearnList(world.slug, world.topics)
+
+  // Live "X / N sessions completed" for this world's mastery topics.
+  const completedCount = learnList.filter((it) => completed.has(normalizeTopic(it.topic))).length
+
+  // Next world in the coding journey, by `order` from GET /worlds. When this is
+  // the last world, there is no next → the button falls back to the World Map.
+  const sortedWorlds = [...(rawWorlds || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  const curIdx = sortedWorlds.findIndex((w) => w.slug === world.slug)
+  const nextWorld = curIdx >= 0 ? sortedWorlds[curIdx + 1] || null : null
 
   const BackButton = (
     <button
@@ -199,9 +234,24 @@ export default function WorldDetail() {
         <>
           {/* WHAT YOU'LL MASTER — the interactive centerpiece */}
           <section className="mt-10">
-            <div className="mb-2 flex items-center gap-2">
-              <AnimatedIcon icon={GraduationCap} size={22} animation="none" style={{ color: theme.tint }} />
-              <h2 className="font-heading text-2xl font-extrabold">What you'll master here</h2>
+            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <AnimatedIcon icon={GraduationCap} size={22} animation="none" style={{ color: theme.tint }} />
+                <h2 className="font-heading text-2xl font-extrabold">What you'll master here</h2>
+              </div>
+              {learnList.length > 0 && (
+                <span
+                  className="game-text shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
+                  style={{
+                    borderColor: `${theme.tint}55`,
+                    background: completedCount > 0 ? `${theme.tint}18` : 'transparent',
+                    color: completedCount > 0 ? theme.tint : undefined,
+                  }}
+                >
+                  <CheckCircle2 size={13} className="shrink-0" style={{ color: theme.tint }} />
+                  {completedCount} / {learnList.length} sessions completed
+                </span>
+              )}
             </div>
             <p className="game-text mb-5 text-sm text-text-secondary">Tap a topic to start learning — each one opens an interactive lesson.</p>
 
@@ -211,6 +261,7 @@ export default function WorldDetail() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {learnList.map((item, i) => {
                   const layoutId = `topic-${world.slug}-${normalizeTopic(item.topic)}`
+                  const isDone = completed.has(normalizeTopic(item.topic))
                   return (
                     <motion.button
                       type="button"
@@ -244,6 +295,25 @@ export default function WorldDetail() {
                         {item.topic}
                       </h3>
                       <p className="mt-1 text-sm text-text-secondary">{item.desc}</p>
+
+                      {/* STATUS TAG — flips to a glowing "Session Completed" pill
+                          the moment the lesson is finished (live, no reload). */}
+                      <div className="mt-4">
+                        {isDone ? (
+                          <span
+                            className="game-text session-glow inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
+                            style={{ '--glow-color': `${theme.tint}80`, borderColor: theme.tint, background: `${theme.tint}1f`, color: theme.tint }}
+                          >
+                            <CheckCircle2 size={13} className="shrink-0" />
+                            <span className="truncate">Session Completed</span>
+                          </span>
+                        ) : (
+                          <span className="game-text inline-flex max-w-full items-center gap-1.5 rounded-full border border-k-border px-3 py-1 text-xs font-semibold text-text-secondary">
+                            <Circle size={11} className="shrink-0" />
+                            <span className="truncate">Session Not Attended</span>
+                          </span>
+                        )}
+                      </div>
                     </motion.button>
                   )
                 })}
@@ -309,6 +379,28 @@ export default function WorldDetail() {
               <AnimatedIcon icon={Brain} size={18} animation="hover" />
               Take a Quiz
             </Button>
+
+            {/* ADVANCE — jump to the next world by `order`, or back to the map
+                when this is the final realm. Rightmost, tint-filled, distinct. */}
+            {nextWorld ? (
+              <Button
+                tint={theme.tint}
+                onClick={() => navigate(`/world/${nextWorld.slug}`)}
+                className="flex min-w-0 flex-1 items-center justify-center gap-2 sm:ml-auto sm:flex-none"
+              >
+                <span className="truncate">Continue to {nextWorld.name}</span>
+                <AnimatedIcon icon={ArrowRight} size={18} animation="hover" className="shrink-0" />
+              </Button>
+            ) : (
+              <Button
+                tint={theme.tint}
+                onClick={() => navigate('/map')}
+                className="flex min-w-0 flex-1 items-center justify-center gap-2 sm:ml-auto sm:flex-none"
+              >
+                <AnimatedIcon icon={Map} size={18} animation="hover" className="shrink-0" />
+                <span className="truncate">Back to World Map</span>
+              </Button>
+            )}
           </section>
         </>
       )}
@@ -323,6 +415,7 @@ export default function WorldDetail() {
             tint={theme.tint}
             lesson={getLesson(world.slug, activeTopic)}
             layoutId={`topic-${world.slug}-${normalizeTopic(activeTopic)}`}
+            onComplete={handleTopicComplete}
             onClose={() => setActiveTopic(null)}
           />
         )}

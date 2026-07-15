@@ -159,7 +159,7 @@ Errors:
 | Method | Path | Auth | Body | Returns |
 | --- | --- | --- | --- | --- |
 | POST | `/auth/register/student` | – | `{ name, grade, school, email, password }` | `{ user, accessToken, refreshToken }` |
-| POST | `/auth/login` | – | `{ email, password }` | `{ user, accessToken, refreshToken }` |
+| POST | `/auth/login` | – | `{ identifier, password }` (identifier = **username OR email**; legacy `{ email, password }` still works) | `{ user, accessToken, refreshToken }` |
 | POST | `/auth/refresh` | – | `{ refreshToken }` | `{ accessToken }` |
 | POST | `/auth/logout` | Bearer | – | `null` |
 | GET | `/auth/me` | Bearer | – | `{ user }` |
@@ -173,6 +173,14 @@ attempts return **`423 Locked`** with `"Account temporarily locked. Try again in
 still return the generic `401 "Invalid credentials"` (email existence is never revealed). The
 pure decision logic lives in `src/utils/loginLockout.js` (unit-tested in
 `tests/loginLockout.test.js`).
+
+**Login by username or email.** Students provisioned without an email log in with a
+**username** (their login id). `POST /auth/login` takes `{ identifier, password }` where
+`identifier` is a username **or** an email; the legacy `{ email, password }` body is still
+accepted (the email value is used as the identifier when `identifier` is absent). Resolution
+is case-insensitive via `$or: [{ email }, { username }]` (`userRepository.findByLogin`).
+The pure resolver (`buildLoginFilter` / `normalizeIdentifier`) lives in `src/utils/username.js`.
+The returned `user` payload now includes `username`.
 
 ### Student
 
@@ -327,12 +335,12 @@ Uses `multer` memory storage + the Cloudinary SDK (configured from `CLOUDINARY_*
 | --- | --- | --- |
 | GET | `/admin/stats` | `{ totalStudents, activeStudents, completionRate, xpDistribution[] }` |
 | GET | `/admin/students?search=&page=&limit=` | Paginated student search (org-scoped; used by the org drill-in) |
-| POST | `/admin/students` | Single create. Body `{ firstName, lastName?, email, phone?, password? }` (password min 6, default `Keydzz@123` if omitted). `name` is composed as `firstName lastName`. Returns `{ student, password }`. |
+| POST | `/admin/students` | Single create. Body `{ firstName, lastName?, email? (optional), phone?, username? (optional), password? }` (password min 6, default `Keydzz@123` if omitted). `email` is now optional; `username` is auto-generated from `firstName` when omitted. `name` is composed as `firstName lastName`. Returns `{ student, username, password }`. |
 | POST | `/admin/students/bulk` | `multipart/form-data`: file field **`file`** (.xlsx/.xls/.csv) **plus** text field **`password`** (the one common password applied to every student in the batch, min 6). See bulk shape below. |
-| GET | `/admin/students/template` | `.xlsx` template download with header row `firstName, lastName, email, phone` + example rows |
+| GET | `/admin/students/template` | `.xlsx` template download with header row `firstName, lastName, email, phone, username` + example rows (email + username optional) |
 | GET | `/admin/students/export` | CSV roster download (`text/csv`, `<slugOrCode>_students.csv`) of all org students: columns `name,grade,school,email,xp,level,coins,status,createdAt` |
 | PATCH | `/admin/students/:id/suspend` | Body `{ suspend?: boolean }` (default true) |
-| POST | `/admin/students/:id/reset-password` | Body `{ password? }` (min 6; generated if omitted). Resets the student's password, invalidates their refresh token, returns `{ student: { id, name, email }, password }` (plaintext). 404 if the student is outside the admin's org. |
+| POST | `/admin/students/:id/reset-password` | Body `{ password? }` (min 6; generated if omitted). Resets the student's password, invalidates their refresh token, returns `{ student: { id, name, email, username }, password }` (plaintext). 404 if the student is outside the admin's org. |
 | GET/POST/GET:id/PUT/PATCH/DELETE | `/admin/courses` | Course CRUD (platform-level, see note) |
 | GET/POST/GET:id/PUT/PATCH/DELETE | `/admin/lessons` | Lesson CRUD (platform-level) |
 | GET/POST/GET:id/PUT/PATCH/DELETE | `/admin/challenges` | Challenge CRUD (platform-level) |
@@ -347,9 +355,10 @@ spreadsheet via the **same** bulk service. The request is `multipart/form-data`:
 
 - **`file`** — the `.xlsx`/`.xls`/`.csv` workbook (max 5MB).
 - **`password`** — one **common password** (string, min 6) applied to **every** student
-  in the batch. Each student's login username is their **email**, so usernames differ but
-  the password is shared. (A power user may add a per-row `password` column; that row then
-  uses its own password. If neither is present the default `Keydzz@123` is used.)
+  in the batch. Each student logs in with a **username** (their login id) — supplied in the
+  `username` column, or **auto-generated** from `firstName` when blank. The password is
+  shared. (A power user may add a per-row `password` column; that row then uses its own
+  password. If neither is present the default `Keydzz@123` is used.)
 
 Template / accepted columns (header keys are case-insensitive and space-tolerant, e.g.
 `first name`, `FIRSTNAME`):
@@ -358,19 +367,22 @@ Template / accepted columns (header keys are case-insensitive and space-tolerant
 | --- | --- | --- |
 | `firstName` | yes | used to compose `name` |
 | `lastName` | no | composes `name = "firstName lastName"` |
-| `email` | yes | validated + lowercased; the login identifier (must be unique) |
+| `email` | **no (optional)** | validated + lowercased when present; unique when present |
 | `phone` | no | stored on the student |
+| `username` | **no (optional)** | the login id; lowercased; **auto-generated** from `firstName` when blank; unique |
 | `password` | no (power-user) | overrides the common password for that row |
 
-Per-row handling: rows missing `firstName` or `email`, with an invalid email, duplicated
-in-file (by normalized email), or already existing in the target org are **skipped** with a
-reason. Response (HTTP 201):
+Per-row handling: rows missing `firstName`, with an invalid email (when one is provided),
+duplicated in-file (by email **or** username when present), with a username already in use,
+or already existing in the target org (by email) are **skipped** with a reason. Response
+(HTTP 201) — `created[]` includes the **username** so the admin can hand out the login id
+plus password:
 
 ```json
 {
   "createdCount": 2,
   "skippedCount": 1,
-  "created": [{ "name": "Asha Rao", "email": "asha.rao@example.com", "phone": "9876543210", "password": "Common@123" }],
+  "created": [{ "name": "Asha Rao", "username": "asharao", "email": "asha.rao@example.com", "phone": "9876543210", "password": "Common@123" }],
   "skipped": [{ "row": 3, "email": "dup@example.com", "reason": "Duplicate in file" }]
 }
 ```
@@ -393,11 +405,11 @@ Successful creates increment the org's `studentCount`.
 | DELETE | `/superadmin/orgs/:id` | Delete org (cascades users) |
 | GET | `/superadmin/orgs/:id/students?search=&page=&limit=` | List students **in that org** (paginated/searchable). `404` if the org is not found. Same row shape as `/superadmin/students`. |
 | POST | `/superadmin/orgs/:id/students/bulk` | Bulk upload **into org `:id`**. `multipart/form-data` with file field **`file`** + text field **`password`** (common, min 6). Same bulk response shape as `/admin/students/bulk`. `404` if the org is not found. Increments `org.studentCount`. |
-| POST | `/superadmin/orgs/:id/students` | Single create **into org `:id`**. Body `{ firstName, lastName?, email, phone?, password? }`. `404` if the org is not found. |
-| GET | `/superadmin/students/template` | `.xlsx` template (`firstName, lastName, email, phone`) — the super admin has no org but needs the template to upload into one. |
-| GET | `/superadmin/students?search=&org=&page=&limit=` | **All** students across orgs, paginated + searchable (name/email). Each row is the student plus `org:{ id, name, code }` (or `null`). |
+| POST | `/superadmin/orgs/:id/students` | Single create **into org `:id`**. Body `{ firstName, lastName?, email? (optional), phone?, username? (optional), password? }`. Returns `{ student, username, password }`. `404` if the org is not found. |
+| GET | `/superadmin/students/template` | `.xlsx` template (`firstName, lastName, email, phone, username`) — the super admin has no org but needs the template to upload into one. |
+| GET | `/superadmin/students?search=&org=&page=&limit=` | **All** students across orgs, paginated + searchable (name/email/username). Each row is the student (incl. `username`, and `email` when present) plus `org:{ id, name, code }` (or `null`). |
 | PATCH | `/superadmin/students/:id/suspend` | Body `{ suspend?: boolean }` (default true). Global (not org-bound). |
-| POST | `/superadmin/students/:id/reset-password` | Body `{ password? }` (min 6; generated if omitted). Global; reuses the same generator as admin reset. Returns `{ student:{ id, name, email }, password }`. |
+| POST | `/superadmin/students/:id/reset-password` | Body `{ password? }` (min 6; generated if omitted). Global; reuses the same generator as admin reset. Returns `{ student:{ id, name, email, username }, password }`. |
 
 `GET /superadmin/analytics` returns (all computed via Mongoose aggregation, real data only):
 

@@ -68,7 +68,9 @@ export const superadminApi = baseApi.injectEndpoints({
       providesTags: (res, err, { id }) => [{ type: 'OrgStudents', id }],
     }),
     createOrgStudent: builder.mutation({
-      // arg: { id, firstName, lastName, email, phone, password }
+      // arg: { id, firstName, lastName, password, email?, phone?, username? }
+      // email + username optional; server auto-generates a unique username when blank.
+      // Response: { student: { ..., username }, password }
       query: ({ id, ...body }) => ({
         url: `/superadmin/orgs/${id}/students`,
         method: 'POST',

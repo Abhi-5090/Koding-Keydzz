@@ -361,12 +361,13 @@ export default function Organizations() {
                     onChange={onField}
                     placeholder="••••••••"
                     required
-                    className="k-input"
+                    className="k-input min-w-0"
                   />
-                  <Button type="button" size="sm" variant="secondary" onClick={() => setShowPw((s) => !s)}>
+                  <Button className="shrink-0" type="button" size="sm" variant="secondary" onClick={() => setShowPw((s) => !s)}>
                     {showPw ? 'Hide' : 'Show'}
                   </Button>
                   <Button
+                    className="shrink-0"
                     type="button"
                     size="sm"
                     variant="outline"
@@ -437,9 +438,10 @@ export default function Organizations() {
                 value={adminForm.adminPassword}
                 onChange={(e) => setAdminForm((f) => ({ ...f, adminPassword: e.target.value }))}
                 placeholder="Leave blank to keep current"
-                className="k-input"
+                className="k-input min-w-0"
               />
               <Button
+                className="shrink-0"
                 type="button"
                 size="sm"
                 variant="outline"

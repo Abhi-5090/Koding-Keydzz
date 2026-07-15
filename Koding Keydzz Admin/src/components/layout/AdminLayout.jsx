@@ -74,14 +74,14 @@ export default function AdminLayout() {
   const SidebarContent = () => (
     <>
       <div className="flex items-center gap-3 px-6 py-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-turmeric text-malt shadow-glow">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-turmeric text-malt shadow-glow">
           <AnimatedIcon icon={KeyRound} size={22} animation="pop" className="text-malt" />
         </div>
-        <div>
-          <p className="font-heading text-base font-bold leading-tight text-text-primary">
+        <div className="min-w-0">
+          <p className="truncate font-heading text-base font-bold leading-tight text-text-primary">
             Koding Keydzz
           </p>
-          <p className="text-xs text-text-secondary/70">{portalLabel}</p>
+          <p className="truncate text-xs text-text-secondary/70">{portalLabel}</p>
         </div>
       </div>
 
@@ -93,7 +93,7 @@ export default function AdminLayout() {
             end={item.end}
             onClick={() => setMobileOpen(false)}
             className={({ isActive }) =>
-              `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors duration-150 ease-out active:scale-[0.98] ${
+              `group flex min-w-0 items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors duration-150 ease-out active:scale-[0.98] ${
                 isActive
                   ? 'bg-turmeric text-malt shadow-glow'
                   : 'text-text-secondary hover:bg-surface hover:text-text-primary'
@@ -107,9 +107,9 @@ export default function AdminLayout() {
                   size={18}
                   animation={isActive ? 'pulse' : 'hover'}
                   glow={isActive}
-                  className={isActive ? 'text-malt' : ''}
+                  className={`shrink-0 ${isActive ? 'text-malt' : ''}`}
                 />
-                {item.label}
+                <span className="truncate">{item.label}</span>
               </>
             )}
           </NavLink>
@@ -165,17 +165,17 @@ export default function AdminLayout() {
             <AnimatedIcon icon={mobileOpen ? X : Menu} size={20} animation="pop" />
           </button>
 
-          <div className="flex flex-1 items-center justify-end gap-4">
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-sm font-semibold text-text-primary">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="min-w-0 text-right">
+                <p className="truncate text-sm font-semibold text-text-primary">
                   {adminName}
                 </p>
-                <p className="text-xs text-text-secondary/70">
+                <p className="truncate text-xs text-text-secondary/70">
                   {user?.org?.name || roleLabel}
                 </p>
               </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-turmeric/20 font-heading font-bold text-turmeric">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-turmeric/20 font-heading font-bold text-turmeric">
                 {adminName.charAt(0).toUpperCase()}
               </div>
             </div>

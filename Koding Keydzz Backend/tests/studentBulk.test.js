@@ -86,13 +86,21 @@ describe('studentBulkService pure helpers', () => {
       expect(r.reason).toMatch(/firstname/i);
     });
 
-    it('rejects a missing email', () => {
+    it('accepts a row WITHOUT an email (email is now optional)', () => {
       const r = validateStudentRow({ firstName: 'Asha' });
-      expect(r.ok).toBe(false);
-      expect(r.reason).toMatch(/missing email/i);
+      expect(r.ok).toBe(true);
+      expect(r.value.email).toBe('');
+      expect(r.value.name).toBe('Asha');
     });
 
-    it('rejects an invalid email', () => {
+    it('accepts a row with a username and no email', () => {
+      const r = validateStudentRow({ firstName: 'Asha', username: 'Asha2015' });
+      expect(r.ok).toBe(true);
+      expect(r.value.email).toBe('');
+      expect(r.value.username).toBe('asha2015'); // lowercased
+    });
+
+    it('still rejects an invalid email when one IS provided', () => {
       const r = validateStudentRow({ firstName: 'Asha', email: 'not-an-email' });
       expect(r.ok).toBe(false);
       expect(r.reason).toMatch(/invalid email/i);
@@ -100,17 +108,29 @@ describe('studentBulkService pure helpers', () => {
   });
 
   describe('parseStudentRows', () => {
-    it('separates valid rows from invalid/missing rows', () => {
+    it('separates valid rows from invalid/missing rows (email now optional)', () => {
       const { valid, skipped } = parseStudentRows([
         { firstName: 'A', email: 'a@x.com' },
-        { firstName: '', email: 'b@x.com' }, // missing firstName
-        { firstName: 'C', email: '' }, // missing email
-        { firstName: 'D', email: 'bad-email' }, // invalid
+        { firstName: '', email: 'b@x.com' }, // missing firstName -> skip
+        { firstName: 'C', email: '' }, // no email -> now VALID
+        { firstName: 'D', email: 'bad-email' }, // invalid email -> skip
       ]);
-      expect(valid).toHaveLength(1);
-      expect(valid[0].email).toBe('a@x.com');
-      expect(skipped).toHaveLength(3);
-      expect(skipped.map((s) => s.row)).toEqual([2, 3, 4]);
+      expect(valid).toHaveLength(2);
+      expect(valid.map((v) => v.firstName)).toEqual(['A', 'C']);
+      expect(skipped).toHaveLength(2);
+      expect(skipped.map((s) => s.row)).toEqual([2, 4]);
+    });
+
+    it('accepts email-less rows and detects in-file duplicate usernames', () => {
+      const { valid, skipped } = parseStudentRows([
+        { firstName: 'A', username: 'star' },
+        { firstName: 'B', username: 'STAR' }, // dup username (case-insensitive)
+        { firstName: 'C', username: 'moon' },
+      ]);
+      expect(valid.map((v) => v.username)).toEqual(['star', 'moon']);
+      expect(skipped).toHaveLength(1);
+      expect(skipped[0].row).toBe(2);
+      expect(skipped[0].reason).toMatch(/duplicate username/i);
     });
 
     it('detects in-file duplicate emails (case-insensitive)', () => {

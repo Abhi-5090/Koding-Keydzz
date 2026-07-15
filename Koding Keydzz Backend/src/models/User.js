@@ -57,13 +57,26 @@ const userSchema = new mongoose.Schema(
     firstName: { type: String, default: '', trim: true },
     lastName: { type: String, default: '', trim: true },
     phone: { type: String, default: '', trim: true },
+    // Login id for young students who have no email. Lowercased + trimmed.
+    // SPARSE unique: only documents that actually have a username are indexed,
+    // so admins/superadmin (who log in by email) never collide on a null value.
+    username: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      unique: true,
+      sparse: true,
+      default: undefined,
+    },
+    // Email is now OPTIONAL (students may have none). SPARSE unique: unique only
+    // when present, and multiple email-less students don't collide on null.
     email: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
       lowercase: true,
       trim: true,
-      index: true,
+      default: undefined,
     },
     passwordHash: { type: String, required: true, select: false },
     grade: { type: String, default: '' },

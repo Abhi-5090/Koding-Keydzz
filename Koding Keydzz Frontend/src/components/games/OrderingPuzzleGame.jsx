@@ -106,15 +106,15 @@ export default function OrderingPuzzleGame({ game, level, onExit, onComplete, ha
         <button
           type="button"
           onClick={onExit}
-          className="game-text inline-flex items-center gap-1.5 rounded-xl border border-k-border bg-surface/60 px-3 py-2 text-sm text-text-secondary transition-colors can-hover:hover:text-turmeric"
+          className="game-text inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-k-border bg-surface/60 px-3 py-2 text-sm text-text-secondary transition-colors can-hover:hover:text-turmeric"
         >
           <ArrowLeft size={16} /> Levels
         </button>
-        <div className="text-right">
+        <div className="min-w-0 text-right">
           <div className="game-text text-xs uppercase tracking-wide text-text-secondary">
             Level {level.id} · {level.difficulty}
           </div>
-          <div className="game-text text-lg font-extrabold text-turmeric">{level.name}</div>
+          <div className="game-text truncate text-lg font-extrabold text-turmeric">{level.name}</div>
         </div>
       </div>
 

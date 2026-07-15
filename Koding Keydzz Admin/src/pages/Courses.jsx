@@ -151,15 +151,15 @@ export default function Courses() {
             >
               <div className="p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-turmeric/15 p-2.5 text-turmeric">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="shrink-0 rounded-xl bg-turmeric/15 p-2.5 text-turmeric">
                       <BookOpen size={20} />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-heading font-bold text-text-primary">{course.title}</h3>
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <h3 className="truncate font-heading font-bold text-text-primary">{course.title}</h3>
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${
+                          className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-semibold ${
                             course.published
                               ? 'border-success/30 bg-success/15 text-success'
                               : 'border-k-border bg-malt text-text-secondary/70'
@@ -171,7 +171,7 @@ export default function Courses() {
                       <p className="mt-1 text-sm text-text-secondary/70">{course.description}</p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex shrink-0 gap-1">
                     <button
                       onClick={() => { setFormError(''); setCourseModal({ mode: 'edit', data: { ...course } }); }}
                       className="rounded-lg p-1.5 text-text-secondary hover:bg-surface hover:text-turmeric"
@@ -229,20 +229,20 @@ export default function Courses() {
                     {(course.lessons || []).map((lesson) => (
                       <div
                         key={lesson.id}
-                        className="flex items-center justify-between rounded-lg border border-k-border bg-card px-3 py-2.5"
+                        className="flex items-center justify-between gap-3 rounded-lg border border-k-border bg-card px-3 py-2.5"
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-turmeric/20 text-xs font-bold text-turmeric">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-turmeric/20 text-xs font-bold text-turmeric">
                             {lesson.order}
                           </span>
-                          <div>
-                            <p className="text-sm font-medium text-text-primary">{lesson.title}</p>
-                            <p className="text-xs text-text-secondary/60">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-text-primary">{lesson.title}</p>
+                            <p className="truncate text-xs text-text-secondary/60">
                               {lesson.xp} XP · {lesson.duration} min
                             </p>
                           </div>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex shrink-0 gap-1">
                           <button
                             onClick={() => { setFormError(''); setLessonModal({ courseId: course.id, mode: 'edit', data: { ...lesson } }); }}
                             className="rounded-lg p-1.5 text-text-secondary hover:text-turmeric"

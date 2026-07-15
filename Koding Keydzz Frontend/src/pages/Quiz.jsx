@@ -400,11 +400,11 @@ function McqInput({ question, value, onChange }) {
               selected ? 'border-turmeric bg-turmeric/15 text-turmeric' : 'border-k-border bg-surface/50 can-hover:hover:border-turmeric'
             }`}
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-malt text-sm font-bold">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-malt text-sm font-bold">
               {String.fromCharCode(65 + i)}
             </span>
-            <span className="flex-1">{opt}</span>
-            {selected && <AnimatedIcon icon={Check} size={18} className="text-turmeric" animation="pop" />}
+            <span className="min-w-0 flex-1">{opt}</span>
+            {selected && <span className="shrink-0"><AnimatedIcon icon={Check} size={18} className="text-turmeric" animation="pop" /></span>}
           </motion.button>
         )
       })}
@@ -492,11 +492,11 @@ function DragDropInput({ question, value, onChange }) {
             whileDrag={{ scale: 1.02 }}
             className="game-text flex cursor-grab items-center gap-3 rounded-xl border-2 border-k-border bg-surface/50 px-4 py-3 transition-colors duration-200 can-hover:hover:border-turmeric active:cursor-grabbing"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-malt text-sm font-bold text-turmeric">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-malt text-sm font-bold text-turmeric">
               {i + 1}
             </span>
-            <span className="flex-1">{item.label}</span>
-            <GripVertical size={18} className="text-text-secondary" />
+            <span className="min-w-0 flex-1">{item.label}</span>
+            <GripVertical size={18} className="shrink-0 text-text-secondary" />
           </Reorder.Item>
         ))}
       </Reorder.Group>
@@ -521,7 +521,7 @@ function MatchInput({ question, value, onChange }) {
             key={i}
             className="flex flex-col gap-2 rounded-xl border-2 border-k-border bg-surface/50 p-3 sm:flex-row sm:items-center"
           >
-            <span className="game-text flex-1 font-semibold text-text-primary">{left}</span>
+            <span className="game-text min-w-0 flex-1 font-semibold text-text-primary">{left}</span>
             <ArrowRight size={16} className="hidden shrink-0 text-text-secondary sm:block" />
             <input
               value={map[left] ?? ''}

@@ -110,14 +110,14 @@ function Analytics({ a }) {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {CONTENT_ITEMS.map(({ key, label, icon: Icon }) => (
             <div key={key} className="k-card flex items-center gap-3 p-4">
-              <div className="rounded-xl bg-turmeric/15 p-2 text-turmeric">
+              <div className="shrink-0 rounded-xl bg-turmeric/15 p-2 text-turmeric">
                 <Icon size={18} />
               </div>
-              <div>
-                <p className="font-heading text-xl font-extrabold text-text-primary">
+              <div className="min-w-0">
+                <p className="truncate font-heading text-xl font-extrabold tabular-nums text-text-primary">
                   {(contentCounts[key] ?? 0).toLocaleString()}
                 </p>
-                <p className="text-xs text-text-secondary/70">{label}</p>
+                <p className="truncate text-xs text-text-secondary/70">{label}</p>
               </div>
             </div>
           ))}
@@ -238,9 +238,11 @@ function Analytics({ a }) {
                 {topOrgsByStudents.map((o, i) => (
                   <tr key={o.code || o.org || i} className="border-b border-k-border/50 hover:bg-surface/40">
                     <td className="px-4 py-3 font-heading font-bold text-turmeric">#{i + 1}</td>
-                    <td className="px-4 py-3 text-text-primary">{o.org}</td>
+                    <td className="px-4 py-3 text-text-primary">
+                      <span className="block max-w-[280px] truncate">{o.org}</span>
+                    </td>
                     <td className="px-4 py-3 text-text-secondary/70">{o.code || '—'}</td>
-                    <td className="px-4 py-3 font-semibold text-turmeric">
+                    <td className="px-4 py-3 font-semibold tabular-nums text-turmeric">
                       {(o.students ?? 0).toLocaleString()}
                     </td>
                   </tr>

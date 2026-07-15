@@ -41,7 +41,7 @@ function asList(data) {
   return data?.students || data?.items || [];
 }
 
-const emptyStudent = { firstName: '', lastName: '', email: '', phone: '', password: '' };
+const emptyStudent = { firstName: '', lastName: '', email: '', phone: '', username: '', password: '' };
 
 /**
  * Shared org-student roster experience used by BOTH the super admin (per-org,
@@ -79,6 +79,8 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState(emptyStudent);
   const [addError, setAddError] = useState('');
+  const [addResult, setAddResult] = useState(null); // { name, username, password, email, phone }
+  const [addCopied, setAddCopied] = useState(false);
 
   const [confirmTarget, setConfirmTarget] = useState(null);
 
@@ -92,23 +94,40 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
 
   const onAddField = (e) => setAddForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
+  const closeAdd = () => {
+    setAddOpen(false);
+    setAddForm(emptyStudent);
+    setAddError('');
+    setAddResult(null);
+    setAddCopied(false);
+  };
+
   const handleAddStudent = async (e) => {
     e.preventDefault();
     setAddError('');
-    if (!addForm.firstName.trim() || !addForm.email.trim() || addForm.password.length < 6) {
-      setAddError('First name, email, and a password (min 6 characters) are required.');
+    if (!addForm.firstName.trim() || addForm.password.length < 6) {
+      setAddError('First name and a password (min 6 characters) are required.');
       return;
     }
     try {
-      await createStudent({
+      const res = await createStudent({
         firstName: addForm.firstName.trim(),
         lastName: addForm.lastName.trim(),
-        email: addForm.email.trim(),
-        phone: addForm.phone.trim(),
+        email: addForm.email.trim() || undefined,
+        phone: addForm.phone.trim() || undefined,
+        username: addForm.username.trim() || undefined,
         password: addForm.password,
       }).unwrap();
-      setAddForm(emptyStudent);
-      setAddOpen(false);
+      const created = res?.student || res || {};
+      setAddResult({
+        name:
+          created.name ||
+          [addForm.firstName.trim(), addForm.lastName.trim()].filter(Boolean).join(' ').trim(),
+        username: created.username || addForm.username.trim(),
+        password: res?.password || addForm.password,
+        email: created.email || addForm.email.trim(),
+        phone: created.phone || addForm.phone.trim(),
+      });
     } catch (err) {
       setAddError(
         err?.data?.details?.[0]?.message ||
@@ -116,6 +135,14 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
           'Could not add the student. Please try again.'
       );
     }
+  };
+
+  const copyAddCredentials = () => {
+    if (!addResult) return;
+    const text = `Username: ${addResult.username}\nPassword: ${addResult.password}`;
+    navigator.clipboard?.writeText(text).catch(() => {});
+    setAddCopied(true);
+    setTimeout(() => setAddCopied(false), 1500);
   };
 
   const doSuspend = async () => {
@@ -147,7 +174,11 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
 
   const copyPassword = () => {
     if (!resetResult?.password) return;
-    navigator.clipboard?.writeText(resetResult.password).catch(() => {});
+    const username = resetResult.student?.username;
+    const text = username
+      ? `Username: ${username}\nPassword: ${resetResult.password}`
+      : resetResult.password;
+    navigator.clipboard?.writeText(text).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -174,15 +205,28 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
       header: 'Student',
       sortValue: (r) => studentName(r),
       render: (r) => (
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-turmeric/20 text-xs font-bold text-turmeric">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-turmeric/20 text-xs font-bold text-turmeric">
             {studentName(r).charAt(0)}
           </div>
-          <div>
-            <p className="font-medium text-text-primary">{studentName(r)}</p>
-            <p className="text-xs text-text-secondary/60">{r.email}</p>
+          <div className="min-w-0 max-w-[220px]">
+            <p className="truncate font-medium text-text-primary">{studentName(r)}</p>
+            <p className="truncate text-xs text-text-secondary/60">{r.email || '—'}</p>
           </div>
         </div>
+      ),
+    },
+    {
+      key: 'username',
+      header: 'Username',
+      sortValue: (r) => r.username || '',
+      render: (r) => (
+        <span
+          className="block max-w-[160px] truncate font-mono text-xs text-text-primary"
+          title={r.username || ''}
+        >
+          {r.username || '—'}
+        </span>
       ),
     },
     { key: 'phone', header: 'Phone', render: (r) => r.phone || '—' },
@@ -266,7 +310,7 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
         <DataTable
           columns={columns}
           data={students}
-          searchKeys={['name', 'firstName', 'lastName', 'email', 'phone']}
+          searchKeys={['name', 'firstName', 'lastName', 'username', 'email', 'phone']}
           pageSize={10}
         />
       </QueryState>
@@ -274,69 +318,127 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
       {/* Add single student */}
       <Modal
         open={addOpen}
-        onClose={() => setAddOpen(false)}
+        onClose={closeAdd}
         title="Add Student"
         size="md"
         footer={
-          <>
-            <Button variant="secondary" onClick={() => setAddOpen(false)} disabled={adding}>
-              Cancel
+          addResult ? (
+            <Button icon={CheckCircle2} onClick={closeAdd}>
+              Done
             </Button>
-            <Button onClick={handleAddStudent} loading={adding} icon={UserPlus}>
-              Add Student
-            </Button>
-          </>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={closeAdd} disabled={adding}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddStudent} loading={adding} icon={UserPlus}>
+                Add Student
+              </Button>
+            </>
+          )
         }
       >
-        <form onSubmit={handleAddStudent} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        {addResult ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+              <CheckCircle2 size={16} /> {addResult.name || 'Student'} added.
+            </div>
+
+            <p className="text-sm text-text-secondary/80">
+              Share these login credentials with the student. The password will not be shown
+              again after you close this dialog.
+            </p>
+
+            <div className="space-y-3 rounded-xl border border-k-border bg-malt/40 p-4">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <span className="k-label mb-0 shrink-0">Username</span>
+                <code className="min-w-0 select-all truncate font-mono text-sm font-bold text-turmeric" title={addResult.username}>
+                  {addResult.username || '—'}
+                </code>
+              </div>
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <span className="k-label mb-0 shrink-0">Password</span>
+                <code className="min-w-0 select-all truncate font-mono text-sm font-bold text-turmeric" title={addResult.password}>
+                  {addResult.password}
+                </code>
+              </div>
+              {addResult.email && (
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <span className="k-label mb-0 shrink-0">Email</span>
+                  <span className="min-w-0 truncate text-sm text-text-secondary" title={addResult.email}>
+                    {addResult.email}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <Button
+              variant="secondary"
+              icon={addCopied ? Check : Copy}
+              onClick={copyAddCredentials}
+              className="w-full justify-center"
+            >
+              {addCopied ? 'Copied' : 'Copy username & password'}
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleAddStudent} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                label="First Name"
+                name="firstName"
+                value={addForm.firstName}
+                onChange={onAddField}
+                placeholder="Aarav"
+                required
+              />
+              <FormField
+                label="Last Name"
+                name="lastName"
+                value={addForm.lastName}
+                onChange={onAddField}
+                placeholder="Sharma"
+              />
+            </div>
             <FormField
-              label="First Name"
-              name="firstName"
-              value={addForm.firstName}
+              label="Username (optional)"
+              name="username"
+              value={addForm.username}
               onChange={onAddField}
-              placeholder="Aarav"
+              placeholder="aarav.sharma"
+              hint="Auto-generated if blank. This is the student's login id."
+            />
+            <FormField
+              label="Email (optional)"
+              name="email"
+              type="email"
+              value={addForm.email}
+              onChange={onAddField}
+              placeholder="aarav@school.edu"
+              hint="Young students may not have an email — leave it blank."
+            />
+            <FormField
+              label="Phone"
+              name="phone"
+              value={addForm.phone}
+              onChange={onAddField}
+              placeholder="+91 98765 43210"
+            />
+            <FormField
+              label="Password"
+              name="password"
+              value={addForm.password}
+              onChange={onAddField}
+              placeholder="Initial login password (min 6 characters)"
               required
             />
-            <FormField
-              label="Last Name"
-              name="lastName"
-              value={addForm.lastName}
-              onChange={onAddField}
-              placeholder="Sharma"
-            />
-          </div>
-          <FormField
-            label="Email"
-            name="email"
-            type="email"
-            value={addForm.email}
-            onChange={onAddField}
-            placeholder="aarav@school.edu"
-            hint="The student logs in with this email."
-            required
-          />
-          <FormField
-            label="Phone"
-            name="phone"
-            value={addForm.phone}
-            onChange={onAddField}
-            placeholder="+91 98765 43210"
-          />
-          <FormField
-            label="Password"
-            name="password"
-            value={addForm.password}
-            onChange={onAddField}
-            placeholder="Initial login password (min 6 characters)"
-            required
-          />
-          {addError && (
-            <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
-              {addError}
-            </p>
-          )}
-        </form>
+            {addError && (
+              <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+                {addError}
+              </p>
+            )}
+          </form>
+        )}
       </Modal>
 
       <ConfirmDialog
@@ -379,13 +481,15 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
       >
         {resetTarget && !resetResult && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-turmeric/20 text-base font-bold text-turmeric">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-turmeric/20 text-base font-bold text-turmeric">
                 {studentName(resetTarget).charAt(0)}
               </div>
-              <div>
-                <p className="font-medium text-text-primary">{studentName(resetTarget)}</p>
-                <p className="text-xs text-text-secondary/60">{resetTarget.email}</p>
+              <div className="min-w-0">
+                <p className="truncate font-medium text-text-primary">{studentName(resetTarget)}</p>
+                <p className="truncate text-xs text-text-secondary/60">
+                  {resetTarget.username || resetTarget.email || '—'}
+                </p>
               </div>
             </div>
             <p className="text-sm text-text-secondary/80">
@@ -404,21 +508,33 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
             <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
               <CheckCircle2 size={16} /> Password reset for {studentName(resetResult.student || {})}.
             </div>
+            {resetResult.student?.username && (
+              <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-k-border bg-malt/40 px-4 py-3">
+                <span className="k-label mb-0 shrink-0">Username</span>
+                <code
+                  className="min-w-0 select-all truncate font-mono text-sm font-bold text-turmeric"
+                  title={resetResult.student.username}
+                >
+                  {resetResult.student.username}
+                </code>
+              </div>
+            )}
             {resetResult.password && (
               <div>
                 <p className="k-label mb-1.5">New password</p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 select-all rounded-xl border border-k-border bg-malt/60 px-4 py-3 font-mono text-lg font-bold tracking-wide text-turmeric">
+                  <code className="min-w-0 flex-1 select-all truncate rounded-xl border border-k-border bg-malt/60 px-4 py-3 font-mono text-lg font-bold tracking-wide text-turmeric">
                     {resetResult.password}
                   </code>
-                  <Button variant="secondary" icon={copied ? Check : Copy} onClick={copyPassword}>
+                  <Button className="shrink-0" variant="secondary" icon={copied ? Check : Copy} onClick={copyPassword}>
                     {copied ? 'Copied' : 'Copy'}
                   </Button>
                 </div>
               </div>
             )}
             <p className="text-xs text-text-secondary/70">
-              Share this password securely. It will not be shown again after you close this dialog.
+              Share these credentials securely. They will not be shown again after you close this
+              dialog.
             </p>
           </div>
         )}

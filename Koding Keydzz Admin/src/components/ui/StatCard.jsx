@@ -14,12 +14,12 @@ export default function StatCard({ label, value, icon: Icon, delta, hint, index 
       className="k-card group relative overflow-hidden p-5"
     >
       <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-turmeric/5 transition-transform duration-300 ease-out [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-125" />
-      <div className="relative flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-semibold uppercase tracking-wide text-text-secondary">
             {label}
           </p>
-          <p className="mt-2 font-heading text-3xl font-extrabold text-text-primary">
+          <p className="mt-2 truncate font-heading text-3xl font-extrabold tabular-nums text-text-primary">
             {value}
           </p>
           {(hint || delta != null) && (
@@ -40,7 +40,7 @@ export default function StatCard({ label, value, icon: Icon, delta, hint, index 
         </div>
         {Icon && (
           <motion.div
-            className="rounded-xl bg-turmeric/15 p-2.5 text-turmeric"
+            className="shrink-0 rounded-xl bg-turmeric/15 p-2.5 text-turmeric"
             animate={reduce ? undefined : { y: [0, -3, 0] }}
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: index * 0.2 }}
           >

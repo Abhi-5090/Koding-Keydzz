@@ -92,8 +92,8 @@ export default function StudentLayout() {
         <div className="min-w-0">
           <div className="game-text text-lg font-bold leading-tight text-turmeric">Koding Keydzz</div>
           {orgName && (
-            <div className="flex items-center gap-1 truncate text-xs text-text-secondary" title={orgName}>
-              <Building2 size={12} className="shrink-0" /> {orgName}
+            <div className="flex min-w-0 items-center gap-1 text-xs text-text-secondary" title={orgName}>
+              <Building2 size={12} className="shrink-0" /> <span className="min-w-0 truncate">{orgName}</span>
             </div>
           )}
         </div>
@@ -203,7 +203,7 @@ export default function StudentLayout() {
                 className="hidden max-w-[12rem] items-center gap-1.5 truncate rounded-full border border-k-border bg-surface/70 px-3 py-1.5 text-xs text-text-secondary game-text md:flex"
                 title={orgName}
               >
-                <Building2 size={13} className="shrink-0" /> <span className="truncate">{orgName}</span>
+                <Building2 size={13} className="shrink-0" /> <span className="min-w-0 truncate">{orgName}</span>
               </span>
             )}
             <CoinCounter coins={stats.coins ?? 0} />

@@ -51,9 +51,23 @@ const SNIPPETS = [
  * `for i in range(n):` loops). It is parsed LIVE into the engine program model,
  * shown as an arrow sequence, then animated on Run and scored by evaluate().
  *
- * Props: level, onBack, onNext, hasNext, recordStars
+ * Shared by both code-writing games (Maze Coding + Robot Navigation). The two
+ * games differ only in their level data and a little copy: `title` names the game
+ * in the How-to-Play modal and `helpSeenKey` lets each game track its own
+ * first-time help prompt. The engine + parser + board are grid-agnostic.
+ *
+ * Props: level, onBack, onNext, hasNext, recordStars, gameKey, title, helpSeenKey
  */
-export default function PlayScreen({ level, onBack, onNext, hasNext, recordStars, gameKey = 'maze-coding' }) {
+export default function PlayScreen({
+  level,
+  onBack,
+  onNext,
+  hasNext,
+  recordStars,
+  gameKey = 'maze-coding',
+  title = 'Maze Coding',
+  helpSeenKey = HELP_SEEN_KEY,
+}) {
   const reduce = useReducedMotion()
   const parsed = useMemo(() => parseLevel(level), [level])
   const timer = useLevelTimer()
@@ -108,20 +122,20 @@ export default function PlayScreen({ level, onBack, onNext, hasNext, recordStars
   // Auto-show How-to-Play the first time only.
   useEffect(() => {
     try {
-      if (!localStorage.getItem(HELP_SEEN_KEY)) setShowHelp(true)
+      if (!localStorage.getItem(helpSeenKey)) setShowHelp(true)
     } catch {
       /* storage unavailable — skip the auto prompt */
     }
-  }, [])
+  }, [helpSeenKey])
 
   const closeHelp = useCallback(() => {
     setShowHelp(false)
     try {
-      localStorage.setItem(HELP_SEEN_KEY, '1')
+      localStorage.setItem(helpSeenKey, '1')
     } catch {
       /* ignore */
     }
-  }, [])
+  }, [helpSeenKey])
 
   // Live compile (debounced) — parse the code into a program + arrow sequence.
   useEffect(() => {
@@ -443,7 +457,7 @@ export default function PlayScreen({ level, onBack, onNext, hasNext, recordStars
       <AnimatePresence>
         {result && (
           <LevelWinOverlay
-            confettiKey={`maze-${level.id}`}
+            confettiKey={`${gameKey}-${level.id}`}
             stars={result.stars}
             message={winMessage}
             reward={reward}
@@ -474,7 +488,7 @@ export default function PlayScreen({ level, onBack, onNext, hasNext, recordStars
         )}
       </AnimatePresence>
 
-      <HowToPlayModal open={showHelp} onClose={closeHelp} title="How to Play — Maze Coding" tint="#FF602F">
+      <HowToPlayModal open={showHelp} onClose={closeHelp} title={`How to Play — ${title}`} tint="#FF602F">
         <p>
           Write <strong className="text-text-primary">Python code</strong> to drive the robot to the
           flag. Each command moves it <strong className="text-text-primary">one step</strong>:

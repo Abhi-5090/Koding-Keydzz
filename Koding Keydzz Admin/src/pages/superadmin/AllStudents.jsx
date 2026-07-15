@@ -101,7 +101,11 @@ export default function AllStudents() {
 
   const copyPassword = () => {
     if (!resetResult?.password) return;
-    navigator.clipboard?.writeText(resetResult.password).catch(() => {});
+    const username = resetResult.student?.username;
+    const text = username
+      ? `Username: ${username}\nPassword: ${resetResult.password}`
+      : resetResult.password;
+    navigator.clipboard?.writeText(text).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
@@ -114,22 +118,37 @@ export default function AllStudents() {
       key: 'name',
       header: 'Student',
       render: (r) => (
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-turmeric/20 text-xs font-bold text-turmeric">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-turmeric/20 text-xs font-bold text-turmeric">
             {(r.name || '?').charAt(0)}
           </div>
-          <div>
-            <p className="font-medium text-text-primary">{r.name}</p>
-            <p className="text-xs text-text-secondary/60">{r.email}</p>
+          <div className="min-w-0 max-w-[220px]">
+            <p className="truncate font-medium text-text-primary">{r.name}</p>
+            <p className="truncate text-xs text-text-secondary/60">{r.email || '—'}</p>
           </div>
         </div>
+      ),
+    },
+    {
+      key: 'username',
+      header: 'Username',
+      sortValue: (r) => r.username || '',
+      render: (r) => (
+        <span
+          className="block max-w-[160px] truncate font-mono text-xs text-text-primary"
+          title={r.username || ''}
+        >
+          {r.username || '—'}
+        </span>
       ),
     },
     {
       key: 'org',
       header: 'Organization',
       sortValue: (r) => orgName(r),
-      render: (r) => <span className="text-text-secondary">{orgName(r)}</span>,
+      render: (r) => (
+        <span className="block max-w-[200px] truncate text-text-secondary">{orgName(r)}</span>
+      ),
     },
     {
       key: 'xp',
@@ -185,7 +204,7 @@ export default function AllStudents() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email…"
+            placeholder="Search by name, username or email…"
             className="k-input pl-9"
           />
         </div>
@@ -215,7 +234,7 @@ export default function AllStudents() {
         <DataTable
           columns={columns}
           data={students}
-          searchKeys={['name', 'email']}
+          searchKeys={['name', 'username', 'email']}
           pageSize={10}
         />
       </QueryState>
@@ -259,14 +278,14 @@ export default function AllStudents() {
       >
         {resetTarget && !resetResult && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-turmeric/20 text-base font-bold text-turmeric">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-turmeric/20 text-base font-bold text-turmeric">
                 {(resetTarget.name || '?').charAt(0)}
               </div>
-              <div>
-                <p className="font-medium text-text-primary">{resetTarget.name}</p>
-                <p className="text-xs text-text-secondary/60">
-                  {resetTarget.email} · {orgName(resetTarget)}
+              <div className="min-w-0">
+                <p className="truncate font-medium text-text-primary">{resetTarget.name}</p>
+                <p className="truncate text-xs text-text-secondary/60">
+                  {resetTarget.username || resetTarget.email || '—'} · {orgName(resetTarget)}
                 </p>
               </div>
             </div>
@@ -286,21 +305,33 @@ export default function AllStudents() {
             <div className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
               <CheckCircle2 size={16} /> Password reset for {resetResult.student?.name}.
             </div>
+            {resetResult.student?.username && (
+              <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-k-border bg-malt/40 px-4 py-3">
+                <span className="k-label mb-0 shrink-0">Username</span>
+                <code
+                  className="min-w-0 select-all truncate font-mono text-sm font-bold text-turmeric"
+                  title={resetResult.student.username}
+                >
+                  {resetResult.student.username}
+                </code>
+              </div>
+            )}
             {resetResult.password && (
               <div>
                 <p className="k-label mb-1.5">New password</p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 select-all rounded-xl border border-k-border bg-malt/60 px-4 py-3 font-mono text-lg font-bold tracking-wide text-turmeric">
+                  <code className="min-w-0 flex-1 select-all truncate rounded-xl border border-k-border bg-malt/60 px-4 py-3 font-mono text-lg font-bold tracking-wide text-turmeric">
                     {resetResult.password}
                   </code>
-                  <Button variant="secondary" icon={copied ? Check : Copy} onClick={copyPassword}>
+                  <Button className="shrink-0" variant="secondary" icon={copied ? Check : Copy} onClick={copyPassword}>
                     {copied ? 'Copied' : 'Copy'}
                   </Button>
                 </div>
               </div>
             )}
             <p className="text-xs text-text-secondary/70">
-              Share this password securely. It will not be shown again after you close this dialog.
+              Share these credentials securely. They will not be shown again after you close this
+              dialog.
             </p>
           </div>
         )}

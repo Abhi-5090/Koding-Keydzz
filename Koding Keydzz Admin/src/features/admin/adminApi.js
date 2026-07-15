@@ -27,14 +27,16 @@ export const adminApi = baseApi.injectEndpoints({
       invalidatesTags: ['Students'],
     }),
     createStudent: builder.mutation({
-      // body: { firstName, lastName, email, phone, password }
+      // body: { firstName, lastName, password, email?, phone?, username? }
+      // email + username are optional — the server auto-generates a unique
+      // username when it is omitted. Response: { student: { ..., username }, password }
       query: (body) => ({ url: '/admin/students', method: 'POST', body }),
       transformResponse: unwrap,
       invalidatesTags: ['Students', 'Stats'],
     }),
     resetStudentPassword: builder.mutation({
       // body: { password? } — omit password to let the server generate one.
-      // Response: { student: { id, name, email }, password }
+      // Response: { student: { id, name, username, email }, password }
       query: ({ id, password }) => ({
         url: `/admin/students/${id}/reset-password`,
         method: 'POST',
