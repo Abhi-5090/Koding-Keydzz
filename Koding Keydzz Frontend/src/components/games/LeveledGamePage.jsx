@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Trophy, LayoutGrid } from 'lucide-react'
+import { ArrowLeft, Trophy, LayoutGrid, Lock, Sparkles } from 'lucide-react'
 import PageTransition from '../layout/PageTransition'
 import useGameLevels from '../../games/shared/useGameLevels'
+import { useGetCoursesQuery } from '../../features/courses/coursesApi'
+import { unlockedLevels, nextTierCount, isTiered } from '../../games/shared/levelTiers'
 import LevelSelectGrid from './LevelSelectGrid'
 import GameLeaderboard from './GameLeaderboard'
 
@@ -22,13 +24,43 @@ import GameLeaderboard from './GameLeaderboard'
  *             (e.g. a "Back to lobby" button). When omitted, behavior is
  *             unchanged.
  */
-export default function LeveledGamePage({ gameKey, game, levels, renderPlay, backSlot }) {
+export default function LeveledGamePage({
+  gameKey,
+  game,
+  levels: allLevels,
+  renderPlay,
+  backSlot,
+}) {
+  /**
+   * TIERED LEVELS.
+   *
+   * The puzzle games hold several tiers, and a tier opens when a pupil passes
+   * a course. `gameTier` comes from the server with the course ladder — it is
+   * not counted here, because these levels pay XP, coins and leaderboard
+   * places, and a browser-side count would be one edit away from unlocking
+   * everything.
+   *
+   * Every game funnels its level list through this component, so filtering
+   * here is what makes tiering work everywhere at once. Games whose levels
+   * carry no `tier` are unaffected: absent means tier 0, i.e. always open.
+   *
+   * `isLoading` is treated as tier 0 rather than as "no levels": a pupil on a
+   * slow connection sees the base set and then the rest appear, instead of an
+   * empty game.
+   */
+  const coursesQuery = useGetCoursesQuery()
+  const gameTier = coursesQuery.data?.gameTier ?? 0
+
+  const levels = useMemo(() => unlockedLevels(allLevels, gameTier), [allLevels, gameTier])
+  const comingNext = useMemo(() => nextTierCount(allLevels, gameTier), [allLevels, gameTier])
+  const tiered = useMemo(() => isTiered(allLevels), [allLevels])
+
   const { progress, isUnlocked, completeLevel } = useGameLevels(gameKey, levels)
   const [activeId, setActiveId] = useState(null)
   const [showBoard, setShowBoard] = useState(false)
 
   const activeLevel = activeId != null ? levels.find((l) => l.id === activeId) : null
-  const hasNext = activeLevel ? activeLevel.id < levels[levels.length - 1].id : false
+  const hasNext = activeLevel ? activeLevel.id < levels[levels.length - 1]?.id : false
   const tint = game?.tint || '#FF602F'
 
   const pick = (level) => {
@@ -115,6 +147,24 @@ export default function LeveledGamePage({ gameKey, game, levels, renderPlay, bac
               exit={{ opacity: 0, x: 24 }}
               transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
             >
+              {/* Name the reward. "12 more puzzles when you pass the next
+                  course" is a reason to go back to the lessons; a silent
+                  absence is no reason at all. */}
+              {tiered && comingNext > 0 && (
+                <p className="game-text mb-3 flex items-start gap-2 rounded-xl border border-k-border bg-surface/60 px-3 py-2 text-sm text-text-secondary">
+                  <Sparkles size={15} className="mt-0.5 shrink-0 text-turmeric" aria-hidden="true" />
+                  <span>
+                    <strong className="text-text-primary">{comingNext} more levels</strong> unlock
+                    here when you pass your next course.
+                  </span>
+                </p>
+              )}
+              {tiered && comingNext === 0 && gameTier > 0 && (
+                <p className="game-text mb-3 flex items-start gap-2 rounded-xl border border-k-border bg-surface/60 px-3 py-2 text-sm text-text-secondary">
+                  <Lock size={15} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
+                  You have unlocked every level in this game. Nicely done.
+                </p>
+              )}
               <LevelSelectGrid game={game} levels={levels} progress={progress} onPick={pick} />
             </motion.div>
           )}

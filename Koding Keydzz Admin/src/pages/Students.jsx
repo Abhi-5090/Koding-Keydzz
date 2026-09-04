@@ -3,15 +3,14 @@ import {
   Eye,
   Ban,
   CheckCircle2,
-  Zap,
-  Award,
-  Trophy,
   UserPlus,
   UploadCloud,
   KeyRound,
   Download,
   Copy,
   Check,
+  Pencil,
+  Trash2,
   AlertTriangle,
   Users as UsersIcon,
 } from 'lucide-react';
@@ -19,6 +18,8 @@ import {
   useGetStudentsQuery,
   useSuspendStudentMutation,
   useCreateStudentMutation,
+  useUpdateStudentMutation,
+  useDeleteStudentMutation,
   useResetStudentPasswordMutation,
   exportStudentsCsv,
 } from '../features/admin/adminApi';
@@ -31,6 +32,9 @@ import PageHeader from '../components/ui/PageHeader';
 import FormField from '../components/ui/FormField';
 import QueryState from '../components/ui/QueryState';
 import BulkUploadModal from '../components/students/BulkUploadModal';
+import StudentDetailModal from '../components/students/StudentDetailModal';
+import StudentEditModal, { GRADE_OPTIONS } from '../components/students/StudentEditModal';
+import { formatApiError } from '../utils/apiError';
 
 function StatusBadge({ status }) {
   const map = {
@@ -47,7 +51,16 @@ function StatusBadge({ status }) {
   );
 }
 
-const emptyStudent = { firstName: '', lastName: '', email: '', phone: '', username: '', password: '' };
+const emptyStudent = {
+  firstName: '',
+  lastName: '',
+  grade: '',
+  school: '',
+  email: '',
+  phone: '',
+  username: '',
+  password: '',
+};
 
 function asList(data) {
   if (Array.isArray(data)) return data;
@@ -58,11 +71,15 @@ export default function Students() {
   const { data, isError, isLoading, error, refetch } = useGetStudentsQuery();
   const [suspendStudent, { isLoading: suspending }] = useSuspendStudentMutation();
   const [createStudent, { isLoading: addingStudent }] = useCreateStudentMutation();
+  const [updateStudent, { isLoading: updating }] = useUpdateStudentMutation();
+  const [deleteStudent, { isLoading: deleting }] = useDeleteStudentMutation();
   const [resetStudentPassword, { isLoading: resetting }] = useResetStudentPasswordMutation();
 
   const students = asList(data);
 
   const [viewing, setViewing] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [confirmTarget, setConfirmTarget] = useState(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -116,7 +133,7 @@ export default function Students() {
       });
     } catch (err) {
       setResetError(
-        err?.data?.message || 'Could not reset the password. Please try again.'
+        formatApiError(err, 'Could not reset the password. Please try again.')
       );
     }
   };
@@ -166,6 +183,8 @@ export default function Students() {
       const res = await createStudent({
         firstName: addForm.firstName.trim(),
         lastName: addForm.lastName.trim(),
+        grade: addForm.grade || undefined,
+        school: addForm.school.trim() || undefined,
         email: addForm.email.trim() || undefined,
         phone: addForm.phone.trim() || undefined,
         username: addForm.username.trim() || undefined,
@@ -184,8 +203,7 @@ export default function Students() {
     } catch (err) {
       setAddError(
         err?.data?.details?.[0]?.message ||
-          err?.data?.message ||
-          'Could not add the student. Please try again.'
+          formatApiError(err, 'Could not add the student. Please try again.')
       );
     }
   };
@@ -209,6 +227,15 @@ export default function Students() {
     setConfirmTarget(null);
   };
 
+  const doDelete = async () => {
+    try {
+      await deleteStudent(deleteTarget.id).unwrap();
+    } catch {
+      /* the roster reflects server state on the next fetch */
+    }
+    setDeleteTarget(null);
+  };
+
   const columns = [
     {
       key: 'name',
@@ -220,7 +247,7 @@ export default function Students() {
           </div>
           <div className="min-w-0 max-w-[220px]">
             <p className="truncate font-medium text-text-primary">{r.name}</p>
-            <p className="truncate text-xs text-text-secondary/60">{r.email || '—'}</p>
+            <p className="truncate text-xs text-text-secondary/70">{r.email || '—'}</p>
           </div>
         </div>
       ),
@@ -283,6 +310,14 @@ export default function Students() {
             <AnimatedIcon icon={Eye} size={16} animation="hover" />
           </button>
           <button
+            onClick={() => setEditTarget(r)}
+            title="Edit student"
+            aria-label={`Edit ${r.name}`}
+            className="rounded-lg p-1.5 text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-turmeric active:scale-95"
+          >
+            <AnimatedIcon icon={Pencil} size={16} animation="hover" />
+          </button>
+          <button
             onClick={() => openReset(r)}
             title="Reset password"
             aria-label={`Reset password for ${r.name}`}
@@ -299,6 +334,14 @@ export default function Students() {
             }`}
           >
             <AnimatedIcon icon={r.suspended ? CheckCircle2 : Ban} size={16} animation="pop" />
+          </button>
+          <button
+            onClick={() => setDeleteTarget(r)}
+            title="Delete student"
+            aria-label={`Delete ${r.name}`}
+            className="rounded-lg p-1.5 text-error transition-colors duration-150 ease-out hover:bg-surface active:scale-95"
+          >
+            <AnimatedIcon icon={Trash2} size={16} animation="pop" />
           </button>
         </div>
       ),
@@ -352,75 +395,14 @@ export default function Students() {
         />
       </QueryState>
 
-      {/* View progress modal */}
-      <Modal
+      {/* Full progress / detail view (GET /admin/students/:id) */}
+      <StudentDetailModal
         open={!!viewing}
         onClose={() => setViewing(null)}
-        title="Student Progress"
-        size="md"
-      >
-        {viewing && (
-          <div className="space-y-5">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-turmeric/20 text-xl font-bold text-turmeric">
-                {(viewing.name || '?').charAt(0)}
-              </div>
-              <div>
-                <p className="font-heading text-lg font-bold text-text-primary">
-                  {viewing.name}
-                </p>
-                <p className="text-sm text-text-secondary/70">{viewing.email}</p>
-                <div className="mt-1">
-                  <StatusBadge status={viewing.status} />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { icon: Zap, label: 'Total XP', value: (viewing.xp ?? 0).toLocaleString() },
-                { icon: Award, label: 'Coins', value: viewing.coins ?? 0 },
-                { icon: Trophy, label: 'Badges', value: viewing.achievements ?? 0 },
-              ].map((m) => (
-                <div key={m.label} className="rounded-xl border border-k-border bg-malt/40 p-3 text-center">
-                  <m.icon size={18} className="mx-auto mb-1 text-turmeric" />
-                  <p className="font-heading text-lg font-bold text-text-primary">
-                    {m.value}
-                  </p>
-                  <p className="text-xs text-text-secondary/60">{m.label}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-2 text-sm">
-              <Row label="Grade" value={viewing.grade || '—'} />
-              <Row label="Current World" value={viewing.world || '—'} />
-              <Row label="Level" value={`Level ${viewing.level ?? 1}`} />
-              <Row label="Course Completion" value={`${viewing.completionRate ?? 0}%`} />
-              <Row
-                label="Last Active"
-                value={
-                  viewing.lastActiveDays == null
-                    ? '—'
-                    : viewing.lastActiveDays === 0
-                    ? 'Today'
-                    : `${viewing.lastActiveDays} day(s) ago`
-                }
-              />
-            </div>
-
-            <div>
-              <p className="k-label mb-1.5">Overall Progress</p>
-              <div className="h-3 overflow-hidden rounded-full bg-malt">
-                <div
-                  className="h-full rounded-full bg-turmeric shadow-glow"
-                  style={{ width: `${viewing.completionRate ?? 0}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+        studentId={viewing?.id}
+        fallbackName={viewing?.name}
+        role="admin"
+      />
 
       <ConfirmDialog
         open={!!confirmTarget}
@@ -435,6 +417,27 @@ export default function Students() {
             ? `Restore access for ${confirmTarget?.name}?`
             : `${confirmTarget?.name} will lose access to the platform until reinstated.`
         }
+      />
+
+      {/* Edit student (PATCH /admin/students/:id) */}
+      <StudentEditModal
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        student={editTarget}
+        loading={updating}
+        onSubmit={(id, patch) => updateStudent({ id, ...patch }).unwrap()}
+      />
+
+      {/* Delete student (DELETE /admin/students/:id) */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={doDelete}
+        loading={deleting}
+        title="Delete student?"
+        confirmLabel="Delete"
+        variant="danger"
+        message={`Delete ${deleteTarget?.name}? This permanently removes the student and their progress. This cannot be undone.`}
       />
 
       {/* Add single student */}
@@ -522,6 +525,23 @@ export default function Students() {
                 placeholder="Sharma"
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                label="Grade"
+                name="grade"
+                as="select"
+                value={addForm.grade}
+                onChange={onAddField}
+                options={GRADE_OPTIONS}
+              />
+              <FormField
+                label="School"
+                name="school"
+                value={addForm.school}
+                onChange={onAddField}
+                placeholder="Springfield Public School"
+              />
+            </div>
             <FormField
               label="Username (optional)"
               name="username"
@@ -594,7 +614,7 @@ export default function Students() {
               </div>
               <div className="min-w-0">
                 <p className="truncate font-medium text-text-primary">{resetTarget.name}</p>
-                <p className="truncate text-xs text-text-secondary/60">
+                <p className="truncate text-xs text-text-secondary/70">
                   {resetTarget.username || resetTarget.email || '—'}
                 </p>
               </div>
@@ -702,15 +722,6 @@ export default function Students() {
         onClose={() => setBulkOpen(false)}
         onComplete={() => refetch()}
       />
-    </div>
-  );
-}
-
-function Row({ label, value }) {
-  return (
-    <div className="flex items-center justify-between border-b border-k-border/50 py-2">
-      <span className="text-text-secondary/70">{label}</span>
-      <span className="font-medium text-text-primary">{value}</span>
     </div>
   );
 }

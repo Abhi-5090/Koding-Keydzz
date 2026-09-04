@@ -5,6 +5,9 @@ import {
   UploadCloud,
   Download,
   KeyRound,
+  Eye,
+  Pencil,
+  Trash2,
   Ban,
   CheckCircle2,
   Copy,
@@ -20,6 +23,9 @@ import FormField from '../ui/FormField';
 import QueryState from '../ui/QueryState';
 import AnimatedIcon from '../ui/AnimatedIcon';
 import BulkUploadModal from '../students/BulkUploadModal';
+import StudentDetailModal from '../students/StudentDetailModal';
+import StudentEditModal, { GRADE_OPTIONS } from '../students/StudentEditModal';
+import { formatApiError } from '../../utils/apiError';
 
 function StatusBadge({ status }) {
   const map = {
@@ -41,7 +47,16 @@ function asList(data) {
   return data?.students || data?.items || [];
 }
 
-const emptyStudent = { firstName: '', lastName: '', email: '', phone: '', username: '', password: '' };
+const emptyStudent = {
+  firstName: '',
+  lastName: '',
+  grade: '',
+  school: '',
+  email: '',
+  phone: '',
+  username: '',
+  password: '',
+};
 
 /**
  * Shared org-student roster experience used by BOTH the super admin (per-org,
@@ -70,11 +85,16 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
   } = source.useStudents();
   const [createStudent, { isLoading: adding }] = source.useCreate();
   const [suspendStudent, { isLoading: suspending }] = source.useSuspend();
+  const [updateStudent, { isLoading: updating }] = source.useUpdate();
+  const [deleteStudent, { isLoading: deleting }] = source.useDelete();
   const [resetStudentPassword, { isLoading: resetting }] = source.useReset();
 
   const students = asList(data);
   const liveCount = count ?? (data?.total ?? students.length);
 
+  const [viewing, setViewing] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState(emptyStudent);
@@ -113,6 +133,8 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
       const res = await createStudent({
         firstName: addForm.firstName.trim(),
         lastName: addForm.lastName.trim(),
+        grade: addForm.grade || undefined,
+        school: addForm.school.trim() || undefined,
         email: addForm.email.trim() || undefined,
         phone: addForm.phone.trim() || undefined,
         username: addForm.username.trim() || undefined,
@@ -131,8 +153,7 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
     } catch (err) {
       setAddError(
         err?.data?.details?.[0]?.message ||
-          err?.data?.message ||
-          'Could not add the student. Please try again.'
+          formatApiError(err, 'Could not add the student. Please try again.')
       );
     }
   };
@@ -155,6 +176,15 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
     setConfirmTarget(null);
   };
 
+  const doDelete = async () => {
+    try {
+      await deleteStudent(deleteTarget.id).unwrap();
+    } catch {
+      /* table reflects server state */
+    }
+    setDeleteTarget(null);
+  };
+
   const openReset = (student) => {
     setResetTarget(student);
     setResetResult(null);
@@ -168,7 +198,7 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
       const res = await resetStudentPassword({ id: resetTarget.id }).unwrap();
       setResetResult({ student: res?.student || resetTarget, password: res?.password });
     } catch (err) {
-      setResetError(err?.data?.message || 'Could not reset the password. Please try again.');
+      setResetError(formatApiError(err, 'Could not reset the password. Please try again.'));
     }
   };
 
@@ -211,7 +241,7 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
           </div>
           <div className="min-w-0 max-w-[220px]">
             <p className="truncate font-medium text-text-primary">{studentName(r)}</p>
-            <p className="truncate text-xs text-text-secondary/60">{r.email || '—'}</p>
+            <p className="truncate text-xs text-text-secondary/70">{r.email || '—'}</p>
           </div>
         </div>
       ),
@@ -245,6 +275,22 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
       render: (r) => (
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setViewing(r)}
+            title="View progress"
+            aria-label={`View progress for ${studentName(r)}`}
+            className="rounded-lg p-1.5 text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-turmeric active:scale-95"
+          >
+            <AnimatedIcon icon={Eye} size={16} animation="hover" />
+          </button>
+          <button
+            onClick={() => setEditTarget(r)}
+            title="Edit student"
+            aria-label={`Edit ${studentName(r)}`}
+            className="rounded-lg p-1.5 text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-turmeric active:scale-95"
+          >
+            <AnimatedIcon icon={Pencil} size={16} animation="hover" />
+          </button>
+          <button
             onClick={() => openReset(r)}
             title="Reset password"
             aria-label={`Reset password for ${studentName(r)}`}
@@ -261,6 +307,14 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
             }`}
           >
             <AnimatedIcon icon={r.suspended ? CheckCircle2 : Ban} size={16} animation="pop" />
+          </button>
+          <button
+            onClick={() => setDeleteTarget(r)}
+            title="Delete student"
+            aria-label={`Delete ${studentName(r)}`}
+            className="rounded-lg p-1.5 text-error transition-colors duration-150 ease-out hover:bg-surface active:scale-95"
+          >
+            <AnimatedIcon icon={Trash2} size={16} animation="pop" />
           </button>
         </div>
       ),
@@ -400,6 +454,23 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
                 placeholder="Sharma"
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                label="Grade"
+                name="grade"
+                as="select"
+                value={addForm.grade}
+                onChange={onAddField}
+                options={GRADE_OPTIONS}
+              />
+              <FormField
+                label="School"
+                name="school"
+                value={addForm.school}
+                onChange={onAddField}
+                placeholder="Springfield Public School"
+              />
+            </div>
             <FormField
               label="Username (optional)"
               name="username"
@@ -456,6 +527,27 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
         }
       />
 
+      {/* Edit student */}
+      <StudentEditModal
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        student={editTarget}
+        loading={updating}
+        onSubmit={(id, patch) => updateStudent({ id, ...patch }).unwrap()}
+      />
+
+      {/* Delete student */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={doDelete}
+        loading={deleting}
+        title="Delete student?"
+        confirmLabel="Delete"
+        variant="danger"
+        message={`Delete ${studentName(deleteTarget || {})}? This permanently removes the student and their progress. This cannot be undone.`}
+      />
+
       {/* Reset password */}
       <Modal
         open={!!resetTarget}
@@ -487,7 +579,7 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
               </div>
               <div className="min-w-0">
                 <p className="truncate font-medium text-text-primary">{studentName(resetTarget)}</p>
-                <p className="truncate text-xs text-text-secondary/60">
+                <p className="truncate text-xs text-text-secondary/70">
                   {resetTarget.username || resetTarget.email || '—'}
                 </p>
               </div>
@@ -539,6 +631,14 @@ export default function OrgStudents({ source, count, title = 'Students' }) {
           </div>
         )}
       </Modal>
+
+      <StudentDetailModal
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        studentId={viewing?.id}
+        fallbackName={viewing && studentName(viewing)}
+        role={source.detailRole || 'admin'}
+      />
 
       <BulkUploadModal
         open={bulkOpen}

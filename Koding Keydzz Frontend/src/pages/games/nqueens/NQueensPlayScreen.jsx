@@ -131,6 +131,10 @@ export default function NQueensPlayScreen({ level, onExit, onNext, hasNext, comp
       const res = await completeLevel(level, stars, {
         moves: Array.isArray(placedQueens) ? placedQueens.length : n,
         timeMs,
+        // Reported so the SERVER can grade the stars from the same rule the
+        // player was shown; its verdict is what the account records.
+        // An N-Queens "mistake" is a queen placed where it was attacked.
+        performance: { hintsUsed, mistakes: missUsed },
       })
       if (cancelled.current) return
       setLevelRank(Number.isFinite(res?.levelRank) ? res.levelRank : null)

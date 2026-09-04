@@ -8,13 +8,14 @@ import {
 import { useGetAvatarItemsQuery } from '../../features/avatar/avatarApi'
 import { formatMs } from '../../games/shared/useLevelTimer'
 import QueryState from '../ui/QueryState'
+import { BOARD_MUTED } from '../../theme/tokens'
 
 const EASE_OUT = [0.23, 1, 0.32, 1]
 
 // Podium colours per spec: 1st turmeric, 2nd text-secondary, 3rd bronze.
 const MEDALS = {
   1: { icon: Crown, color: '#FF602F' },
-  2: { icon: Medal, color: '#9DB8C4' },
+  2: { icon: Medal, color: BOARD_MUTED },
   3: { icon: Medal, color: '#C98A5A' },
 }
 
@@ -255,7 +256,7 @@ function StarCell({ stars }) {
           key={i}
           size={12}
           strokeWidth={2.5}
-          className={i < s ? 'text-turmeric' : 'text-text-secondary/40'}
+          className={i < s ? 'text-turmeric' : 'text-text-secondary/70'}
           fill={i < s ? '#FF602F' : 'transparent'}
         />
       ))}

@@ -25,6 +25,8 @@ import FormField from '../../components/ui/FormField';
 import PageHeader from '../../components/ui/PageHeader';
 import QueryState from '../../components/ui/QueryState';
 import OrgCard from '../../components/org/OrgCard';
+import UnassignedUsers from '../../components/org/UnassignedUsers';
+import { formatApiError } from '../../utils/apiError';
 
 function asList(data) {
   if (Array.isArray(data)) return data;
@@ -117,10 +119,9 @@ export default function Organizations() {
       const apiUrl = import.meta.env.VITE_API_URL || 'the server';
       const msg =
         detail ||
-        err?.data?.message ||
         (err?.status === 'FETCH_ERROR'
           ? `Can't reach the API at ${apiUrl}. Make sure the backend is running on :5500, then hard-refresh this page (Cmd+Shift+R).`
-          : 'Could not create the organization. Please try again.');
+          : formatApiError(err, 'Could not create the organization. Please try again.'));
       setFormError(msg);
     }
   };
@@ -172,7 +173,7 @@ export default function Organizations() {
       await updateOrgAdmin(body).unwrap();
       setAdminTarget(null);
     } catch (err) {
-      setAdminError(err?.data?.message || 'Could not update the admin. Please try again.');
+      setAdminError(formatApiError(err, 'Could not update the admin. Please try again.'));
     }
   };
 
@@ -199,6 +200,12 @@ export default function Organizations() {
           Create Organization
         </Button>
       </PageHeader>
+
+      {/* Tenancy problems first: an account owned by no school is a live
+          data-visibility fault, so it sits above the org list rather than
+          being something you have to go looking for. Renders nothing when
+          there are none. */}
+      <UnassignedUsers />
 
       {created && (
         <motion.div
@@ -238,7 +245,7 @@ export default function Organizations() {
 
           <dl className="mt-4 grid grid-cols-1 gap-4 rounded-xl border border-k-border bg-malt/40 p-4 sm:grid-cols-2">
             <div>
-              <dt className="text-xs uppercase tracking-wide text-text-secondary/60">
+              <dt className="text-xs uppercase tracking-wide text-text-secondary/70">
                 Organization
               </dt>
               <dd className="mt-0.5 text-sm font-medium text-text-primary">
@@ -246,13 +253,13 @@ export default function Organizations() {
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-text-secondary/60">
+              <dt className="text-xs uppercase tracking-wide text-text-secondary/70">
                 Org code
               </dt>
               <dd className="mt-0.5 font-mono text-sm text-turmeric">{created.org.code}</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-text-secondary/60">
+              <dt className="text-xs uppercase tracking-wide text-text-secondary/70">
                 Admin login email
               </dt>
               <dd className="mt-0.5 break-all font-mono text-sm text-turmeric">
@@ -260,7 +267,7 @@ export default function Organizations() {
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-text-secondary/60">
+              <dt className="text-xs uppercase tracking-wide text-text-secondary/70">
                 Admin password
               </dt>
               <dd className="mt-0.5 break-all font-mono text-sm text-turmeric">
@@ -380,7 +387,7 @@ export default function Organizations() {
                     Generate
                   </Button>
                 </div>
-                <p className="mt-1 text-xs text-text-secondary/60">
+                <p className="mt-1 text-xs text-text-secondary/70">
                   These are the credentials the Org Admin will use to log in.
                 </p>
               </div>
@@ -431,10 +438,15 @@ export default function Organizations() {
             onChange={(e) => setAdminForm((f) => ({ ...f, adminEmail: e.target.value }))}
           />
           <div>
-            <label className="k-label">New Password</label>
+            <label className="k-label" htmlFor="org-admin-password">
+              New Password
+            </label>
             <div className="flex items-center gap-2">
               <input
+                id="org-admin-password"
+                name="adminPassword"
                 type="text"
+                autoComplete="new-password"
                 value={adminForm.adminPassword}
                 onChange={(e) => setAdminForm((f) => ({ ...f, adminPassword: e.target.value }))}
                 placeholder="Leave blank to keep current"

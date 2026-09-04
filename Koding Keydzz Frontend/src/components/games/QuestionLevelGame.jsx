@@ -13,6 +13,7 @@ import {
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LevelWinOverlay from './LevelWinOverlay'
+import { cssVar } from '../../theme/tokens'
 
 /**
  * QuestionLevelGame — reusable engine for question-set levels.
@@ -39,6 +40,8 @@ import LevelWinOverlay from './LevelWinOverlay'
  *                     timer, no behavior change for the other games.
  *
  * Stars: 3 = zero wrong (all first-try), 2 = 1–2 wrong, 1 = completed with more.
+ * The wrong-answer count is REPORTED to the server, which applies that same
+ * rule — the client no longer names its own star count.
  * Never reveals future answers; optional `explain` shown only after a wrong pick.
  */
 export default function QuestionLevelGame({
@@ -130,11 +133,14 @@ export default function QuestionLevelGame({
 
   const finish = useCallback(
     async (totalWrong) => {
+      // Shown to the player immediately. The SERVER regrades from `mistakes`
+      // below and its answer is what the account records — see
+      // backend src/config/starPolicy.js.
       const earned = totalWrong === 0 ? 3 : totalWrong <= 2 ? 2 : 1
       setStars(earned)
       setFinished(true)
       setAwarding(true)
-      const res = await onComplete?.(earned)
+      const res = await onComplete?.(earned, { hintsUsed: 0, mistakes: totalWrong })
       const awarded = res?.awarded || { xp: 0, coins: 0 }
       if (res?.alreadyCompleted || (!awarded.xp && !awarded.coins)) {
         setAlreadyMastered(!!res?.alreadyCompleted)
@@ -209,7 +215,7 @@ export default function QuestionLevelGame({
             className="h-2 rounded-full transition-[width,background-color,opacity] duration-300 ease-out"
             style={{
               width: i === index ? 22 : 8,
-              background: i < index ? tint : i === index ? tint : '#9DB8C455',
+              background: i < index ? tint : i === index ? tint : cssVar('muted', 0.33),
               opacity: i <= index ? 1 : 0.4,
             }}
           />

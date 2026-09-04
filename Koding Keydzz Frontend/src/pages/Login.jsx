@@ -39,6 +39,7 @@ export default function Login() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-malt px-6 py-12">
       <div className="absolute inset-0 bg-gradient-to-br from-malt via-card to-malt" />
+
       <Particles count={24} />
       <FloatingShapes />
 
@@ -109,7 +110,7 @@ function Field({ label, ...props }) {
       <input
         {...props}
         required
-        className="w-full rounded-xl border border-k-border bg-surface/60 px-4 py-3 text-text-primary outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-text-secondary/50 focus:border-turmeric focus:shadow-golden-glow"
+        className="w-full rounded-xl border border-k-border bg-surface/60 px-4 py-3 text-text-primary outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-text-secondary/70 focus:border-turmeric focus:shadow-golden-glow"
       />
     </label>
   )

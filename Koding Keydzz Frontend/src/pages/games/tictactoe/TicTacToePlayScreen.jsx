@@ -136,7 +136,15 @@ export default function TicTacToePlayScreen({
       if (!passed) return
 
       setAwarding(true)
-      const res = await completeLevel(level, stars, { moves: humanMoves, timeMs })
+      const res = await completeLevel(level, stars, {
+        moves: humanMoves,
+        timeMs,
+        // The server decides whether a draw is perfect play, from the bot
+        // skill in its own catalogue — 'X' is the player.
+        performance: {
+          outcome: finalOutcome === 'X' ? 'win' : finalOutcome === 'draw' ? 'draw' : 'loss',
+        },
+      })
       if (cancelled.current) return
       setLevelRank(Number.isFinite(res?.levelRank) ? res.levelRank : null)
       const awarded = res?.awarded || { xp: 0, coins: 0 }

@@ -1,0 +1,79 @@
+/**
+ * THEME TOKENS — the single source of truth for colour.
+ *
+ * ONE THEME. The app is dark: hot ember on deep teal-navy. There is no light
+ * mode and no theme switching — `:root` below is the whole palette.
+ *
+ * WHY THE VALUES ARE STILL CSS VARIABLES RATHER THAN HEX IN THE COMPONENTS
+ * -----------------------------------------------------------------------
+ * Nothing to do with switching themes. It is so there is exactly one place a
+ * colour is defined. Before this, the same six brand hexes were written out by
+ * hand in ~90 places — game-board grounds, SVG fills, the Monaco theme object,
+ * inline badge styles — and they drifted. Tailwind resolves every colour
+ * utility to these variables, and the handful of places a class cannot reach
+ * (a board cell computed from a world tint) read them through
+ * `src/theme/tokens.js`.
+ *
+ * Values are space-separated RGB CHANNELS, not hex, so Tailwind can compose
+ * them with an alpha modifier: `bg-card/80` becomes `rgb(var(--c-card) / 0.8)`.
+ * The codebase relies on those modifiers 300+ times, so a hex-valued variable
+ * would silently break every one of them.
+ *
+ * `--c-ember` is a deliberate duplicate of `--c-primary`. It marks the places
+ * that want the brand hue as a GRAPHIC — a world tint, a star fill, a glow —
+ * as distinct from the places that want it as readable ink. They are the same
+ * value today; the distinction is what stops the two being conflated.
+ *
+ * Every text/background pairing here is contrast-proven, not eyeballed — see
+ * src/theme/contrast.test.js, which parses this file and fails the build if
+ * any pairing drops below WCAG AA.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --c-bg: 0 22 33;            /* #001621 app background */
+  --c-bg-elev: 4 33 46;       /* #04212E nav / topbar / sidebar */
+  --c-card: 4 33 46;          /* #04212E card background */
+  --c-surface: 10 46 60;      /* #0A2E3C raised surface inside a card */
+  --c-text: 255 255 255;      /* #FFFFFF primary text */
+  /**
+   * Secondary text. 7.96:1 on card at full opacity.
+   *
+   * DO NOT USE BELOW /70. Measured against the card ground: /70 is 4.60:1 (passes),
+   * /60 is 3.74:1 and /50 is 3.01:1 — both FAIL the 4.5:1 that WCAG AA
+   * requires and that the platform's own HTML course teaches. An axe audit
+   * found 96 uses at /60 and below across the two apps; they were raised to
+   * /70, which is the lowest passing value and still reads as muted.
+   */
+  --c-muted: 157 184 196;     /* #9DB8C4 secondary text */
+  --c-primary: 255 96 47;     /* #FF602F brand: text, icons and fills */
+  --c-accent: 255 106 61;     /* #FF6A3D brand hover step */
+  --c-success: 52 211 153;    /* #34D399 */
+  --c-error: 255 84 112;      /* #FF5470 */
+  --c-focus: 255 96 47;       /* #FF602F focus ring */
+  --c-ember: 255 96 47;       /* #FF602F the brand hue as a GRAPHIC */
+
+  --c-border-rgb: 255 96 47;
+  --c-border-a: 0.16;
+
+  /* ---- Elevation ----
+     On a dark ground the brand glow IS the elevation. */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lift: 0 12px 32px rgb(0 0 0 / 0.5);
+  --shadow-brand: 0 0 24px rgb(255 96 47 / 0.5);
+  --shadow-brand-lg: 0 0 56px rgb(255 96 47 / 0.5);
+
+  /* Kept as variables so the components that reference them keep working and
+     the intent stays declared in one place. */
+  --glow-strength: 1;
+  --deco-opacity: 0.6;
+  --deco-opacity-mult: 1;
+
+  /* ---- Motion ----
+     Built-in CSS easings are too weak to read as intentional. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+}

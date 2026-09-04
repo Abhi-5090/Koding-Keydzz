@@ -7,6 +7,7 @@ import {
   registerStudentSchema,
   loginSchema,
   refreshSchema,
+  changePasswordSchema,
 } from '../utils/validators.js';
 
 const router = Router();
@@ -35,5 +36,18 @@ router.post('/login', validate({ body: loginSchema }), authController.login);
 router.post('/refresh', validate({ body: refreshSchema }), authController.refresh);
 router.post('/logout', protect, authController.logout);
 router.get('/me', protect, authController.me);
+
+/**
+ * Change your own password.
+ *
+ * Reachable while `mustChangePassword` is set — it is on the allowlist in
+ * `protect`, because it is the one thing such an account must be able to do.
+ */
+router.post(
+  '/change-password',
+  protect,
+  validate({ body: changePasswordSchema }),
+  authController.changePassword
+);
 
 export default router;

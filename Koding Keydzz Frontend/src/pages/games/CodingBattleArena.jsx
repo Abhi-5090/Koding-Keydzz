@@ -65,7 +65,7 @@ function CampaignBattle({ onExit }) {
           onNext={onNext}
           hasNext={hasNext}
           timePerQuestion={TIME_BY_DIFFICULTY[level.difficulty] || 12}
-          onComplete={(stars) => completeLevel(level, stars)}
+          onComplete={(stars, performance) => completeLevel(level, stars, { performance })}
         />
       )}
     />

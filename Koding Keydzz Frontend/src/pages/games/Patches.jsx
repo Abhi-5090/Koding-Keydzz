@@ -5,6 +5,7 @@ import levels from '../../data/patchesLevels'
 import LeveledGamePage from '../../components/games/LeveledGamePage'
 import HowToPlayModal from '../../components/games/HowToPlayModal'
 import PatchesPlayScreen from './patches/PatchesPlayScreen'
+import { BOARD_BG } from '../../theme/tokens'
 
 const GAME_KEY = 'patches'
 const TINT = '#8B7CF6'
@@ -141,7 +142,7 @@ function TypeCard({ icon: Icon, glyph, n, color, title, desc, box, grid }) {
           width: grid.cols * cell,
           height: grid.rows * cell,
           borderColor: `${color}88`,
-          background: '#001621',
+          background: BOARD_BG,
         }}
       >
         <div

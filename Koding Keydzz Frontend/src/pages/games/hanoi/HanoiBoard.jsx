@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import { cssVar } from '../../../theme/tokens'
 
 /**
  * HanoiBoard — three vertical rods on a shared base. Each disk is a rounded
@@ -112,7 +113,7 @@ function Peg({
             height: '100%',
             background: isGoal
               ? `linear-gradient(180deg, ${tint}, ${tint}55)`
-              : 'linear-gradient(180deg, #0A2E3C, #04212E)',
+              : `linear-gradient(180deg, ${cssVar('surface')}, ${cssVar('card')})`,
             boxShadow: isGoal ? `0 0 12px ${tint}66` : 'none',
           }}
         />

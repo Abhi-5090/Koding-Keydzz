@@ -1,37 +1,61 @@
 import { gameScoreRepository } from '../repositories/gameScoreRepository.js';
 import { aggregatePerGame, comparePerLevel } from '../utils/leaderboard.js';
+import { publicDisplayName, isSameUser } from '../utils/privacy.js';
 
-function sameUser(a, b) {
-  return String(a) === String(b);
-}
-
-function toGameEntry(row) {
+/**
+ * Shape a per-game aggregate row for the client.
+ *
+ * Note what is NOT here: the raw `userId`. Returning it let any signed-in
+ * student enumerate every other child's id, which was the key needed to
+ * hijack their private notification room. Callers identify their own row via
+ * the `isMe` flag (and the separate `me` field) instead.
+ */
+function toGameEntry(row, requesterId) {
   return {
     rank: row.rank,
-    userId: row.userId,
-    name: row.name,
+    name: publicDisplayName(row.name),
     avatar: row.avatar,
     levelsCompleted: row.levelsCompleted,
     totalStars: row.totalStars,
     totalMoves: row.totalMoves,
     totalTimeMs: row.totalTimeMs,
+    isMe: isSameUser(row.userId, requesterId),
+  };
+}
+
+function toLevelEntry(row, rank, requesterId) {
+  return {
+    rank,
+    name: publicDisplayName(row.name),
+    avatar: row.avatar,
+    moves: row.moves,
+    timeMs: row.timeMs,
+    stars: row.stars,
+    isMe: isSameUser(row.user, requesterId),
   };
 }
 
 /**
  * Aggregate leaderboard for a game across players.
- * scope 'org' restricts to the requester's org; 'global' (default) spans all
- * students. The requester's own row is always returned as `me`, even if it
- * falls outside the top `limit`.
+ *
+ * Scope defaults to 'org' (the requester's own school). A cross-tenant
+ * 'global' board publishes one school's children to another's, so it is
+ * opt-in and still name-reduced. `org` is required for the org scope; if it is
+ * missing we return an empty board rather than silently falling back to global.
  */
 export async function getGameLeaderboard({
   gameKey,
   userId,
-  scope = 'global',
+  scope = 'org',
   org = null,
   limit = 20,
 }) {
-  const orgFilter = scope === 'org' ? org : null;
+  const resolvedScope = scope === 'global' ? 'global' : 'org';
+  if (resolvedScope === 'org' && !org) {
+    return { entries: [], me: null, totalPlayers: 0, scope: resolvedScope };
+  }
+
+  const orgFilter = resolvedScope === 'org' ? org : null;
   const rows = await gameScoreRepository.scoresForGameWithUser(gameKey, {
     org: orgFilter,
   });
@@ -39,45 +63,44 @@ export async function getGameLeaderboard({
   const ranked = aggregatePerGame(rows); // sorted + rank assigned
   const totalPlayers = ranked.length;
 
-  const meRow = ranked.find((r) => sameUser(r.userId, userId)) || null;
-  const entries = ranked.slice(0, limit).map(toGameEntry);
-  const me = meRow ? toGameEntry(meRow) : null;
+  const meRow = ranked.find((r) => isSameUser(r.userId, userId)) || null;
+  const entries = ranked.slice(0, limit).map((r) => toGameEntry(r, userId));
+  const me = meRow ? toGameEntry(meRow, userId) : null;
 
-  return { entries, me, totalPlayers };
+  return { entries, me, totalPlayers, scope: resolvedScope };
 }
 
 /**
  * Per-level ranking of players by moves asc, then timeMs asc. Only players with
- * a recorded score for the level are included.
+ * a recorded score for the level are included. Same scoping rules as above.
  */
 export async function getLevelLeaderboard({
   gameKey,
   levelId,
   userId,
-  scope = 'global',
+  scope = 'org',
   org = null,
   limit = 20,
 }) {
-  const orgFilter = scope === 'org' ? org : null;
+  const resolvedScope = scope === 'global' ? 'global' : 'org';
+  if (resolvedScope === 'org' && !org) {
+    return { entries: [], me: null, totalPlayers: 0, scope: resolvedScope };
+  }
+
+  const orgFilter = resolvedScope === 'org' ? org : null;
   const rows = await gameScoreRepository.scoresForLevelWithUser(gameKey, levelId, {
     org: orgFilter,
   });
 
-  const ranked = [...rows].sort(comparePerLevel).map((r, i) => ({
-    rank: i + 1,
-    userId: r.user,
-    name: r.name,
-    avatar: r.avatar,
-    moves: r.moves,
-    timeMs: r.timeMs,
-    stars: r.stars,
-  }));
-  const totalPlayers = ranked.length;
+  const sorted = [...rows].sort(comparePerLevel);
+  const totalPlayers = sorted.length;
 
-  const me = ranked.find((r) => sameUser(r.userId, userId)) || null;
-  const entries = ranked.slice(0, limit);
+  const entries = sorted.slice(0, limit).map((r, i) => toLevelEntry(r, i + 1, userId));
 
-  return { entries, me, totalPlayers };
+  const myIndex = sorted.findIndex((r) => isSameUser(r.user, userId));
+  const me = myIndex === -1 ? null : toLevelEntry(sorted[myIndex], myIndex + 1, userId);
+
+  return { entries, me, totalPlayers, scope: resolvedScope };
 }
 
 export default { getGameLeaderboard, getLevelLeaderboard };

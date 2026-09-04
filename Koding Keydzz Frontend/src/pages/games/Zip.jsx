@@ -4,6 +4,7 @@ import levels from '../../data/zipLevels'
 import LeveledGamePage from '../../components/games/LeveledGamePage'
 import HowToPlayModal from '../../components/games/HowToPlayModal'
 import ZipPlayScreen from './zip/ZipPlayScreen'
+import { BOARD_BG } from '../../theme/tokens'
 
 const GAME_KEY = 'zip'
 const TINT = '#2DD4BF'
@@ -99,7 +100,7 @@ function ExampleMini({ tint }) {
     <div className="flex items-center gap-3">
       <div
         className="relative overflow-hidden rounded-lg border-2"
-        style={{ width: 96, height: 96, borderColor: `${tint}88`, background: '#001621' }}
+        style={{ width: 96, height: 96, borderColor: `${tint}88`, background: BOARD_BG }}
       >
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 3 3" preserveAspectRatio="none">
           <polyline

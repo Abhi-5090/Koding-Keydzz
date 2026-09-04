@@ -25,20 +25,23 @@ export const listDailyChallenges = asyncHandler(async (_req, res) => {
 });
 
 export const getLeaderboard = asyncHandler(async (req, res) => {
-  // New param is `scope` ('global' | 'school'); the legacy `type` param is kept
-  // for back-compat (unknown types fall through to 'global').
-  const requested = req.query.scope || req.query.type || 'global';
-  const scope = requested === 'school' ? 'school' : 'global';
-
-  // The school board is org-scoped and therefore requires authentication.
-  if (scope === 'school' && !req.user) {
-    throw ApiError.unauthorized('Authentication is required for the school leaderboard');
+  // Authentication is mandatory: this board lists children by name, so it must
+  // never answer an anonymous caller. The route enforces it too (protect), and
+  // this is the defence in depth.
+  if (!req.user) {
+    throw ApiError.unauthorized('Authentication is required to view the leaderboard');
   }
+
+  // `scope` is the current param; the legacy `type` param is still accepted.
+  // The DEFAULT is now 'school' — a cross-tenant board has to be asked for
+  // explicitly rather than being what you get by omitting a parameter.
+  const requested = req.query.scope || req.query.type || 'school';
+  const scope = requested === 'global' ? 'global' : 'school';
 
   const data = await leaderboardService.getLeaderboard({
     scope,
-    org: scope === 'school' ? req.user.org : null,
-    userId: req.user ? req.user._id : null,
+    org: req.user.org,
+    userId: req.user._id,
   });
   return sendSuccess(res, data, 'Leaderboard');
 });

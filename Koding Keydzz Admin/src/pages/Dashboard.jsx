@@ -1,261 +1,509 @@
-import { Users, UserCheck, Target, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from 'recharts';
-import { useGetStatsQuery } from '../features/admin/adminApi';
-import StatCard from '../components/ui/StatCard';
-import ChartCard from '../components/ui/ChartCard';
+  Users,
+  UserCheck,
+  GraduationCap,
+  School,
+  AlertTriangle,
+  TrendingUp,
+  Trophy,
+  ArrowRight,
+  CalendarDays,
+  Info,
+} from 'lucide-react';
+import { useGetOrgAnalyticsQuery } from '../features/admin/adminApi';
+import { selectAuth } from '../features/auth/authSlice';
 import PageHeader from '../components/ui/PageHeader';
 import QueryState from '../components/ui/QueryState';
+import {
+  ChartPanel,
+  ChartEmpty,
+  StatTile,
+  TrendChart,
+  BarBreakdown,
+  DonutSplit,
+  MeterRow,
+  StatusChip,
+} from '../components/charts/Primitives';
+import { shortDate } from '../components/charts/chartTheme';
+import useChartTheme from '../components/charts/useChartTheme';
+import { useRevealOnScroll } from '../motion/hooks';
 
-// Categorical palette woven from the two brand anchors: hot oranges + cool teals
-// + cool neutral. Lead with primary #FF602F.
-const PIE_COLORS = ['#FF602F', '#FF6A3D', '#2DD4BF', '#5BC0BE', '#9DB8C4'];
+/**
+ * The school dashboard — served to BOTH administrators and faculty.
+ *
+ * The API scopes itself from the caller's token: an administrator sees the
+ * whole school, a teacher sees exactly the pupils in the classes they teach.
+ * So this page has no role branching beyond the wording and which panels are
+ * relevant.
+ *
+ * WRITTEN FOR NON-TECHNICAL READERS. This product is operated by teachers and
+ * school office staff, not analysts, so:
+ *   • every metric has a plain-language explanation behind the (i);
+ *   • no jargon in a label without the definition one tap away;
+ *   • the most actionable panel — who needs help — is placed first, above the
+ *     charts, because that is the reason a teacher opens this page;
+ *   • an empty state explains what to do next, never just "no data".
+ */
 
-const tooltipStyle = {
-  contentStyle: {
-    background: '#04212E',
-    border: '1px solid #FF602F29',
-    borderRadius: 12,
-    color: '#fff',
-  },
-  labelStyle: { color: '#9DB8C4' },
-  itemStyle: { color: '#fff' },
-};
+const RANGES = [
+  { days: 7, label: '7 days' },
+  { days: 30, label: '30 days' },
+  { days: 90, label: '90 days' },
+];
 
-export default function Dashboard() {
-  const { data, isError, isLoading, error, refetch } = useGetStatsQuery();
-
+/** Range switcher. One row above the charts, per the interaction spec. */
+function RangePicker({ value, onChange }) {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        subtitle="Platform overview & learning analytics"
-      />
-
-      <QueryState
-        isLoading={isLoading}
-        isError={isError}
-        error={error}
-        refetch={refetch}
-        isEmpty={!data}
-        loadingLabel="Loading analytics…"
-        emptyTitle="No analytics yet"
-        emptyMessage="Stats will appear here once students start learning."
-      >
-        {data && <DashboardContent stats={data} />}
-      </QueryState>
+    <div
+      className="inline-flex items-center gap-1 rounded-xl border border-k-border bg-card p-1"
+      role="group"
+      aria-label="Reporting period"
+    >
+      <CalendarDays size={14} className="ml-1.5 text-text-secondary/70" aria-hidden="true" />
+      {RANGES.map((r) => (
+        <button
+          key={r.days}
+          type="button"
+          onClick={() => onChange(r.days)}
+          aria-pressed={value === r.days}
+          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-turmeric ${
+            value === r.days
+              ? 'bg-turmeric text-malt'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          {r.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-function DashboardContent({ stats }) {
-  const xpDistribution = stats.xpDistribution || [];
-  const growth = stats.growth || [];
-  const completionTrend = stats.completionTrend || [];
-  const worldDistribution = stats.worldDistribution || [];
-  const retention = stats.retention || [];
+/** The list a teacher actually came for. */
+function AttentionPanel({ students, scope }) {
+  if (!students?.length) {
+    return (
+      <div className="k-card p-5">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-success/15 p-2.5 text-success">
+            <UserCheck size={22} aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-heading text-base font-bold text-text-primary">
+              Everyone is on track
+            </h3>
+            <p className="mt-1 text-sm text-text-secondary/70">
+              No {scope === 'classrooms' ? 'pupil in your classes' : 'student'} is currently
+              flagged as falling behind. Check back after the next lesson.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <section className="k-card overflow-hidden">
+      <header className="flex items-start justify-between gap-3 border-b border-k-border p-5">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-error/15 p-2.5 text-error">
+            <AlertTriangle size={22} aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-heading text-base font-bold text-text-primary">
+              Needs your attention
+            </h3>
+            <p className="mt-0.5 text-sm text-text-secondary/70">
+              {students.length} {students.length === 1 ? 'student is' : 'students are'} falling
+              behind. Start here.
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/students"
+          className="shrink-0 text-xs font-semibold text-turmeric hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-turmeric"
+        >
+          All students
+        </Link>
+      </header>
+
+      <div className="max-h-80 overflow-y-auto">
+        <table className="w-full text-sm">
+          <caption className="sr-only">Students needing attention, most urgent first</caption>
+          <thead className="sticky top-0 bg-card">
+            <tr className="border-b border-k-border text-left text-xs uppercase tracking-wide text-text-secondary/70">
+              <th scope="col" className="px-5 py-2 font-semibold">Student</th>
+              <th scope="col" className="px-3 py-2 font-semibold">Why</th>
+              <th scope="col" className="px-3 py-2 text-right font-semibold">Avg score</th>
+              <th scope="col" className="px-5 py-2 text-right font-semibold">Last active</th>
+            </tr>
+          </thead>
+          <tbody>
+            {students.map((s) => (
+              <tr key={s.id} className="border-b border-k-border/50 last:border-0">
+                <td className="px-5 py-3">
+                  <Link
+                    to={`/students?q=${encodeURIComponent(s.username || s.name)}`}
+                    className="font-semibold text-text-primary hover:text-turmeric focus-visible:outline focus-visible:outline-2 focus-visible:outline-turmeric"
+                  >
+                    {s.name}
+                  </Link>
+                  <div className="text-xs text-text-secondary/70">
+                    {s.rollNumber ? `Roll ${s.rollNumber}` : s.username}
+                    {s.grade ? ` · Grade ${s.grade}` : ''}
+                  </div>
+                </td>
+                <td className="px-3 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {s.attention.slice(0, 2).map((r) => (
+                      <StatusChip key={r} tone="serious">
+                        {r}
+                      </StatusChip>
+                    ))}
+                    {s.attention.length > 2 && (
+                      <span className="text-xs text-text-secondary/70">
+                        +{s.attention.length - 2}
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-right tabular-nums text-text-primary">
+                  {s.quizzesAttempted ? `${s.avgScore}%` : '—'}
+                </td>
+                <td className="px-5 py-3 text-right text-xs tabular-nums text-text-secondary/70">
+                  {s.daysSinceActive == null
+                    ? 'Never'
+                    : s.daysSinceActive === 0
+                      ? 'Today'
+                      : `${s.daysSinceActive}d ago`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export default function Dashboard() {
+  const { CATEGORICAL, STATUS } = useChartTheme();
+  /**
+   * Chart panels rise into place as they scroll into view.
+   *
+   * Scroll-triggered rather than all-on-mount: this dashboard is several
+   * screens tall, so animating everything at load would spend the whole
+   * sequence off-screen where nobody sees it, and would animate content the
+   * user may never scroll to. `once` (the default in useRevealOnScroll) means
+   * a panel settles permanently after its first appearance — a panel that
+   * re-animates every time it crosses the fold is a distraction on the way
+   * back up.
+   */
+  const chartsRef = useRevealOnScroll({ selector: '.k-card', y: 20, stagger: 0.06 });
+  const [days, setDays] = useState(30);
+  const { user } = useSelector(selectAuth);
+  const query = useGetOrgAnalyticsQuery({ days });
+  const d = query.data;
+
+  const isFaculty = user?.role === 'faculty';
+  const firstName = (user?.name || '').split(' ')[0];
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          index={0}
-          label="Total Students"
-          value={(stats.totalStudents ?? 0).toLocaleString()}
-          icon={Users}
-        />
-        <StatCard
-          index={1}
-          label="Active Students"
-          value={(stats.activeStudents ?? 0).toLocaleString()}
-          icon={UserCheck}
-          hint="last 7 days"
-        />
-        <StatCard
-          index={2}
-          label="Completion Rate"
-          value={`${stats.completionRate ?? 0}%`}
-          icon={Target}
-          hint="avg across courses"
-        />
-        <StatCard
-          index={3}
-          label="Avg XP"
-          value={(stats.avgXp ?? 0).toLocaleString()}
-          icon={Zap}
-          hint="per student"
-        />
-      </div>
+      <PageHeader
+        title={firstName ? `Welcome back, ${firstName}` : 'Dashboard'}
+        subtitle={
+          isFaculty
+            ? 'Progress for the classes you teach'
+            : `Progress across ${d?.organization?.name || 'your school'}`
+        }
+      >
+        <RangePicker value={days} onChange={setDays} />
+      </PageHeader>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {xpDistribution.length > 0 && (
-          <ChartCard
-            title="XP Distribution"
-            subtitle="Students grouped by total XP earned"
-            index={0}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={xpDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" vertical={false} />
-                <XAxis dataKey="range" stroke="#9DB8C4" fontSize={12} />
-                <YAxis stroke="#9DB8C4" fontSize={12} allowDecimals={false} />
-                <Tooltip {...tooltipStyle} cursor={{ fill: '#FF602F14' }} />
-                <Bar
-                  dataKey="students"
-                  fill="#FF602F"
-                  radius={[6, 6, 0, 0]}
-                  animationDuration={900}
+      <QueryState
+        isLoading={query.isLoading}
+        isError={query.isError}
+        error={query.error}
+        refetch={query.refetch}
+        loadingLabel="Loading your dashboard…"
+      >
+        {d?.empty ? (
+          /* A teacher with no classes assigned. Tell them exactly what to do
+             rather than showing a wall of zeros. */
+          <div className="k-card flex flex-col items-center gap-3 py-16 text-center">
+            <div className="rounded-full bg-turmeric/15 p-3 text-turmeric">
+              <School size={26} aria-hidden="true" />
+            </div>
+            <h2 className="font-heading text-lg font-bold text-text-primary">
+              No classes assigned yet
+            </h2>
+            <p className="max-w-md text-sm text-text-secondary/70">{d.emptyReason}</p>
+          </div>
+        ) : (
+          <div ref={chartsRef} className="space-y-6">
+            {/* ---- Headline numbers ---- */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatTile
+                index={0}
+                label={isFaculty ? 'My students' : 'Students'}
+                value={d?.kpis?.students?.value ?? 0}
+                delta={d?.kpis?.students?.delta}
+                direction={d?.kpis?.students?.direction}
+                hint={`vs previous ${days} days`}
+                icon={Users}
+              />
+              <StatTile
+                index={1}
+                label="Active this week"
+                value={d?.kpis?.activeStudents?.value ?? 0}
+                delta={d?.kpis?.activeStudents?.delta}
+                direction={d?.kpis?.activeStudents?.direction}
+                hint={`${d?.engagement?.engagementRate ?? 0}% of students`}
+                icon={UserCheck}
+              />
+              <StatTile
+                index={2}
+                label="Average quiz score"
+                value={`${d?.engagement?.classAverageScore ?? 0}%`}
+                delta={null}
+                direction="flat"
+                hint="best attempt per quiz"
+                icon={TrendingUp}
+              />
+              <StatTile
+                index={3}
+                label="Need attention"
+                value={d?.kpis?.needingAttention?.value ?? 0}
+                delta={null}
+                direction="flat"
+                tone="inverse"
+                hint="falling behind"
+                icon={AlertTriangle}
+              />
+            </div>
+
+            {/* ---- The actionable panel, deliberately above the charts ---- */}
+            <AttentionPanel students={d?.needingAttention} scope={d?.scope} />
+
+            {/* ---- Activity over time ---- */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <ChartPanel
+                index={0}
+                title="Learning activity"
+                subtitle={`Quiz attempts and game levels, last ${days} days`}
+                help="Each point counts how many quizzes were submitted and how many game levels were finished that day. A flat line means nobody used the app — often a holiday, or a class that has stopped logging in."
+              >
+                <TrendChart
+                  data={(d?.series?.quizActivity || []).map((row, i) => ({
+                    date: row.date,
+                    quizzes: row.value,
+                    games: d?.series?.gameActivity?.[i]?.value ?? 0,
+                  }))}
+                  series={[
+                    { key: 'quizzes', label: 'Quiz attempts' },
+                    { key: 'games', label: 'Game levels' },
+                  ]}
+                  formatX={shortDate}
+                  emptyMessage="No activity in this period"
+                  emptyHint="Once students start playing, their daily activity appears here."
                 />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
+              </ChartPanel>
 
-        {growth.length > 0 && (
-          <ChartCard
-            title="Student Growth"
-            subtitle="New enrollments over time"
-            index={1}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={growth}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" vertical={false} />
-                <XAxis dataKey="month" stroke="#9DB8C4" fontSize={12} />
-                <YAxis stroke="#9DB8C4" fontSize={12} allowDecimals={false} />
-                <Tooltip {...tooltipStyle} />
-                <Line
-                  type="monotone"
-                  dataKey="students"
-                  stroke="#FF6A3D"
-                  strokeWidth={3}
-                  dot={{ fill: "#FF602F", r: 4 }}
-                  activeDot={{ r: 6 }}
-                  animationDuration={1000}
+              <ChartPanel
+                index={1}
+                title="When students last used the app"
+                subtitle="How recently each student was active"
+                help="Students grouped by how long ago they last used Koding Keydzz. A large 'Over a month' group is the clearest early warning that a class has quietly stopped."
+              >
+                <BarBreakdown
+                  data={d?.distributions?.recency || []}
+                  suffix=""
+                  colorFor={(row) => {
+                    const map = {
+                      Today: STATUS.good,
+                      '1–6 days': STATUS.good,
+                      '1–4 weeks': STATUS.warning,
+                      'Over a month': STATUS.critical,
+                    };
+                    return map[row.label] || CATEGORICAL[0];
+                  }}
+                  emptyMessage="No students yet"
                 />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
+              </ChartPanel>
+            </div>
 
-        {completionTrend.length > 0 && (
-          <ChartCard
-            title="Completion Trend"
-            subtitle="Weekly average completion rate"
-            index={2}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={completionTrend}>
-                <defs>
-                  <linearGradient id="compGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#FF602F" stopOpacity={0.7} />
-                    <stop offset="100%" stopColor="#FF602F" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" vertical={false} />
-                <XAxis dataKey="week" stroke="#9DB8C4" fontSize={12} />
-                <YAxis stroke="#9DB8C4" fontSize={12} unit="%" />
-                <Tooltip {...tooltipStyle} />
-                <Area
-                  type="monotone"
-                  dataKey="rate"
-                  stroke="#FF602F"
-                  strokeWidth={2}
-                  fill="url(#compGrad)"
-                  animationDuration={1000}
+            {/* ---- Curriculum + difficulty ---- */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <ChartPanel
+                index={2}
+                title="Progress through each world"
+                subtitle="Share of lessons completed"
+                help="For each world, the percentage of all available lessons that your students have completed between them. Low numbers on later worlds are normal early in a term."
+                height="auto"
+              >
+                {d?.worldMastery?.length ? (
+                  <div className="flex flex-col gap-4 py-1">
+                    {d.worldMastery.map((w) => (
+                      <MeterRow
+                        key={w.id}
+                        label={w.label}
+                        value={w.value}
+                        sub={`${w.completions} of ${w.lessons * (d.kpis.students.value || 0)} lesson completions`}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <ChartEmpty message="No lessons completed yet" />
+                )}
+              </ChartPanel>
+
+              <ChartPanel
+                index={3}
+                title="Hardest quizzes"
+                subtitle="Lowest pass rate first"
+                help="The quizzes your students struggle with most. A quiz that most of the class fails usually means the concept needs re-teaching — it is rarely thirty separate problems."
+              >
+                <BarBreakdown
+                  data={(d?.quizDifficulty || []).slice(0, 7).map((q) => ({
+                    label: q.title.length > 26 ? `${q.title.slice(0, 24)}…` : q.title,
+                    value: q.passRate,
+                  }))}
+                  horizontal
+                  suffix="%"
+                  colorFor={(row) =>
+                    row.value >= 70
+                      ? STATUS.good
+                      : row.value >= 40
+                        ? STATUS.warning
+                        : STATUS.critical
+                  }
+                  emptyMessage="No quizzes attempted yet"
+                  emptyHint="Pass rates appear once students start submitting quizzes."
                 />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
+              </ChartPanel>
+            </div>
 
-        {worldDistribution.length > 0 && (
-          <ChartCard
-            title="World Distribution"
-            subtitle="Where students are currently learning"
-            index={3}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={worldDistribution}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={85}
-                  innerRadius={45}
-                  paddingAngle={3}
-                  animationDuration={900}
-                  label={({ value }) => `${value}`}
+            {/* ---- Levels + top students ---- */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <ChartPanel
+                index={4}
+                title="Experience levels"
+                subtitle="How far students have progressed"
+                help="Students earn XP from lessons, quizzes and games, and level up as it accumulates. A wide spread is healthy; everyone stuck at level 1 means the class has not really started."
+                className="xl:col-span-2"
+              >
+                <BarBreakdown
+                  data={d?.distributions?.level || []}
+                  emptyMessage="No progress yet"
+                />
+              </ChartPanel>
+
+              <ChartPanel
+                index={5}
+                title="Top students"
+                subtitle="By experience points"
+                help="Ranked by total XP. Useful for recognition — but a leaderboard is not a measure of ability, only of time spent."
+                height="auto"
+              >
+                {d?.topStudents?.length ? (
+                  <ol className="flex flex-col gap-2 py-1">
+                    {d.topStudents.slice(0, 8).map((s, i) => (
+                      <li key={s.id} className="flex items-center gap-3">
+                        <span
+                          className="w-5 shrink-0 text-center text-xs font-bold tabular-nums"
+                          style={{
+                            color:
+                              i === 0
+                                ? '#FF602F'
+                                : i === 1
+                                  ? '#9DB8C4'
+                                  : i === 2
+                                    ? '#C98A5A'
+                                    : 'rgba(157,184,196,0.5)',
+                          }}
+                        >
+                          {i + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                          {s.name}
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-text-secondary">
+                          {s.xp.toLocaleString()} XP
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <ChartEmpty message="No students yet" />
+                )}
+              </ChartPanel>
+            </div>
+
+            {/* ---- Coverage summary ---- */}
+            <section className="k-card p-5">
+              <div className="mb-4 flex items-center gap-1.5">
+                <h3 className="font-heading text-base font-bold text-text-primary">
+                  Coverage at a glance
+                </h3>
+                <span
+                  title="Coverage is the share of the available material your students have worked through."
+                  className="text-text-secondary/70"
                 >
-                  {worldDistribution.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="#04212E" />
-                  ))}
-                </Pie>
-                <Tooltip {...tooltipStyle} />
-                <Legend
-                  wrapperStyle={{ fontSize: 12, color: "#9DB8C4" }}
-                  iconType="circle"
+                  <Info size={14} aria-hidden="true" />
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                <MeterRow
+                  label="Lessons completed"
+                  value={d?.engagement?.avgLessonCoverage ?? 0}
+                  sub="average per student"
                 />
-              </PieChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
+                <MeterRow
+                  label="Quizzes attempted"
+                  value={d?.engagement?.avgQuizCoverage ?? 0}
+                  sub="average per student"
+                />
+                <MeterRow
+                  label="Students active this week"
+                  value={d?.engagement?.engagementRate ?? 0}
+                  sub={`${d?.engagement?.activeStudents ?? 0} of ${d?.kpis?.students?.value ?? 0}`}
+                />
+              </div>
+              <p className="mt-4 border-t border-k-border pt-3 text-xs text-text-secondary/70">
+                Average XP {(d?.engagement?.avgXp ?? 0).toLocaleString()} · median{' '}
+                {(d?.engagement?.medianXp ?? 0).toLocaleString()}. The median is the
+                middle student — when it is much lower than the average, a few very
+                active students are lifting the mean.
+              </p>
+            </section>
 
-        {retention.length > 0 && (
-          <ChartCard
-            title="Active & Returning"
-            subtitle="Daily active vs returning students (last 7 days)"
-            index={4}
-            className="lg:col-span-2"
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={retention}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" vertical={false} />
-                <XAxis dataKey="day" stroke="#9DB8C4" fontSize={12} />
-                <YAxis stroke="#9DB8C4" fontSize={12} allowDecimals={false} />
-                <Tooltip {...tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: 12, color: "#9DB8C4" }} iconType="circle" />
-                <Line
-                  type="monotone"
-                  dataKey="active"
-                  name="Active"
-                  stroke="#FF602F"
-                  strokeWidth={3}
-                  dot={{ fill: "#FF602F", r: 3 }}
-                  activeDot={{ r: 6 }}
-                  animationDuration={1000}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="returning"
-                  name="Returning"
-                  stroke="#2DD4BF"
-                  strokeWidth={3}
-                  dot={{ fill: '#2DD4BF', r: 3 }}
-                  activeDot={{ r: 6 }}
-                  animationDuration={1000}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
+            {!isFaculty && (
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  to="/classrooms"
+                  className="inline-flex items-center gap-2 rounded-xl border border-k-border bg-card px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:border-turmeric/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-turmeric"
+                >
+                  <School size={16} aria-hidden="true" />
+                  Manage classes
+                  <ArrowRight size={14} aria-hidden="true" />
+                </Link>
+                <Link
+                  to="/staff"
+                  className="inline-flex items-center gap-2 rounded-xl border border-k-border bg-card px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:border-turmeric/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-turmeric"
+                >
+                  <GraduationCap size={16} aria-hidden="true" />
+                  Manage teachers
+                  <ArrowRight size={14} aria-hidden="true" />
+                </Link>
+              </div>
+            )}
+          </div>
         )}
-      </div>
+      </QueryState>
     </div>
   );
 }

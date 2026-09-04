@@ -2,6 +2,57 @@
 
 Production-ready backend foundation for **Koding Keydzz**, an educational gaming platform that teaches kids to code through gamified worlds, lessons, quizzes, challenges, XP, levels, coins, achievements, and leaderboards.
 
+## Tenancy model
+
+```
+superadmin  (platform owner, tenant-less)
+   └── Organization  (a school — the tenant boundary)
+         ├── admin    (MANY per school — full access to that school)
+         ├── faculty  (teachers — see only their assigned classes)
+         └── student  (learners)
+               ▲
+               └── Classroom  links faculty ⇄ students
+```
+
+**Roles and what they can do** live in one place: `src/config/permissions.js`.
+Routes declare the CAPABILITY they need (`requireCapability('student:write')`)
+rather than a list of roles, so adding a role is a single edit there instead of
+a sweep through every route file.
+
+| Role | Scope | Can |
+|---|---|---|
+| `superadmin` | Platform | Manage organizations, author the shared curriculum, see every school's analytics |
+| `admin` | One school | Manage that school's students, teachers, classes, announcements and reports. Many admins per school |
+| `faculty` | Their classes | See and report on the pupils in classes assigned to them; reset a pupil's password; adjust their own class rosters |
+| `student` | Themselves | Learn |
+
+**Faculty scoping.** A teacher's view is narrowed by `withClassroomScope`,
+which resolves the classes they teach into `req.classroomScope`. Every student
+read and write threads that through, so granting a teacher `student:read`
+cannot expose the rest of the school. A pupil outside their classes returns
+`404`, never `403` — a teacher must not be able to confirm that a child they
+do not teach exists.
+
+**Curriculum is global and superadmin-only to write.** Worlds, lessons,
+quizzes, achievements and shop items are ONE shared set backing every tenant.
+Org staff can read them; only the platform owner can change them, because
+otherwise a single school could rename a world or delete a quiz for everyone.
+
+### Analytics
+
+| Endpoint | Audience | Returns |
+|---|---|---|
+| `GET /superadmin/analytics/platform` | superadmin | Scale, growth, DAU/WAU/MAU + stickiness, per-tenant health with an at-risk list, distributions, content coverage |
+| `GET /superadmin/orgs/:id/analytics` | superadmin | One school, in the same shape its own admin sees |
+| `GET /admin/analytics` | admin **or** faculty | Whole school for an admin; only their own classes for a teacher — the server scopes it from the token |
+| `GET /admin/analytics/classrooms/:id` | admin, faculty | One class |
+
+Responses are chart-ready: series come back **dense** (a quiet day is a zero,
+not a missing point, so a line chart cannot draw a straight line across a gap
+and lie), KPIs carry `{ value, previous, delta, direction }` with `delta: null`
+when there is no honest baseline, and every average is paired with a median.
+
+
 ## Stack
 
 - Node.js (ESM, `"type": "module"`)
@@ -79,8 +130,29 @@ leaving real app-created students untouched. The seed prints a count summary at 
 
 Seeded accounts:
 
-- Super admin: `superadmin@kodingkeydzz.com` / `Super@123`
-- Default org admin: `admin@kodingkeydzz.com` / `Admin@123` (org **Koding Keydzz Academy**, code `KKACAD`)
+**Local development only.** `npm run seed` creates two bootstrap accounts:
+
+- Super admin: `superadmin@kodingkeydzz.com`
+- Default org admin: `admin@kodingkeydzz.com` (org **Koding Keydzz Academy**, code `KKACAD`)
+
+Their dev passwords are `Super@123` / `Admin@123`. These are **development
+defaults and must never reach production** — they used to be re-applied on
+every seed run, which silently reset the platform's highest-privilege account
+to a password published in this file.
+
+In production the seed **refuses to create either account** unless you supply
+strong values:
+
+```bash
+SEED_SUPERADMIN_PASSWORD="$(node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))")" \
+SEED_ADMIN_PASSWORD="$(node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))")" \
+NODE_ENV=production npm run seed
+```
+
+The seed is **idempotent**: it upserts content on a natural key and never
+touches the password of an account that already exists, so it is safe to re-run
+after a content update. `--reset` restores the old destructive wipe for local
+work and is refused against `NODE_ENV=production`.
 
 The first four worlds teach coding **concepts** in a friendly, language-neutral way
 (what a variable is, how loops repeat, what functions return, how boolean logic works);
@@ -341,11 +413,60 @@ Uses `multer` memory storage + the Cloudinary SDK (configured from `CLOUDINARY_*
 | GET | `/admin/students/export` | CSV roster download (`text/csv`, `<slugOrCode>_students.csv`) of all org students: columns `name,grade,school,email,xp,level,coins,status,createdAt` |
 | PATCH | `/admin/students/:id/suspend` | Body `{ suspend?: boolean }` (default true) |
 | POST | `/admin/students/:id/reset-password` | Body `{ password? }` (min 6; generated if omitted). Resets the student's password, invalidates their refresh token, returns `{ student: { id, name, email, username }, password }` (plaintext). 404 if the student is outside the admin's org. |
+| GET | `/admin/students/:id` | Single student **profile + progress** (org-scoped: `404` if the student is outside the admin's org). See payload below. |
 | GET/POST/GET:id/PUT/PATCH/DELETE | `/admin/courses` | Course CRUD (platform-level, see note) |
 | GET/POST/GET:id/PUT/PATCH/DELETE | `/admin/lessons` | Lesson CRUD (platform-level) |
 | GET/POST/GET:id/PUT/PATCH/DELETE | `/admin/challenges` | Challenge CRUD (platform-level) |
 | GET/POST/GET:id/PUT/PATCH/DELETE | `/admin/achievements` | Achievement CRUD (platform-level) |
+| GET/POST/GET:id/PUT/PATCH/DELETE | `/admin/shop-items` | Shop-item (**AvatarItem**) CRUD (platform-level). Body `{ key, name, type: skin\|outfit\|accessory\|pet\|effect\|background, price?, requiredLevel?, rarity?: common\|rare\|epic\|legendary, asset?, isDefault? }`. `key` is unique — a duplicate returns `409`. |
+| GET/POST/GET:id/PUT/PATCH/DELETE | `/admin/quizzes` | Quiz CRUD with nested questions (platform-level). See body/shape below. |
 | POST | `/admin/notifications/broadcast` | Body `{ title, body?, scope? }` (platform-level) |
+
+#### Student detail + progress (`GET /admin/students/:id`)
+
+Also available to the super admin as `GET /superadmin/students/:id` (any org) and
+`GET /superadmin/orgs/:id/students/:studentId` (that org's student). Response `data`:
+
+```json
+{
+  "student": {
+    "id": "...", "name": "Asha Rao", "firstName": "Asha", "lastName": "Rao",
+    "username": "asharao", "email": "asha@example.com", "phone": "",
+    "grade": "", "school": "", "status": "active",
+    "org": { "id": "...", "name": "Koding Keydzz Academy" },
+    "xp": 1200, "level": 5, "coins": 300, "nextLevelXp": 1500,
+    "totalCoinsEarned": 450, "createdAt": "2026-01-01T00:00:00.000Z"
+  },
+  "stats": { "quizzesPassed": 4, "gameLevelsCompleted": 12, "perfectLevels": 3, "lessonsCompleted": 9 },
+  "gameProgress": [{ "gameKey": "maze", "levelsCompleted": 2, "totalStars": 5 }],
+  "achievements": [{ "key": "first_steps", "title": "First Steps", "icon": "🎯", "unlocked": true, "progress": 1, "target": 1, "percent": 100 }]
+}
+```
+
+`org` is `null` for a student with no org. `gameProgress` aggregates the student's flat
+`gameProgress` rows (`{ gameKey, levelId, stars }`) into per-game `{ levelsCompleted, totalStars }`.
+`achievements` reuses the same per-user progress computation as `GET /achievements` / the dashboard.
+
+#### Quiz management (`/admin/quizzes`)
+
+Questions are stored **embedded** in the Quiz document (not a separate collection), so a
+`DELETE` removes the quiz and its questions together. Both `lesson` and `world` are optional
+refs (a quiz may hang off a lesson — inheriting its world — or be pinned directly to a world).
+
+- **GET `/admin/quizzes`** → `[{ id, title, type, xpReward, questionCount, lesson:{ id, title }\|null, world:{ id, name, slug }\|null }]`.
+- **GET `/admin/quizzes/:id`** → the FULL quiz **including each question's answer** (this is the admin editor endpoint — unlike the student-facing `GET /quizzes/:id`, answers are **not** stripped):
+
+  ```json
+  {
+    "id": "...", "title": "Loops Quiz", "type": "mcq", "xpReward": 50,
+    "lesson": { "id": "...", "title": "For loops" }, "world": { "id": "...", "name": "Python Kingdom", "slug": "python-kingdom" },
+    "questions": [{ "id": "...", "type": "mcq", "prompt": "2+2?", "options": ["3","4"], "answer": 1, "explanation": "", "points": 10 }]
+  }
+  ```
+
+- **POST `/admin/quizzes`** → body `{ title, lesson?, world?, type?, xpReward?, questions: [{ type: mcq\|fillblank\|match\|dragdrop\|coding, prompt, options?, answer, points?, explanation? }] }`. Each question's `answer` is persisted as the model's `correctAnswer` (Mixed — index/string/array/map per type); `correctAnswer` is accepted as an alias. Missing `type` → `mcq`, missing `points` → `10`.
+- **PUT/PATCH `/admin/quizzes/:id`** → partial update. When `questions` is supplied it **replaces** the existing set wholesale.
+- **DELETE `/admin/quizzes/:id`** → removes the quiz (+ embedded questions).
 
 #### Bulk student upload (Excel)
 
@@ -389,7 +510,7 @@ plus password:
 
 Successful creates increment the org's `studentCount`.
 
-**Authorization split.** Student management routes (`/admin/stats`, `/admin/students*`) are org-scoped: they require `authorize('admin')` **and** `requireOrg`, so the tenant-less superadmin cannot call them (it manages students via `/superadmin/students*` instead). The content-management routes (`/admin/courses`, `/admin/lessons`, `/admin/challenges`, `/admin/achievements`, `/admin/notifications/broadcast`) are **platform-level** and authorized with `authorize('admin', 'superadmin')` with **no** `requireOrg`, so both org admins and the superadmin can manage shared content.
+**Authorization split.** Student management routes (`/admin/stats`, `/admin/students*`) are org-scoped: they require `authorize('admin')` **and** `requireOrg`, so the tenant-less superadmin cannot call them (it manages students via `/superadmin/students*` instead). The content-management routes (`/admin/courses`, `/admin/lessons`, `/admin/challenges`, `/admin/achievements`, `/admin/shop-items`, `/admin/quizzes`, `/admin/notifications/broadcast`) are **platform-level** and authorized with `authorize('admin', 'superadmin')` with **no** `requireOrg`, so both org admins and the superadmin can manage shared content.
 
 ### Super Admin (`/superadmin`, superadmin role)
 
@@ -404,10 +525,12 @@ Successful creates increment the org's `studentCount`.
 | PATCH | `/superadmin/orgs/:id/admin` | Update an org's admin |
 | DELETE | `/superadmin/orgs/:id` | Delete org (cascades users) |
 | GET | `/superadmin/orgs/:id/students?search=&page=&limit=` | List students **in that org** (paginated/searchable). `404` if the org is not found. Same row shape as `/superadmin/students`. |
+| GET | `/superadmin/orgs/:id/students/:studentId` | Single student **profile + progress** for that org's student. `404` if the org is missing or the student isn't in it. Same payload as `GET /admin/students/:id`. |
 | POST | `/superadmin/orgs/:id/students/bulk` | Bulk upload **into org `:id`**. `multipart/form-data` with file field **`file`** + text field **`password`** (common, min 6). Same bulk response shape as `/admin/students/bulk`. `404` if the org is not found. Increments `org.studentCount`. |
 | POST | `/superadmin/orgs/:id/students` | Single create **into org `:id`**. Body `{ firstName, lastName?, email? (optional), phone?, username? (optional), password? }`. Returns `{ student, username, password }`. `404` if the org is not found. |
 | GET | `/superadmin/students/template` | `.xlsx` template (`firstName, lastName, email, phone, username`) — the super admin has no org but needs the template to upload into one. |
 | GET | `/superadmin/students?search=&org=&page=&limit=` | **All** students across orgs, paginated + searchable (name/email/username). Each row is the student (incl. `username`, and `email` when present) plus `org:{ id, name, code }` (or `null`). |
+| GET | `/superadmin/students/:id` | Single student **profile + progress**, any org (unscoped). Same payload as `GET /admin/students/:id`. `404` if not a student. |
 | PATCH | `/superadmin/students/:id/suspend` | Body `{ suspend?: boolean }` (default true). Global (not org-bound). |
 | POST | `/superadmin/students/:id/reset-password` | Body `{ password? }` (min 6; generated if omitted). Global; reuses the same generator as admin reset. Returns `{ student:{ id, name, email, username }, password }`. |
 

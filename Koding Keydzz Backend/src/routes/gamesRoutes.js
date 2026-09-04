@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import * as gameProgressController from '../controllers/gameProgressController.js';
-import { protect, authorize } from '../middlewares/auth.js';
+import { protect, requireCapability } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
+import { gameCompleteLimiter } from '../middlewares/rateLimit.js';
 import {
   gameCompleteSchema,
   gameKeyParamSchema,
@@ -11,9 +12,13 @@ import {
 
 const router = Router();
 
+// Only STUDENTS earn XP. Admin accounts posting completions polluted the
+// leaderboards and the analytics with staff progress.
 router.post(
   '/complete',
   protect,
+  requireCapability('learn:play'),
+  gameCompleteLimiter,
   validate({ body: gameCompleteSchema }),
   gameProgressController.completeGameLevel
 );
@@ -22,7 +27,7 @@ router.post(
 router.get(
   '/:gameKey/leaderboard',
   protect,
-  authorize('student', 'admin', 'superadmin'),
+  requireCapability('game:catalog'),
   validate({ params: gameKeyParamSchema, query: gameLeaderboardQuerySchema }),
   gameProgressController.getGameLeaderboard
 );
@@ -31,7 +36,7 @@ router.get(
 router.get(
   '/:gameKey/levels/:levelId/leaderboard',
   protect,
-  authorize('student', 'admin', 'superadmin'),
+  requireCapability('game:catalog'),
   validate({ params: gameLevelParamSchema, query: gameLeaderboardQuerySchema }),
   gameProgressController.getLevelLeaderboard
 );

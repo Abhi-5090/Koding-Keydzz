@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Coins, ShoppingBag, Circle, Star, Gem, Crown } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Coins,
+  ShoppingBag,
+  Circle,
+  Star,
+  Gem,
+  Crown,
+} from 'lucide-react';
 import AnimatedIcon from '../components/ui/AnimatedIcon';
 import {
   useGetShopItemsQuery,
@@ -13,9 +23,11 @@ import Modal from '../components/ui/Modal';
 import FormField from '../components/ui/FormField';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import PageHeader from '../components/ui/PageHeader';
+import { useCan } from '../features/auth/useCan';
 import QueryState from '../components/ui/QueryState';
+import { formatApiError } from '../utils/apiError';
 
-const TYPES = ['skin', 'outfit', 'accessory', 'pet', 'effect'];
+const TYPES = ['skin', 'outfit', 'accessory', 'pet', 'effect', 'background'];
 const RARITIES = ['common', 'rare', 'epic', 'legendary'];
 
 const emptyItem = {
@@ -26,6 +38,7 @@ const emptyItem = {
   requiredLevel: 1,
   rarity: 'common',
   asset: '',
+  isDefault: false,
 };
 
 // Rarity markers ramp from cool neutral → teal → warm orange, anchored to the
@@ -52,8 +65,14 @@ function asList(data) {
 function RarityBadge({ value }) {
   const Icon = RARITY_ICONS[value] || RARITY_ICONS.common;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${RARITY_STYLES[value] || RARITY_STYLES.common}`}>
-      <AnimatedIcon icon={Icon} size={12} animation={value === 'legendary' ? 'pulse' : 'pop'} />
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${RARITY_STYLES[value] || RARITY_STYLES.common}`}
+    >
+      <AnimatedIcon
+        icon={Icon}
+        size={12}
+        animation={value === 'legendary' ? 'pulse' : 'pop'}
+      />
       {value}
     </span>
   );
@@ -69,12 +88,24 @@ export default function ShopItems() {
 
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  /**
+   * Curriculum is GLOBAL — shared by every school — so only the platform owner
+   * may write it. Teachers and school administrators hold `content:read` and
+   * reach this page legitimately; every write control shown to them returned
+   * 403. Hidden rather than disabled, because they can never do it.
+   */
+  const canWrite = useCan('content:write');
+
   const [formError, setFormError] = useState('');
 
   const setField = (e) =>
     setModal((m) => ({
       ...m,
-      data: { ...m.data, [e.target.name]: e.target.value },
+      data: {
+        ...m.data,
+        [e.target.name]:
+          e.target.type === 'checkbox' ? e.target.checked : e.target.value,
+      },
     }));
 
   const save = async () => {
@@ -83,6 +114,7 @@ export default function ShopItems() {
       ...modal.data,
       price: Number(modal.data.price),
       requiredLevel: Number(modal.data.requiredLevel),
+      isDefault: !!modal.data.isDefault,
     };
     try {
       if (modal.mode === 'create') {
@@ -92,7 +124,9 @@ export default function ShopItems() {
       }
       setModal(null);
     } catch (err) {
-      setFormError(err?.data?.message || 'Could not save the item. Please try again.');
+      setFormError(
+        formatApiError(err, 'Could not save the item. Please try again.'),
+      );
     }
   };
 
@@ -115,8 +149,15 @@ export default function ShopItems() {
             <ShoppingBag size={16} />
           </div>
           <div className="min-w-0 max-w-[220px]">
-            <p className="truncate font-medium text-text-primary">{r.name}</p>
-            <p className="truncate text-xs text-text-secondary/60">{r.key}</p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <p className="truncate font-medium text-text-primary">{r.name}</p>
+              {r.isDefault && (
+                <span className="shrink-0 rounded-full border border-success/30 bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold text-success">
+                  Default
+                </span>
+              )}
+            </div>
+            <p className="truncate text-xs text-text-secondary/70">{r.key}</p>
           </div>
         </div>
       ),
@@ -124,7 +165,9 @@ export default function ShopItems() {
     {
       key: 'type',
       header: 'Type',
-      render: (r) => <span className="capitalize text-text-secondary">{r.type}</span>,
+      render: (r) => (
+        <span className="capitalize text-text-secondary">{r.type}</span>
+      ),
     },
     {
       key: 'rarity',
@@ -144,32 +187,62 @@ export default function ShopItems() {
     {
       key: 'requiredLevel',
       header: 'Req. Level',
-      render: (r) => <span className="text-text-secondary">Lv {r.requiredLevel}</span>,
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      sortable: false,
-      searchable: false,
       render: (r) => (
-        <div className="flex gap-1">
-          <button onClick={() => { setFormError(''); setModal({ mode: 'edit', data: { ...r } }); }} className="rounded-lg p-1.5 text-text-secondary hover:text-turmeric">
-            <Pencil size={16} />
-          </button>
-          <button onClick={() => setConfirm(r)} className="rounded-lg p-1.5 text-text-secondary hover:text-error">
-            <Trash2 size={16} />
-          </button>
-        </div>
+        <span className="text-text-secondary">Lv {r.requiredLevel}</span>
       ),
     },
+    // The whole Actions COLUMN goes, not just its buttons — a column header
+    // with nothing under it reads as a rendering fault.
+    ...(canWrite
+      ? [
+          {
+            key: 'actions',
+            header: 'Actions',
+            sortable: false,
+            searchable: false,
+            render: (r) => (
+              <div className="flex gap-1">
+                <button
+                  onClick={() => {
+                    setFormError('');
+                    setModal({ mode: 'edit', data: { ...r } });
+                  }}
+                  aria-label={`Edit ${r.name || 'item'}`}
+                  className="rounded-lg p-1.5 text-text-secondary hover:text-turmeric"
+                >
+                  <Pencil size={16} aria-hidden="true" />
+                </button>
+                <button
+                  onClick={() => setConfirm(r)}
+                  aria-label={`Delete ${r.name || 'item'}`}
+                  className="rounded-lg p-1.5 text-text-secondary hover:text-error"
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Shop & Avatars" subtitle={isLoading ? 'Loading…' : `${items.length} catalog items`}>
-        <Button icon={Plus} onClick={() => { setFormError(''); setModal({ mode: 'create', data: { ...emptyItem } }); }}>
-          New Item
-        </Button>
+      <PageHeader
+        title="Shop & Avatars"
+        subtitle={isLoading ? 'Loading…' : `${items.length} catalog items`}
+      >
+        {canWrite ? (
+          <Button
+            icon={Plus}
+            onClick={() => {
+              setFormError('');
+              setModal({ mode: 'create', data: { ...emptyItem } });
+            }}
+          >
+            New Item
+          </Button>
+        ) : null}
       </PageHeader>
 
       <QueryState
@@ -183,16 +256,25 @@ export default function ShopItems() {
         emptyMessage="Add skins, outfits, pets and effects to the avatar shop."
         emptyIcon={ShoppingBag}
       >
-        <DataTable columns={columns} data={items} searchKeys={['name', 'key', 'type', 'rarity']} pageSize={8} />
+        <DataTable
+          columns={columns}
+          data={items}
+          searchKeys={['name', 'key', 'type', 'rarity']}
+          pageSize={8}
+        />
       </QueryState>
 
       <Modal
         open={!!modal}
         onClose={() => setModal(null)}
-        title={modal?.mode === 'create' ? 'New Avatar Item' : 'Edit Avatar Item'}
+        title={
+          modal?.mode === 'create' ? 'New Avatar Item' : 'Edit Avatar Item'
+        }
         footer={
           <>
-            <Button variant="secondary" onClick={() => setModal(null)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => setModal(null)}>
+              Cancel
+            </Button>
             <Button onClick={save}>Save Item</Button>
           </>
         }
@@ -200,20 +282,78 @@ export default function ShopItems() {
         {modal && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Key" name="key" value={modal.data.key} onChange={setField} required placeholder="pet_dragon" />
-              <FormField label="Name" name="name" value={modal.data.name} onChange={setField} required placeholder="Loop Dragon" />
+              <FormField
+                label="Key"
+                name="key"
+                value={modal.data.key}
+                onChange={setField}
+                required
+                placeholder="pet_dragon"
+              />
+              <FormField
+                label="Name"
+                name="name"
+                value={modal.data.name}
+                onChange={setField}
+                required
+                placeholder="Loop Dragon"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Type" name="type" as="select" options={TYPES} value={modal.data.type} onChange={setField} />
-              <FormField label="Rarity" name="rarity" as="select" options={RARITIES} value={modal.data.rarity} onChange={setField} />
+              <FormField
+                label="Type"
+                name="type"
+                as="select"
+                options={TYPES}
+                value={modal.data.type}
+                onChange={setField}
+              />
+              <FormField
+                label="Rarity"
+                name="rarity"
+                as="select"
+                options={RARITIES}
+                value={modal.data.rarity}
+                onChange={setField}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Price (coins)" name="price" type="number" value={modal.data.price} onChange={setField} />
-              <FormField label="Required Level" name="requiredLevel" type="number" value={modal.data.requiredLevel} onChange={setField} />
+              <FormField
+                label="Price (coins)"
+                name="price"
+                type="number"
+                value={modal.data.price}
+                onChange={setField}
+              />
+              <FormField
+                label="Required Level"
+                name="requiredLevel"
+                type="number"
+                value={modal.data.requiredLevel}
+                onChange={setField}
+              />
             </div>
-            <FormField label="Asset URL / path" name="asset" value={modal.data.asset} onChange={setField} placeholder="/assets/pets/dragon.png" />
+            <FormField
+              label="Asset URL / path"
+              name="asset"
+              value={modal.data.asset}
+              onChange={setField}
+              placeholder="/assets/pets/dragon.png"
+            />
+            <label className="flex items-center gap-2 text-sm text-text-secondary">
+              <input
+                type="checkbox"
+                name="isDefault"
+                checked={!!modal.data.isDefault}
+                onChange={setField}
+                className="h-4 w-4 accent-turmeric"
+              />
+              Granted to every new student by default
+            </label>
             {formError && (
-              <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">{formError}</p>
+              <p className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+                {formError}
+              </p>
             )}
           </div>
         )}

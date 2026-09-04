@@ -17,6 +17,17 @@ export const studentApi = baseApi.injectEndpoints({
       transformResponse: unwrap,
       providesTags: ['Lessons'],
     }),
+    // Report a finished lesson. The backend awards XP/coins and records the
+    // lesson id against the student, so we invalidate Dashboard (XP/level +
+    // completedLessonIds) and Leaderboard (XP-ranked) to reconcile from source.
+    completeLesson: builder.mutation({
+      query: (lessonId) => ({
+        url: `/progress/lesson/${lessonId}/complete`,
+        method: 'POST',
+      }),
+      transformResponse: unwrap,
+      invalidatesTags: ['Dashboard', 'Leaderboard'],
+    }),
     // Leaderboard scope. The backend reads `type` (enum: global|school|weekly);
     // `scope` is sent alongside for forward-compat with newer API builds.
     // RTK caches per-arg, so switching tabs refetches the right scope.
@@ -43,6 +54,7 @@ export const {
   useGetDashboardQuery,
   useGetWorldsQuery,
   useGetLessonsQuery,
+  useCompleteLessonMutation,
   useGetLeaderboardQuery,
   useGetNotificationsQuery,
   useGetAchievementsQuery,

@@ -6,14 +6,40 @@ on:
   pull_request:
     branches: [main, master, develop]
 
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # ---- Backend: install + syntax check + run any tests ----
+  # ---- Backend: unit tests + DB-backed integration tests ----
   backend:
-    name: Backend (install + check)
+    name: Backend (unit + integration)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: "Koding Keydzz Backend"
+
+    # A real MongoDB, because the integration suite asserts tenant isolation
+    # and authorization over actual HTTP. Those are exactly the behaviours no
+    # pure-function test could have caught.
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      MONGO_URI: mongodb://127.0.0.1:27017/koding_keydzz_ci
+      JWT_ACCESS_SECRET: ci_access_secret_0123456789abcdefghij
+      JWT_REFRESH_SECRET: ci_refresh_secret_0123456789abcdefghij
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,15 +47,29 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: "Koding Keydzz Backend/package-lock.json"
+
       - run: npm ci
+
       - name: Syntax check entrypoint
         run: node --check src/server.js
-      - name: Run tests (if defined)
-        run: npm test --if-present
 
-  # ---- Frontends + Admin: install + build ----
+      # Fails if the committed game catalogue has drifted from the frontend's
+      # level data — otherwise a new level would be silently unplayable
+      # (rejected as "unknown level" by the reward endpoint).
+      - name: Verify game catalogue is in sync
+        run: npm run verify:catalog
+
+      # NOTE: no `--if-present`. That flag meant a renamed or broken test
+      # script passed silently, so CI could go green with nothing tested.
+      - name: Tests
+        run: npm test
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  # ---- Frontends + Admin: tests + build ----
   frontends:
-    name: ${{ matrix.app }} (install + build)
+    name: ${{ matrix.app }} (test + build)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -47,8 +87,249 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
       - run: npm ci
-      - name: Run tests (if defined)
-        run: npm test --if-present
+
+      - name: Tests
+        run: npm test
+
       - name: Build
         run: npm run build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  # ---- Browser tests: the apps rendered in a real browser ----
+  #
+  # The unit and integration suites cover logic and the HTTP layer but never
+  # RENDER the apps. This job is what covers UI flows, the lazily-split route
+  # chunks, the in-browser code runners and tablet layout — the class of defect
+  # that only appears in a browser. It found an unassociated form label, a
+  # login gate that rejected the faculty role, and a sign-in rate limit that
+  # locked out a whole school.
+  e2e:
+    name: Browser tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: e2e
+
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The web servers Playwright starts need each app's dependencies.
+      - name: Install dependencies
+        run: |
+          npm ci --prefix "../Koding Keydzz Backend"
+          npm ci --prefix "../Koding Keydzz Frontend"
+          npm ci --prefix "../Koding Keydzz Admin"
+          npm ci
+
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Run browser tests
+        run: npm test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
+
+  # ---- Deployment config sanity ----
+  config:
+    name: Deployment config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate nginx config syntax
+        run: |
+          docker run --rm \
+            -v "$PWD/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:1.27-alpine nginx -t 2>&1 | tee /tmp/nginx.out || true
+          # The upstream host `backend` and the TLS cert paths only exist at
+          # runtime, so treat those two as expected and fail on anything else.
+          if grep -qiE "unexpected|unknown directive|invalid (number|parameter)" /tmp/nginx.out; then
+            echo "::error::nginx config has a syntax error"; exit 1
+          fi
+          echo "nginx config parsed with no syntax errors."
+
+      - name: Assert TLS is configured
+        run: |
+          grep -q "listen 443 ssl" nginx/nginx.conf \
+            || { echo "::error::nginx must serve HTTPS — children's data must not cross the network in plaintext"; exit 1; }
+          grep -q "Strict-Transport-Security" nginx/nginx.conf \
+            || { echo "::error::HSTS header missing"; exit 1; }
+          echo "TLS + HSTS present."
+
+      - name: Assert the CSP allows the in-browser code runners
+        run: |
+          # A default-src 'self' policy silently breaks BOTH playground runners
+          # (the blob: Web Worker and the Pyodide WASM fetch), so the class
+          # loses interactive coding in production while dev still works.
+          grep -q "worker-src 'self' blob:" nginx/nginx.conf \
+            || { echo "::error::CSP must allow blob: workers or the JavaScript runner cannot start"; exit 1; }
+          grep -q "wasm-unsafe-eval" nginx/nginx.conf \
+            || { echo "::error::CSP must allow wasm-unsafe-eval or Pyodide cannot run"; exit 1; }
+          echo "CSP permits both code runners."
+
+      - name: Assert fonts are self-hosted, not fetched from a CDN
+        run: |
+          # Fonts came from fonts.googleapis.com at runtime. School networks
+          # filter Google's CDNs, so the app rendered in fallback fonts and
+          # looked broken; the requests also sent every pupil's IP to a third
+          # party. The files now ship with the app.
+          for app in "Koding Keydzz Frontend" "Koding Keydzz Admin"; do
+            if grep -q "fonts.googleapis.com/css" "$app/index.html"; then
+              echo "::error::$app fetches fonts from Google's CDN — self-host them instead"; exit 1
+            fi
+            test -f "$app/public/fonts/fonts.css" \
+              || { echo "::error::$app is missing public/fonts/fonts.css"; exit 1; }
+            # Every face the stylesheet declares must actually be deployed.
+            # `|| exit 1` after `done` is load-bearing: the `while` runs in a
+            # pipeline subshell, so an `exit 1` inside it ends only that
+            # subshell — without this the guard would print the error and then
+            # report success, which is worse than not having the guard.
+            grep -o "/fonts/[a-z0-9.-]*\.woff2" "$app/public/fonts/fonts.css" | sort -u | while read -r ref; do
+              test -f "$app/public${ref}" \
+                || { echo "::error::$app/public/fonts/fonts.css references missing file ${ref}"; exit 1; }
+            done || exit 1
+          done
+          # And the CSP HEADER must no longer allow those hosts. Match the
+          # directive line only — the surrounding comment names them on purpose.
+          if grep "add_header Content-Security-Policy" nginx/nginx.conf | grep -q "fonts.gstatic.com"; then
+            echo "::error::CSP still allows fonts.gstatic.com — fonts are self-hosted now"; exit 1
+          fi
+          echo "Fonts are self-hosted in both apps and the CSP no longer allows Google's CDNs."
+
+      - name: Assert MongoDB is not published to the host
+        run: |
+          if grep -A25 "^  mongo:" docker-compose.yml | grep -qE '^\s+-\s+"27017:27017"'; then
+            echo "::error::docker-compose publishes MongoDB to the host — remove the ports mapping"; exit 1
+          fi
+          echo "MongoDB is not host-published."
+
+      - name: Assert the sign-in rate limit is sized for a shared school IP
+        run: |
+          # A school shares one public IP. A low IP-keyed sign-in cap locks out
+          # a whole class, so guard against the old value coming back.
+          if grep -qE "max: 30,?\s*$" "Koding Keydzz Backend/src/middlewares/rateLimit.js" \
+             && grep -A3 "authLimiter" "Koding Keydzz Backend/src/middlewares/rateLimit.js" | grep -q "max: 30"; then
+            echo "::error::authLimiter is back to 30/IP — that locks out a whole class"; exit 1
+          fi
+          grep -q "AUTH_RATE_LIMIT_MAX" "Koding Keydzz Backend/src/middlewares/rateLimit.js" \
+            || { echo "::error::auth rate limit must be configurable"; exit 1; }
+          echo "Rate limits are configurable and sized for shared IPs."
+
+      - name: Assert the staff portal admits every staff role
+        run: |
+          # Adding the faculty role broke the login gate and the route guard,
+          # which had hardcoded admin/superadmin. Guard against a regression.
+          grep -q "PORTAL_ROLES" "Koding Keydzz Admin/src/features/auth/authSlice.js" \
+            || { echo "::error::portal role list must be shared, not hardcoded"; exit 1; }
+          grep -q "'faculty'" "Koding Keydzz Admin/src/features/auth/authSlice.js" \
+            || { echo "::error::faculty must be admitted to the staff portal"; exit 1; }
+          echo "Staff portal admits admin, superadmin and faculty."
+
+      - name: Assert the multi-instance contract is wired and documented
+        run: |
+          # Socket.IO rooms live in one process's memory. Two instances without
+          # a shared backplane silently DROP any notification whose pupil is on
+          # the other instance — nothing is logged, the child just never sees
+          # their badge. Guard the three pieces that make scaling out safe.
+          grep -q "REDIS_URL" "Koding Keydzz Backend/src/config/env.js"             || { echo "::error::REDIS_URL must be a validated env var"; exit 1; }
+          grep -q "@socket.io/redis-adapter" "Koding Keydzz Backend/src/sockets/index.js"             || { echo "::error::the Socket.IO Redis adapter must be wired"; exit 1; }
+          grep -q "@socket.io/redis-adapter" "Koding Keydzz Backend/package.json"             || { echo "::error::the Redis adapter must be a declared dependency"; exit 1; }
+          grep -q "ip_hash" nginx/nginx.conf             || { echo "::error::nginx must document sticky sessions — Socket.IO long-polling breaks without them"; exit 1; }
+          grep -q "REDIS_URL" "Koding Keydzz Backend/.env.example"             || { echo "::error::REDIS_URL must be documented in .env.example"; exit 1; }
+          echo "Multi-instance contract present: adapter wired, sticky sessions documented."
+
+      - name: Assert colours come from tokens, not hardcoded hex
+        run: |
+          # Every colour must have exactly ONE definition. The same six brand
+          # hexes used to be hand-written in ~90 places — board grounds, SVG
+          # fills, the Monaco theme, inline styles — and they drifted. Tailwind
+          # resolves utilities to the variables in src/theme.css; a hardcoded
+          # hex in a stylesheet quietly opts back out of that.
+          for app in "Koding Keydzz Frontend" "Koding Keydzz Admin"; do
+            if grep -nEi '#(001621|FF602F|04212E|0A2E3C|9DB8C4|FF6A3D)' "$app/src/index.css"; then
+              echo "::error::$app/src/index.css has hardcoded theme colours — use rgb(var(--c-*))"; exit 1
+            fi
+            grep -q "rgb(var(--c-primary)" "$app/tailwind.config.js" \
+              || { echo "::error::$app tailwind config must resolve colours to CSS variables"; exit 1; }
+            grep -q "<alpha-value>" "$app/tailwind.config.js" \
+              || { echo "::error::$app must use <alpha-value> or every /opacity modifier breaks"; exit 1; }
+          done
+          echo "Both apps resolve colours through theme tokens."
+
+      - name: Assert the code editor is self-hosted, not fetched from a CDN
+        run: |
+          # @monaco-editor/react ships only a loader; the ~3 MB editor is
+          # fetched at runtime, from cdn.jsdelivr.net unless configured. On a
+          # school network that filters CDNs that leaves the Playground and
+          # BOTH programming games (66 levels) with a blank panel and one
+          # console line as the only diagnosis.
+          app="Koding Keydzz Frontend"
+          grep -q "loader.config" "$app/src/lib/monacoLoader.js" \
+            || { echo "::error::monacoLoader must call loader.config to override the CDN default"; exit 1; }
+          # Every place that mounts an editor must configure the loader first —
+          # loader.config is ignored once loading has begun.
+          # NOTE: `while read`, not `for f in $(...)`. Every path in this repo
+          # contains a space ("Koding Keydzz Frontend"), so word splitting
+          # would shred each filename into three and the guard would "pass"
+          # while checking nothing.
+          grep -rl "@monaco-editor/react" "$app/src" --include=*.jsx | while IFS= read -r f; do
+            grep -q "configureMonaco" "$f" \
+              || { echo "::error::$f mounts Monaco without calling configureMonaco()"; exit 1; }
+          done || exit 1
+          # And the copy must be part of the build, so no deployment can forget.
+          node -e "
+            const b = require('./$app/package.json').scripts.build;
+            if (!/fetch:monaco/.test(b)) {
+              console.error('::error::the frontend build script must run fetch:monaco');
+              process.exit(1);
+            }
+          "
+          echo "Monaco is self-hosted and wired into the build."
+
+      - name: Assert GSAP stays out of the entry bundle
+        run: |
+          # GSAP + ScrollTrigger is ~112 kB. In the entry chunk it would undo
+          # the route splitting that got first paint down to ~50 kB, on exactly
+          # the shared school connections this runs on. It must be lazy.
+          for app in "Koding Keydzz Frontend" "Koding Keydzz Admin"; do
+            if grep -rn "^import .*from 'gsap'" "$app/src" --include=*.js --include=*.jsx \
+                 | grep -v "gsapCore.js"; then
+              echo "::error::$app imports gsap statically — use motion/gsapCore.js (dynamic import)"; exit 1
+            fi
+          done
+          echo "GSAP is loaded on demand in both apps."
+
+      - name: Assert no default credentials in tracked files
+        run: |
+          # The seed used to reset the superadmin password to a value printed
+          # in the README on every run. Guard against that returning.
+          if grep -rn --include=*.js --include=*.mjs --include=*.yml \
+               -E "Super@123|Admin@123" . \
+               | grep -vE "seed\.js|README|DEPLOYMENT|\.github/workflows" ; then
+            echo "::error::default credentials found outside docs/seed-dev-defaults"; exit 1
+          fi
+          echo "No stray default credentials."

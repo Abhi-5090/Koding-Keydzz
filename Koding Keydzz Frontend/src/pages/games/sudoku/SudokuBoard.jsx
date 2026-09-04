@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion'
 import { boxDims } from '../../../games/sudoku/engine'
+import useGridKeyboardNav from '../../../games/shared/useGridKeyboardNav'
+import { BOARD_BG, CONFLICT, cssVar } from '../../../theme/tokens'
 
 /**
  * SudokuBoard — renders the grid with bold sub-box borders, locked givens,
@@ -19,6 +21,11 @@ export default function SudokuBoard({ grid, size, givens, selected, conflicts, o
   const { rows: bRows, cols: bCols } = boxDims(size)
   const conflictSet = new Set(conflicts.map((c) => `${c.r},${c.c}`))
 
+  // Arrow-key navigation across the grid (roving tabindex). Without this the
+  // only way to reach a cell was Tab — up to 81 presses on a 9x9 board — so
+  // the puzzle was effectively pointer-only.
+  const kb = useGridKeyboardNav({ rows: size, cols: size })
+
   const inPeer = (r, c) => {
     if (!selected) return false
     if (r === selected.r || c === selected.c) return true
@@ -37,10 +44,11 @@ export default function SudokuBoard({ grid, size, givens, selected, conflicts, o
         style={{
           gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
           borderColor: `${tint}99`,
-          background: '#001621',
+          background: BOARD_BG,
         }}
         role="grid"
-        aria-label={`${size} by ${size} Sudoku board`}
+        aria-label={`${size} by ${size} Sudoku board. Use the arrow keys to move between cells, then type a number.`}
+        {...kb.containerProps}
       >
         {grid.map((row, r) =>
           row.map((val, c) => {
@@ -60,6 +68,7 @@ export default function SudokuBoard({ grid, size, givens, selected, conflicts, o
                 key={`${r}-${c}`}
                 type="button"
                 role="gridcell"
+                {...kb.cellProps(r, c)}
                 onClick={() => onSelect(r, c)}
                 whileTap={locked ? undefined : { scale: 0.9 }}
                 className={[
@@ -87,7 +96,7 @@ export default function SudokuBoard({ grid, size, givens, selected, conflicts, o
                           : locked
                             ? 'rgba(4,33,46,0.6)'
                             : 'transparent',
-                  color: conflicted ? '#FF5470' : locked ? '#FFFFFF' : tint,
+                  color: conflicted ? CONFLICT : locked ? cssVar('text') : tint,
                 }}
                 aria-label={`Row ${r + 1} column ${c + 1}${val ? `, value ${val}` : ', empty'}${
                   locked ? ', given' : ''

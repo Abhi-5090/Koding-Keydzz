@@ -33,8 +33,15 @@ export default function AnimatedIcon({
 
   // Glow defaults to Ember; pass `glowColor` (e.g. `${tint}b3`) so a world-scoped
   // icon glows in its own accent.
+  // The blur radius is scaled by --glow-strength, which theme.css sets to 1 in
+  // dark and 0 in light. At 0 the shadow sits exactly behind the icon and is
+  // invisible — so a glow that reads as atmosphere on deep teal does not read
+  // as an out-of-focus icon on cream. One variable, all 44 call sites.
   const glowStyle = glow
-    ? { filter: `drop-shadow(0 0 6px ${glowColor})`, ...style }
+    ? {
+        filter: `drop-shadow(0 0 calc(6px * var(--glow-strength, 1)) ${glowColor})`,
+        ...style,
+      }
     : style
 
   // Per-variant motion config. Hover/pop are safe under reduced-motion;

@@ -18,6 +18,8 @@ import {
   LogOut,
   Menu,
   Zap,
+  GraduationCap,
+  Award,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useGetDashboardQuery } from '../../features/student/studentApi'
@@ -32,12 +34,19 @@ import NotificationsBell from './NotificationsBell'
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  // Above the map on purpose: a pupil picks a language track first, then
+  // explores that course's worlds. Trophy is already imported for
+  // Achievements, so GraduationCap keeps the two distinguishable.
+  { to: '/courses', label: 'My Journey', icon: GraduationCap },
   { to: '/map', label: 'World Map', icon: Map },
   { to: '/play', label: 'Playground', icon: Code2 },
   { to: '/games', label: 'Mini Games', icon: Gamepad2 },
   { to: '/quiz', label: 'Quiz Arena', icon: Brain },
   { to: '/avatar', label: 'Avatar', icon: Drama },
   { to: '/achievements', label: 'Achievements', icon: Trophy },
+  // Certificates sit next to Achievements deliberately: both answer "what have
+  // I actually earned", and a certificate is the one a child shows someone.
+  { to: '/certificates', label: 'Certificates', icon: Award },
   { to: '/leaderboard', label: 'Leaderboard', icon: BarChart3 },
   { to: '/shop', label: 'Shop', icon: ShoppingBag },
   { to: '/profile', label: 'Profile', icon: UserCircle },
@@ -48,6 +57,22 @@ export default function StudentLayout() {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  /**
+   * Escape closes the mobile drawer.
+   *
+   * It had none. The backdrop was the only way to dismiss it, and a backdrop
+   * cannot be clicked with a keyboard — so a pupil who opened the menu on a
+   * tablet was stuck in it. (The same bug existed in the admin portal.)
+   */
+  useEffect(() => {
+    if (!mobileOpen) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMobileOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mobileOpen])
 
   // Live dashboard + avatar catalog drive the topbar.
   const { data: dashboard } = useGetDashboardQuery()
@@ -79,9 +104,9 @@ export default function StudentLayout() {
   // Organization the student belongs to (set when an admin creates the account).
   const orgName = user?.org?.name || null
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     disconnectSocket()
-    logout()
+    await logout()
     navigate('/login')
   }
 
@@ -150,6 +175,19 @@ export default function StudentLayout() {
 
   return (
     <div className="flex min-h-screen bg-malt">
+      {/*
+        SKIP LINK — the first focusable thing on the page.
+        A keyboard or screen-reader user should not have to tab through the
+        whole sidebar to reach the lesson. Visually hidden until focused, then
+        it appears: `sr-only` alone would make it a trap nobody can see.
+        The HTML course teaches this, so the platform should demonstrate it.
+      */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:border focus:border-turmeric focus:bg-malt focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-turmeric"
+      >
+        Skip to main content
+      </a>
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-k-border bg-card/60 backdrop-blur-md lg:block">
         <SidebarContent />
@@ -164,6 +202,7 @@ export default function StudentLayout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
+              aria-hidden="true"
               className="fixed inset-0 z-40 bg-black/60 lg:hidden"
             />
             <motion.aside
@@ -224,7 +263,7 @@ export default function StudentLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8">
           <AnimatePresence mode="wait">
             <Outlet />
           </AnimatePresence>

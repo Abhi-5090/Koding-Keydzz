@@ -1,12 +1,12 @@
+/* Tokens FIRST — every rule below and every Tailwind utility resolves
+   against them. See theme.css for the palette and its contrast proof. */
+@import './theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Emil-style strong easing curves — the built-in CSS easings lack punch. */
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-}
+/* Easings and the palette both live in theme.css. */
 
 @layer base {
   html,
@@ -37,7 +37,7 @@
   textarea:focus-visible,
   [role='button']:focus-visible,
   [tabindex]:focus-visible {
-    outline: 2px solid rgba(255, 96, 47, 0.6);
+    outline: 2px solid rgb(var(--c-focus) / 0.85);
     outline-offset: 2px;
   }
 
@@ -46,14 +46,14 @@
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    background: #001621;
+    background: rgb(var(--c-bg));
   }
   ::-webkit-scrollbar-thumb {
-    background: #0a2e3c;
+    background: rgb(var(--c-surface));
     border-radius: 6px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #FF602F66;
+    background: rgb(var(--c-primary) / 0.4);
   }
 }
 
@@ -63,7 +63,7 @@
   }
   .k-input {
     @apply w-full rounded-xl border border-k-border bg-malt px-4 py-2.5 text-sm text-text-primary
-      placeholder:text-text-secondary/50 outline-none
+      placeholder:text-text-secondary/70 outline-none
       focus:border-turmeric focus:ring-2 focus:ring-turmeric/30;
     transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
   }
@@ -111,5 +111,85 @@
     opacity: 1;
     transform: none;
     animation: none;
+  }
+}
+
+/* ==========================================================================
+   PRINTING A CREDENTIAL SLIP
+   ==========================================================================
+   There is no email delivery in this platform, so when an administrator
+   creates a teacher the only ways the temporary password reaches that person
+   are a screen read aloud and a piece of paper. Paper is the better one: it can
+   be handed over in person rather than requiring the new teacher to stand at
+   the administrator's desk, and it can be destroyed afterwards.
+
+   A default print of this page would produce the sidebar, the staff table and a
+   modal. So printing hides everything and brings back only `.credential-slip`.
+   ========================================================================== */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .credential-slip,
+  .credential-slip * {
+    visibility: visible !important;
+  }
+
+  .credential-slip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 12mm;
+    color: #000;
+    background: #fff;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .credential-slip h2 {
+    margin: 0 0 8mm;
+    font-size: 16pt;
+    font-weight: 700;
+  }
+
+  .credential-slip table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8mm;
+  }
+
+  .credential-slip th,
+  .credential-slip td {
+    padding: 2.5mm 0;
+    text-align: left;
+    vertical-align: baseline;
+    border-bottom: 0.3mm solid #ccc;
+    font-size: 11pt;
+  }
+
+  .credential-slip th {
+    width: 45mm;
+    font-weight: 600;
+    color: #444;
+  }
+
+  /* The one value that must not be mistranscribed. */
+  .credential-slip .slip-password {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 14pt;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+
+  .credential-slip p {
+    font-size: 10pt;
+    line-height: 1.5;
+    color: #333;
+  }
+
+  @page {
+    size: A5;
+    margin: 0;
   }
 }

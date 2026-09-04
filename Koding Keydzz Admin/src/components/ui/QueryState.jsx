@@ -1,6 +1,7 @@
 import { Loader2, AlertTriangle, Inbox, RotateCw } from 'lucide-react';
 import AnimatedIcon from './AnimatedIcon';
 import Button from './Button';
+import { formatApiError } from '../../utils/apiError';
 
 /**
  * Wraps an RTK Query result and renders the right UI for each state:
@@ -37,11 +38,10 @@ export default function QueryState({
   }
 
   if (isError) {
-    const message =
-      error?.data?.message ||
-      (error?.status === 'FETCH_ERROR'
-        ? 'Could not reach the server. Check your connection and try again.'
-        : 'Something went wrong while loading this data.');
+    // formatApiError surfaces field-level `details` and already words the
+    // transport failures (offline, 401, 403, 429, 5xx), so this no longer
+    // needs its own ladder.
+    const message = formatApiError(error, 'Something went wrong while loading this data.');
     return (
       <div className="k-card flex flex-col items-center justify-center gap-3 py-16 text-center">
         <div className="rounded-full bg-error/15 p-3 text-error">

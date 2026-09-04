@@ -154,6 +154,10 @@ export default function PatchesPlayScreen({
       const res = await completeLevel(level, stars, {
         moves: finalRects.length,
         timeMs,
+        // Reported so the SERVER can grade the stars from the same rule the
+        // player was shown; its verdict is what the account records.
+        // A Patches "mistake" is a rectangle that did not fit its clue.
+        performance: { hintsUsed, mistakes: invalidsUsed },
       })
       if (cancelled.current) return
       setLevelRank(Number.isFinite(res?.levelRank) ? res.levelRank : null)
@@ -313,10 +317,15 @@ export default function PatchesPlayScreen({
         </div>
 
         {rects.length === 0 && (
-          <p className="game-text mt-1 text-center text-xs text-text-secondary">
-            Press a number and drag to draw its box. ─ makes a sideways row, │ a
-            column, ＋ any shape — each holds exactly that many squares.
-          </p>
+          <>
+            <p className="game-text mt-1 text-center text-xs text-text-secondary">
+              Press a number and drag to draw its box. ─ makes a sideways row, │ a
+              column, ＋ any shape — each holds exactly that many squares.
+            </p>
+            <p className="game-text mt-1 text-center text-[0.68rem] text-text-secondary/70">
+              No mouse? Arrow keys move, Enter starts the box, arrows grow it, Enter places it.
+            </p>
+          </>
         )}
 
         <div className="mt-4 flex flex-wrap justify-center gap-2">

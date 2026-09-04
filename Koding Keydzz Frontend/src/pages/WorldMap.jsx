@@ -8,6 +8,7 @@ import PageTransition from '../components/layout/PageTransition'
 import Particles from '../components/ui/Particles'
 import AnimatedIcon from '../components/ui/AnimatedIcon'
 import { LoadingState, ErrorState, EmptyState } from '../components/ui/QueryState'
+import { BOARD_MUTED, BOARD_SURFACE } from '../theme/tokens'
 
 const EASE_OUT = [0.23, 1, 0.32, 1]
 
@@ -114,7 +115,7 @@ export default function WorldMap() {
                     <div
                       className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full"
                       style={{
-                        background: w.unlocked ? `${w.tint}33` : '#0A2E3C',
+                        background: w.unlocked ? `${w.tint}33` : BOARD_SURFACE,
                         border: `2px solid ${w.unlocked ? w.tint : '#FF602F33'}`,
                       }}
                     >
@@ -126,7 +127,7 @@ export default function WorldMap() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className="text-xs text-text-secondary">World {w.order}</span>
-                      <h3 className="game-text truncate text-lg font-bold" style={{ color: w.unlocked ? w.tint : '#9DB8C4' }}>
+                      <h3 className="game-text truncate text-lg font-bold" style={{ color: w.unlocked ? w.tint : BOARD_MUTED }}>
                         {w.name}
                       </h3>
                       {w.unlocked ? (

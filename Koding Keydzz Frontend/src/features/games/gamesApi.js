@@ -5,7 +5,8 @@ import { baseApi, unwrap } from '../../app/api/baseApi'
  * (idempotent per game/level/difficulty), so we never fabricate XP/coins on the
  * client — we only display what the server returns.
  *
- * POST /games/complete { gameKey, levelId, difficulty, stars, moves?, timeMs? }
+ * POST /games/complete { gameKey, levelId, difficulty, stars, moves?, timeMs?,
+ *                         performance? }
  *  -> { awarded:{xp,coins}, alreadyCompleted, bestStars, totalXp, level, coins,
  *       leveledUp, best:{moves,timeMs,stars}, levelRank }
  *
@@ -20,7 +21,7 @@ import { baseApi, unwrap } from '../../app/api/baseApi'
 export const gamesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     completeLevel: builder.mutation({
-      query: ({ gameKey, levelId, difficulty, stars, moves, timeMs }) => ({
+      query: ({ gameKey, levelId, difficulty, stars, moves, timeMs, performance }) => ({
         url: '/games/complete',
         method: 'POST',
         body: {
@@ -28,6 +29,7 @@ export const gamesApi = baseApi.injectEndpoints({
           levelId,
           difficulty,
           stars,
+          ...(performance ? { performance } : {}),
           ...(Number.isFinite(moves) ? { moves: Math.max(0, Math.round(moves)) } : {}),
           ...(Number.isFinite(timeMs) ? { timeMs: Math.max(0, Math.round(timeMs)) } : {}),
         },

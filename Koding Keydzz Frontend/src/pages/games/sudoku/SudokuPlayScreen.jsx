@@ -93,7 +93,13 @@ export default function SudokuPlayScreen({ level, onExit, onNext, hasNext, compl
       setAlreadyMastered(false)
       setLevelRank(null)
       setAwarding(true)
-      const res = await completeLevel(level, stars, { moves: size * size, timeMs })
+      const res = await completeLevel(level, stars, {
+        moves: size * size,
+        timeMs,
+        // Reported so the SERVER can grade the stars from the same rule the
+        // player was shown; its verdict is what the account records.
+        performance: { hintsUsed, mistakes },
+      })
       if (cancelled.current) return
       setLevelRank(Number.isFinite(res?.levelRank) ? res.levelRank : null)
       const awarded = res?.awarded || { xp: 0, coins: 0 }

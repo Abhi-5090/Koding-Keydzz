@@ -60,6 +60,7 @@ export const baseApi = createApi({
   tagTypes: [
     'Stats',
     'Students',
+    'Worlds',
     'Courses',
     'Lessons',
     'Challenges',
@@ -72,6 +73,17 @@ export const baseApi = createApi({
     'SuperStats',
     'SuperStudents',
     'Analytics',
+    // Tenancy model: organization staff (admins + faculty) and classrooms.
+    'Staff',
+    // Users belonging to no organization. Separate tag because assigning one
+    // has to refresh this list AND every org-scoped roster at once.
+    'Unassigned',
+    // The final-test question bank, and the read-only results staff see.
+    'Questions',
+    'TestResults',
+    'Classrooms',
+    'Audit',
+    'Reports',
   ],
   endpoints: () => ({}),
 });

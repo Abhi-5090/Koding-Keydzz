@@ -1,13 +1,25 @@
+import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Star, Zap, Coins, ArrowRight, RotateCcw, LayoutGrid, Loader2, Timer, Move, Trophy } from 'lucide-react'
 import Confetti from '../ui/Confetti'
 import Button from '../ui/Button'
 import GameLeaderboard from './GameLeaderboard'
 import { formatMs } from '../../games/shared/useLevelTimer'
+import { celebrate } from '../../motion/animations'
+import { cssVar } from '../../theme/tokens'
 
 /**
  * LevelWinOverlay — shared celebration overlay for the level-based mini-games.
- * Spring-pops 3 stars (stagger), shows a message and the BACKEND-awarded
+ * The reward moment, orchestrated as ONE GSAP timeline rather than a set of
+ * independent springs: the stars land, then the XP and coin figures, then the
+ * buttons. Several animations firing at once on the same overlay reads as
+ * things happening at random, and it also invites a tap on "Next Level" before
+ * the child has seen what they earned.
+ *
+ * Under `prefers-reduced-motion` the whole overlay simply appears, complete —
+ * see motion/animations.js, which applies the end state instead of skipping it.
+ *
+ * Shows 3 stars, a message and the BACKEND-awarded
  * XP/coins (never client-fabricated). When awaiting the award, a small spinner
  * shows; when the level was already mastered, a subtle 0-reward note appears.
  *
@@ -56,6 +68,27 @@ export default function LevelWinOverlay({
   title,
   tone = 'good',
 }) {
+  const starRefs = useRef([])
+  const figuresRef = useRef([])
+  const actionsRef = useRef(null)
+
+  /**
+   * One timeline for the whole reward: stars, then figures, then buttons.
+   *
+   * Keyed on the award state so it replays when the backend figures arrive —
+   * the overlay opens on "Saving your reward…", and the XP and coin chips
+   * should land as an EVENT when they appear rather than being there already.
+   */
+  useEffect(
+    () =>
+      celebrate({
+        stars: starRefs.current.filter(Boolean),
+        figures: figuresRef.current.filter(Boolean),
+        actions: actionsRef.current,
+      }),
+    [awarding, reward, alreadyMastered]
+  )
+
   const hasRun = Number.isFinite(runTime) || Number.isFinite(runMoves)
   const showBoard = Boolean(gameKey) && levelId != null
   return (
@@ -80,25 +113,22 @@ export default function LevelWinOverlay({
             {[0, 1, 2].map((i) => {
               const earned = i < stars
               return (
-                <motion.span
-                  key={i}
-                  initial={{ scale: 0.6, opacity: 0, rotate: -25 }}
-                  animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 360,
-                    damping: 14,
-                    delay: 0.15 + i * 0.16,
-                  }}
-                >
+                <span key={i} ref={(el) => { starRefs.current[i] = el }}>
                   <Star
                     size={i === 1 ? 52 : 44}
                     strokeWidth={2}
                     className={earned ? 'text-turmeric' : 'text-surface'}
-                    fill={earned ? '#FF602F' : 'transparent'}
-                    style={earned ? { filter: 'drop-shadow(0 0 10px rgba(255,96,47,0.7))' } : undefined}
+                    /* `ember`, not `turmeric`: the star fill is a graphic
+                       rather than ink, and it reads from one token instead of
+                       the hardcoded #FF602F this used to carry. */
+                    fill={earned ? cssVar('ember') : 'transparent'}
+                    style={
+                      earned
+                        ? { filter: `drop-shadow(0 0 10px ${cssVar('ember', 0.7)})` }
+                        : undefined
+                    }
                   />
-                </motion.span>
+                </span>
               )
             })}
           </div>
@@ -131,33 +161,27 @@ export default function LevelWinOverlay({
               <span className="game-text text-sm">Saving your reward…</span>
             </div>
           ) : reward ? (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
+            <div
+              ref={(el) => { figuresRef.current[0] = el }}
               className="mt-5 flex items-center justify-center gap-5 rounded-2xl border border-k-border bg-surface/60 py-3"
             >
               <RewardChip icon={Zap} value={`+${reward.xp}`} label="XP" />
               <span className="h-8 w-px bg-k-border" />
               <RewardChip icon={Coins} value={`+${reward.coins}`} label="Coins" />
-            </motion.div>
+            </div>
           ) : alreadyMastered ? (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
+            <p
+              ref={(el) => { figuresRef.current[0] = el }}
               className="game-text mx-auto mt-5 max-w-[18rem] rounded-xl border border-k-border bg-surface/40 px-3 py-2 text-xs text-text-secondary"
             >
               Already mastered — no new reward this time.
-            </motion.p>
+            </p>
           ) : null}
 
           {/* This run's time + moves. */}
           {hasRun && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+            <div
+              ref={(el) => { figuresRef.current[1] = el }}
               className="mt-5 flex items-center justify-center gap-5 rounded-2xl border border-k-border bg-surface/50 py-2.5"
             >
               {Number.isFinite(runTime) && (
@@ -169,7 +193,7 @@ export default function LevelWinOverlay({
               {Number.isFinite(runMoves) && (
                 <RunChip icon={Move} value={runMoves} label="moves" />
               )}
-            </motion.div>
+            </div>
           )}
 
           {/* Level rank shout-out. */}
@@ -206,7 +230,10 @@ export default function LevelWinOverlay({
             </motion.div>
           )}
 
-          <div className="mt-6 flex flex-wrap justify-center gap-2.5">
+          {/* Last beat of the timeline: the buttons arrive AFTER the child has
+              seen what they earned, so "Next Level" does not invite a tap over
+              the top of the reward. */}
+          <div ref={actionsRef} className="mt-6 flex flex-wrap justify-center gap-2.5">
             {hasNext && (
               <Button onClick={onNext} className="inline-flex items-center gap-1.5">
                 Next Level <ArrowRight size={17} />

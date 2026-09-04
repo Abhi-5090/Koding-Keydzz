@@ -8,18 +8,29 @@ export const registerStudent = asyncHandler(async (req, res) => {
 });
 
 export const login = asyncHandler(async (req, res) => {
-  const result = await authService.login(req.body);
+  const result = await authService.login({
+    ...req.body,
+    userAgent: String(req.headers['user-agent'] || '').slice(0, 200),
+  });
   return sendSuccess(res, result, 'Login successful');
 });
 
 export const refresh = asyncHandler(async (req, res) => {
-  const result = await authService.refresh(req.body.refreshToken);
+  // Returns a ROTATED refresh token alongside the new access token — clients
+  // must persist both (see the frontend's baseApi reauth handler).
+  const result = await authService.refresh(req.body.refreshToken, {
+    userAgent: String(req.headers['user-agent'] || '').slice(0, 200),
+  });
   return sendSuccess(res, result, 'Token refreshed');
 });
 
 export const logout = asyncHandler(async (req, res) => {
-  await authService.logout(req.user._id);
-  return sendSuccess(res, null, 'Logged out');
+  // Only this device by default; `allDevices: true` signs out everywhere.
+  const result = await authService.logout(req.user._id, {
+    refreshToken: req.body?.refreshToken || null,
+    allDevices: Boolean(req.body?.allDevices),
+  });
+  return sendSuccess(res, result, 'Logged out');
 });
 
 export const me = asyncHandler(async (req, res) => {
@@ -27,4 +38,15 @@ export const me = asyncHandler(async (req, res) => {
   return sendSuccess(res, { user }, 'Current user');
 });
 
-export default { registerStudent, login, refresh, logout, me };
+export const changePassword = asyncHandler(async (req, res) => {
+  // Returns a fresh token pair: the change revokes every session, so the
+  // caller's existing tokens are dead by the time this responds.
+  const result = await authService.changePassword(req.user._id, {
+    currentPassword: req.body.currentPassword,
+    newPassword: req.body.newPassword,
+    userAgent: String(req.headers['user-agent'] || '').slice(0, 200),
+  });
+  return sendSuccess(res, result, 'Password changed');
+});
+
+export default { registerStudent, login, refresh, logout, me, changePassword };

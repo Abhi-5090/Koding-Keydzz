@@ -132,14 +132,22 @@ describe('isSolvedSolution', () => {
 })
 
 describe('authored sudoku levels', () => {
-  it('has the expected counts and shape', () => {
-    expect(sudokuLevels).toHaveLength(14)
+  /**
+   * The level set is now GENERATED and tiered — 170 puzzles across five
+   * unlock tiers, rather than the original 14 hand-authored ones.
+   *
+   * Exact counts and per-tier distribution are asserted in levels.test.js,
+   * which also re-proves every puzzle has exactly one solution. What stays
+   * here is the shape contract the engine itself depends on: each difficulty
+   * maps to one grid size.
+   */
+  it('maps each difficulty to its grid size', () => {
     const easy = sudokuLevels.filter((l) => l.difficulty === 'easy')
     const medium = sudokuLevels.filter((l) => l.difficulty === 'medium')
     const hard = sudokuLevels.filter((l) => l.difficulty === 'hard')
-    expect(easy).toHaveLength(6)
-    expect(medium).toHaveLength(5)
-    expect(hard).toHaveLength(3)
+    expect(easy.length).toBeGreaterThan(0)
+    expect(medium.length).toBeGreaterThan(0)
+    expect(hard.length).toBeGreaterThan(0)
     expect(easy.every((l) => l.size === 4)).toBe(true)
     expect(medium.every((l) => l.size === 6)).toBe(true)
     expect(hard.every((l) => l.size === 9)).toBe(true)

@@ -65,6 +65,25 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Auth', 'Dashboard', 'Worlds', 'Lessons', 'Leaderboard', 'Notifications', 'Avatar', 'Shop', 'Quiz', 'Achievements'],
+  tagTypes: [
+    'Auth',
+    'Dashboard',
+    'Worlds',
+    'Lessons',
+    'Leaderboard',
+    'Notifications',
+    'Avatar',
+    'Shop',
+    'Quiz',
+    'Achievements',
+    // The course ladder. Tagged separately from 'Worlds' because finishing a
+    // lesson changes readiness (how much of the course is left) without
+    // changing the world list itself.
+    'Courses',
+    // The final test's eligibility (attempts left, readiness). Separate from
+    // 'Courses' because submitting a paper changes both, but finishing a
+    // lesson changes only the latter.
+    'FinalTest',
+  ],
   endpoints: () => ({}),
 })

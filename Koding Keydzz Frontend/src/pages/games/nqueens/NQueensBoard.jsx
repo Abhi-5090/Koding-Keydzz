@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion'
 import { Crown } from 'lucide-react'
+import useGridKeyboardNav from '../../../games/shared/useGridKeyboardNav'
+import { BOARD_MUTED, CONFLICT } from '../../../theme/tokens'
 
 /**
  * NQueensBoard — an N x N checkerboard. Tap a square to place/remove a queen.
@@ -27,6 +29,9 @@ export default function NQueensBoard({
   const queenAt = new Map(queens.map((q) => [`${q.r},${q.c}`, q]))
   const maxPx = n <= 5 ? 360 : n <= 6 ? 408 : 456
 
+  // Arrow-key navigation across the board (roving tabindex).
+  const kb = useGridKeyboardNav({ rows: n, cols: n })
+
   return (
     <div className="mx-auto w-full" style={{ maxWidth: maxPx }}>
       <div
@@ -36,7 +41,8 @@ export default function NQueensBoard({
           borderColor: `${tint}99`,
         }}
         role="grid"
-        aria-label={`${n} by ${n} queens board`}
+        aria-label={`${n} by ${n} queens board. Use the arrow keys to move, then press Enter to place or remove a queen.`}
+        {...kb.containerProps}
       >
         {Array.from({ length: n }).map((_, r) =>
           Array.from({ length: n }).map((__, c) => {
@@ -55,6 +61,7 @@ export default function NQueensBoard({
                 key={k}
                 type="button"
                 role="gridcell"
+                {...kb.cellProps(r, c)}
                 onClick={() => onToggle(r, c)}
                 whileTap={fixed ? undefined : { scale: 0.88 }}
                 className="relative flex aspect-square items-center justify-center transition-colors duration-150 focus-visible:z-10"
@@ -74,7 +81,7 @@ export default function NQueensBoard({
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ type: 'spring', stiffness: 460, damping: 16 }}
                     style={{
-                      color: conflicted ? '#FF5470' : fixed ? '#9DB8C4' : tint,
+                      color: conflicted ? CONFLICT : fixed ? BOARD_MUTED : tint,
                       filter: conflicted
                         ? 'drop-shadow(0 0 6px rgba(255,84,112,0.8))'
                         : `drop-shadow(0 0 6px ${tint}aa)`,

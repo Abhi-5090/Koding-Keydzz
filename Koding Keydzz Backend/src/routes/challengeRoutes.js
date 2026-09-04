@@ -7,7 +7,8 @@ import { idParam } from '../utils/validators.js';
 
 const router = Router();
 
-router.get('/daily', gameController.listDailyChallenges);
+// AUTHENTICATED — daily challenges are authored content.
+router.get('/daily', protect, gameController.listDailyChallenges);
 router.post(
   '/:id/complete',
   protect,

@@ -8,7 +8,15 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "seed": "node src/seed/seed.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:catalog": "node scripts/generate-game-catalog.mjs",
+    "verify:catalog": "node scripts/verify-game-catalog.mjs",
+    "migrate": "node scripts/migrate-quiz-attempts.mjs && node scripts/migrate-sessions.mjs",
+    "recover:superadmin": "node scripts/recover-superadmin.mjs",
+    "test:unit": "vitest run --dir tests --exclude 'tests/integration/**'",
+    "test:integration": "vitest run tests/integration",
+    "users:unassigned": "node scripts/find-unassigned-users.mjs",
+    "seed:courses": "node scripts/seed-courses.mjs"
   },
   "keywords": [
     "education",
@@ -19,6 +27,8 @@
   "author": "Koding Keydzz",
   "license": "MIT",
   "dependencies": {
+    "@sentry/node": "^10.73.0",
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
     "cors": "^2.8.5",
@@ -31,12 +41,17 @@
     "mongoose": "^8.6.0",
     "morgan": "^1.10.0",
     "multer": "^2.2.0",
+    "redis": "^4.7.1",
     "socket.io": "^4.7.5",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "supertest": "^7.0.0",
     "vitest": "^2.1.8"
-  }
+  },
+  "overrides": {
+    "qs": "^6.16.0"
+  },
+  "_overridesNote": "qs is pinned to ^6.16.0 to close GHSA-x5fp-wj9c-mxmx (array-limit bypass via bracket-key comma parsing) and GHSA-4mjr-xmp4-gh2g (DoS via attacker-controlled isBuffer). Express 4.22.2 declares qs ~6.15.1, which cannot pick up the fix; 6.16.0 is a semver-minor bump. Remove this override once Express ships a release that depends on 6.16.0 or later."
 }

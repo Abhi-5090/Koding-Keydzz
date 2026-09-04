@@ -1,257 +1,447 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Building2,
-  CheckCircle2,
-  Ban,
-  UserCog,
+  Users,
   GraduationCap,
+  ShieldCheck,
   Activity,
-  CalendarClock,
+  AlertTriangle,
+  TrendingUp,
+  CalendarDays,
+  ArrowRight,
   BookOpen,
-  HelpCircle,
-  Swords,
-  Award,
-  Shirt,
-  Layers,
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from 'recharts';
-import { useGetSuperAnalyticsQuery } from '../../features/superadmin/superadminApi';
-import StatCard from '../../components/ui/StatCard';
-import ChartCard from '../../components/ui/ChartCard';
+import { useGetPlatformAnalyticsQuery } from '../../features/superadmin/superadminApi';
 import PageHeader from '../../components/ui/PageHeader';
 import QueryState from '../../components/ui/QueryState';
+import {
+  ChartPanel,
+  ChartEmpty,
+  StatTile,
+  TrendChart,
+  BarBreakdown,
+  DonutSplit,
+  MeterRow,
+  StatusChip,
+} from '../../components/charts/Primitives';
+import { shortDate, shortMonth } from '../../components/charts/chartTheme';
+import useChartTheme from '../../components/charts/useChartTheme';
 
-const tooltipStyle = {
-  contentStyle: {
-    background: "#04212E",
-    border: '1px solid #FF602F29',
-    borderRadius: 12,
-    color: '#fff',
-  },
-  labelStyle: { color: "#9DB8C4" },
-  itemStyle: { color: '#fff' },
-};
+/**
+ * The platform owner's dashboard.
+ *
+ * Answers, in order of how often it is asked:
+ *   1. How big is the platform, and is it growing?
+ *   2. Are the schools actually USING it? (the renewal question)
+ *   3. Which schools are at risk of churning? (the actionable one)
+ *   4. What is happening day to day?
+ *
+ * The at-risk table sits high on the page for the same reason the teacher
+ * dashboard leads with struggling pupils: it is the reason to open the page.
+ */
 
-const CONTENT_ITEMS = [
-  { key: 'worlds', label: 'Worlds', icon: Layers },
-  { key: 'lessons', label: 'Lessons', icon: BookOpen },
-  { key: 'quizzes', label: 'Quizzes', icon: HelpCircle },
-  { key: 'challenges', label: 'Challenges', icon: Swords },
-  { key: 'achievements', label: 'Achievements', icon: Award },
-  { key: 'avatarItems', label: 'Avatar Items', icon: Shirt },
+const RANGES = [
+  { days: 7, label: '7 days' },
+  { days: 30, label: '30 days' },
+  { days: 90, label: '90 days' },
 ];
 
-export default function SuperAdminDashboard() {
-  const { data, isError, isLoading, error, refetch } = useGetSuperAnalyticsQuery();
-
+function RangePicker({ value, onChange }) {
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Platform Analytics"
-        subtitle="Real-time insight across every organization on Koding Keydzz"
-      />
-
-      <QueryState
-        isLoading={isLoading}
-        isError={isError}
-        error={error}
-        refetch={refetch}
-        isEmpty={!data}
-        loadingLabel="Loading platform analytics…"
-        emptyTitle="No analytics yet"
-        emptyMessage="Analytics will appear once organizations and students are active."
-      >
-        {data && <Analytics a={data} />}
-      </QueryState>
+    <div
+      className="inline-flex items-center gap-1 rounded-xl border border-k-border bg-card p-1"
+      role="group"
+      aria-label="Reporting period"
+    >
+      <CalendarDays size={14} className="ml-1.5 text-text-secondary/70" aria-hidden="true" />
+      {RANGES.map((r) => (
+        <button
+          key={r.days}
+          type="button"
+          onClick={() => onChange(r.days)}
+          aria-pressed={value === r.days}
+          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-turmeric ${
+            value === r.days
+              ? 'bg-turmeric text-malt'
+              : 'text-text-secondary hover:text-text-primary'
+          }`}
+        >
+          {r.label}
+        </button>
+      ))}
     </div>
   );
 }
 
-function Analytics({ a }) {
-  const totals = a.totals || {};
-  const activeUsers = a.activeUsers || {};
-  const contentCounts = a.contentCounts || {};
-  const studentGrowth = a.growth?.students || [];
-  const orgGrowth = a.growth?.orgs || [];
-  const studentsPerOrg = a.studentsPerOrg || [];
-  const xpDistribution = a.xpDistribution || [];
-  const levelDistribution = a.levelDistribution || [];
-  const topOrgsByStudents = a.topOrgsByStudents || [];
-  const topOrgsByXp = a.topOrgsByXp || [];
+/** Engagement band for a school, shown as a labelled chip (never colour alone). */
+function engagementTone(rate) {
+  if (rate >= 50) return { tone: 'good', label: 'Healthy' };
+  if (rate >= 25) return { tone: 'warning', label: 'Slipping' };
+  return { tone: 'critical', label: 'At risk' };
+}
+
+export default function SuperAdminDashboard() {
+  const { CATEGORICAL, STATUS } = useChartTheme();
+  const [days, setDays] = useState(30);
+  const query = useGetPlatformAnalyticsQuery({ days });
+  const d = query.data;
 
   return (
     <div className="space-y-6">
-      {/* Headline stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard index={0} label="Total Orgs" value={(totals.orgs ?? 0).toLocaleString()} icon={Building2} />
-        <StatCard index={1} label="Active Orgs" value={(totals.activeOrgs ?? 0).toLocaleString()} icon={CheckCircle2} />
-        <StatCard index={2} label="Suspended Orgs" value={(totals.suspendedOrgs ?? 0).toLocaleString()} icon={Ban} />
-        <StatCard index={3} label="Total Admins" value={(totals.admins ?? 0).toLocaleString()} icon={UserCog} />
-        <StatCard index={4} label="Total Students" value={(totals.students ?? 0).toLocaleString()} icon={GraduationCap} />
-        <StatCard index={5} label="Suspended Students" value={(totals.suspendedStudents ?? 0).toLocaleString()} icon={Ban} />
-        <StatCard index={6} label="Active (7d)" value={(activeUsers.last7 ?? 0).toLocaleString()} icon={Activity} hint="students active last 7 days" />
-        <StatCard index={7} label="Active (30d)" value={(activeUsers.last30 ?? 0).toLocaleString()} icon={CalendarClock} hint="students active last 30 days" />
-      </div>
+      <PageHeader
+        title="Platform overview"
+        subtitle="Every school, every user, and how much they are actually using Koding Keydzz"
+      >
+        <RangePicker value={days} onChange={setDays} />
+      </PageHeader>
 
-      {/* Content counts row */}
-      {Object.keys(contentCounts).length > 0 && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {CONTENT_ITEMS.map(({ key, label, icon: Icon }) => (
-            <div key={key} className="k-card flex items-center gap-3 p-4">
-              <div className="shrink-0 rounded-xl bg-turmeric/15 p-2 text-turmeric">
-                <Icon size={18} />
+      <QueryState
+        isLoading={query.isLoading}
+        isError={query.isError}
+        error={query.error}
+        refetch={query.refetch}
+        loadingLabel="Loading platform analytics…"
+      >
+        <div className="space-y-6">
+          {/* ---- Scale ---- */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatTile
+              index={0}
+              label="Schools"
+              value={d?.kpis?.organizations?.value ?? 0}
+              delta={d?.kpis?.newOrganizations?.delta}
+              direction={d?.kpis?.newOrganizations?.direction}
+              hint={`${d?.kpis?.newOrganizations?.value ?? 0} added this period`}
+              icon={Building2}
+            />
+            <StatTile
+              index={1}
+              label="Students"
+              value={d?.kpis?.students?.value ?? 0}
+              delta={d?.kpis?.newStudents?.delta}
+              direction={d?.kpis?.newStudents?.direction}
+              hint={`${d?.kpis?.newStudents?.value ?? 0} added this period`}
+              icon={Users}
+            />
+            <StatTile
+              index={2}
+              label="Teachers"
+              value={d?.kpis?.faculty?.value ?? 0}
+              delta={null}
+              direction="flat"
+              hint={`${d?.kpis?.admins?.value ?? 0} administrators`}
+              icon={GraduationCap}
+            />
+            <StatTile
+              index={3}
+              label="Active this week"
+              value={d?.kpis?.weeklyActive?.value ?? 0}
+              delta={d?.kpis?.weeklyActive?.delta}
+              direction={d?.kpis?.weeklyActive?.direction}
+              hint={`${d?.engagement?.activeShare ?? 0}% of all students`}
+              icon={Activity}
+            />
+          </div>
+
+          {/* ---- At-risk schools: the actionable list ---- */}
+          {d?.tenants?.atRisk?.length > 0 && (
+            <section className="k-card overflow-hidden">
+              <header className="flex items-start justify-between gap-3 border-b border-k-border p-5">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-xl bg-error/15 p-2.5 text-error">
+                    <AlertTriangle size={22} aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-heading text-base font-bold text-text-primary">
+                      Schools at risk
+                    </h3>
+                    <p className="mt-0.5 text-sm text-text-secondary/70">
+                      Fewer than a quarter of their students used the app this week. These
+                      are the accounts worth a call.
+                    </p>
+                  </div>
+                </div>
+              </header>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px] text-sm">
+                  <caption className="sr-only">Schools with low weekly engagement</caption>
+                  <thead>
+                    <tr className="border-b border-k-border text-left text-xs uppercase tracking-wide text-text-secondary/70">
+                      <th scope="col" className="px-5 py-2 font-semibold">School</th>
+                      <th scope="col" className="px-3 py-2 text-right font-semibold">Students</th>
+                      <th scope="col" className="px-3 py-2 text-right font-semibold">Active</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Engagement</th>
+                      <th scope="col" className="px-5 py-2 font-semibold">Plan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.tenants.atRisk.map((o) => {
+                      const band = engagementTone(o.engagementRate);
+                      return (
+                        <tr key={o.id} className="border-b border-k-border/50 last:border-0">
+                          <td className="px-5 py-3">
+                            <Link
+                              to={`/superadmin/orgs/${o.id}`}
+                              className="font-semibold text-text-primary hover:text-turmeric focus-visible:outline focus-visible:outline-2 focus-visible:outline-turmeric"
+                            >
+                              {o.name}
+                            </Link>
+                            <div className="text-xs text-text-secondary/70">{o.code}</div>
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums text-text-primary">
+                            {o.students}
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums text-text-primary">
+                            {o.activeStudents}
+                          </td>
+                          <td className="px-3 py-3">
+                            <StatusChip tone={band.tone}>
+                              {o.engagementRate}% · {band.label}
+                            </StatusChip>
+                          </td>
+                          <td className="px-5 py-3 text-xs capitalize text-text-secondary">
+                            {o.plan}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            </section>
+          )}
+
+          {/* ---- Growth ---- */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <ChartPanel
+              index={0}
+              title="Growth"
+              subtitle="New schools and students per month"
+              help="How many schools and students were added each month over the past year. Two lines on one axis because both are counts of new sign-ups — comparing their shape is the point."
+            >
+              <TrendChart
+                data={(d?.series?.studentGrowth || []).map((row, i) => ({
+                  month: row.month,
+                  students: row.value,
+                  schools: d?.series?.orgGrowth?.[i]?.value ?? 0,
+                }))}
+                xKey="month"
+                series={[
+                  { key: 'students', label: 'New students' },
+                  { key: 'schools', label: 'New schools' },
+                ]}
+                formatX={shortMonth}
+                emptyMessage="No sign-ups recorded yet"
+              />
+            </ChartPanel>
+
+            <ChartPanel
+              index={1}
+              title="Daily activity"
+              subtitle={`Quiz attempts and game levels, last ${days} days`}
+              help="Total learning events per day across every school. Weekday peaks with weekend dips is the normal shape for a school product — a flat weekday means something is wrong."
+            >
+              <TrendChart
+                data={(d?.series?.quizActivity || []).map((row, i) => ({
+                  date: row.date,
+                  quizzes: row.value,
+                  games: d?.series?.gameActivity?.[i]?.value ?? 0,
+                }))}
+                series={[
+                  { key: 'quizzes', label: 'Quiz attempts' },
+                  { key: 'games', label: 'Game levels' },
+                ]}
+                formatX={shortDate}
+                emptyMessage="No activity in this period"
+              />
+            </ChartPanel>
+          </div>
+
+          {/* ---- Engagement quality ---- */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <ChartPanel
+              index={2}
+              title="How often students return"
+              subtitle="Daily, weekly and monthly active students"
+              help="DAU / WAU / MAU are the count of distinct students who used the app in the last day, week and month. 'Stickiness' is daily divided by monthly — above 20% is healthy for a learning product, because pupils typically use it on lesson days rather than daily."
+              height="auto"
+            >
+              <div className="flex flex-col gap-4 py-1">
+                <MeterRow
+                  label="Stickiness (daily ÷ monthly)"
+                  value={d?.engagement?.dauOverMau ?? 0}
+                  sub={`${d?.engagement?.dau ?? 0} of ${d?.engagement?.mau ?? 0} monthly students used it today`}
+                />
+                <MeterRow
+                  label="Weekly reach (weekly ÷ monthly)"
+                  value={d?.engagement?.wauOverMau ?? 0}
+                  sub={`${d?.engagement?.wau ?? 0} active in the last 7 days`}
+                />
+                <MeterRow
+                  label="Share of all students active weekly"
+                  value={d?.engagement?.activeShare ?? 0}
+                  sub={`of ${(d?.kpis?.students?.value ?? 0).toLocaleString()} enrolled`}
+                />
+              </div>
+            </ChartPanel>
+
+            <ChartPanel
+              index={3}
+              title="Schools by plan"
+              subtitle="Contract mix"
+              help="How many schools are on each plan. Trial accounts that never convert are the clearest signal that onboarding needs attention."
+            >
+              <DonutSplit
+                data={d?.tenants?.byPlan || []}
+                centerValue={d?.tenants?.total ?? 0}
+                centerLabel="Schools"
+                emptyMessage="No schools yet"
+              />
+            </ChartPanel>
+
+            <ChartPanel
+              index={4}
+              title="Experience levels"
+              subtitle="All students, platform-wide"
+              help="Students grouped by the level they have reached. A large level-1 group relative to the total suggests many accounts were created but never really used."
+            >
+              <BarBreakdown
+                data={(d?.distributions?.level || []).slice(0, 10)}
+                emptyMessage="No progress yet"
+              />
+            </ChartPanel>
+          </div>
+
+          {/* ---- All schools ---- */}
+          <section className="k-card overflow-hidden">
+            <header className="flex flex-wrap items-start justify-between gap-3 border-b border-k-border p-5">
               <div className="min-w-0">
-                <p className="truncate font-heading text-xl font-extrabold tabular-nums text-text-primary">
-                  {(contentCounts[key] ?? 0).toLocaleString()}
+                <h3 className="font-heading text-base font-bold text-text-primary">
+                  All schools
+                </h3>
+                <p className="mt-0.5 text-sm text-text-secondary/70">
+                  Sorted by student count. Engagement is the share of that school&apos;s
+                  students who used the app this week.
                 </p>
-                <p className="truncate text-xs text-text-secondary/70">{label}</p>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+              <Link
+                to="/superadmin/orgs"
+                className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-turmeric hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-turmeric"
+              >
+                Manage schools <ArrowRight size={13} aria-hidden="true" />
+              </Link>
+            </header>
 
-      {/* Growth charts */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {studentGrowth.length > 0 && (
-          <ChartCard title="Student Growth" subtitle="New students over the last 6 months" index={0}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={studentGrowth}>
-                <defs>
-                  <linearGradient id="stuGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#FF602F" stopOpacity={0.7} />
-                    <stop offset="100%" stopColor="#FF602F" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" vertical={false} />
-                <XAxis dataKey="period" stroke="#9DB8C4" fontSize={12} />
-                <YAxis stroke="#9DB8C4" fontSize={12} allowDecimals={false} />
-                <Tooltip {...tooltipStyle} />
-                <Area type="monotone" dataKey="count" stroke="#FF602F" strokeWidth={2} fill="url(#stuGrad)" animationDuration={1000} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
+            {d?.tenants?.table?.length ? (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm">
+                  <caption className="sr-only">Every school with its usage figures</caption>
+                  <thead>
+                    <tr className="border-b border-k-border text-left text-xs uppercase tracking-wide text-text-secondary/70">
+                      <th scope="col" className="px-5 py-2 font-semibold">School</th>
+                      <th scope="col" className="px-3 py-2 text-right font-semibold">Students</th>
+                      <th scope="col" className="px-3 py-2 text-right font-semibold">Teachers</th>
+                      <th scope="col" className="px-3 py-2 font-semibold">Engagement</th>
+                      <th scope="col" className="px-3 py-2 text-right font-semibold">Avg XP</th>
+                      <th scope="col" className="px-3 py-2 text-right font-semibold">Seats</th>
+                      <th scope="col" className="px-5 py-2 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.tenants.table.map((o) => {
+                      const band = engagementTone(o.engagementRate);
+                      return (
+                        <tr key={o.id} className="border-b border-k-border/50 last:border-0">
+                          <td className="px-5 py-3">
+                            <Link
+                              to={`/superadmin/orgs/${o.id}`}
+                              className="font-semibold text-text-primary hover:text-turmeric focus-visible:outline focus-visible:outline-2 focus-visible:outline-turmeric"
+                            >
+                              {o.name}
+                            </Link>
+                            <div className="text-xs capitalize text-text-secondary/70">
+                              {o.code} · {o.plan}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums text-text-primary">
+                            {o.students}
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums text-text-primary">
+                            {o.faculty}
+                          </td>
+                          <td className="px-3 py-3">
+                            <StatusChip tone={band.tone}>{o.engagementRate}%</StatusChip>
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums text-text-secondary">
+                            {o.avgXp.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-right text-xs tabular-nums text-text-secondary">
+                            {o.seatLimit ? `${o.seatUtilization}% of ${o.seatLimit}` : 'Unlimited'}
+                          </td>
+                          <td className="px-5 py-3">
+                            <StatusChip tone={o.status === 'active' ? 'good' : 'critical'}>
+                              {o.status === 'active' ? 'Active' : 'Suspended'}
+                            </StatusChip>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-8">
+                <ChartEmpty
+                  message="No schools yet"
+                  hint="Add your first school from the Schools page to start seeing analytics here."
+                />
+              </div>
+            )}
+          </section>
 
-        {orgGrowth.length > 0 && (
-          <ChartCard title="Organization Growth" subtitle="New organizations over the last 6 months" index={1}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={orgGrowth}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" vertical={false} />
-                <XAxis dataKey="period" stroke="#9DB8C4" fontSize={12} />
-                <YAxis stroke="#9DB8C4" fontSize={12} allowDecimals={false} />
-                <Tooltip {...tooltipStyle} />
-                <Line type="monotone" dataKey="count" stroke="#FF6A3D" strokeWidth={3} dot={{ fill: "#FF602F", r: 4 }} activeDot={{ r: 6 }} animationDuration={1000} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
-
-        {studentsPerOrg.length > 0 && (
-          <ChartCard title="Students per Organization" subtitle="Distribution of learners across orgs" index={2}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={studentsPerOrg}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" vertical={false} />
-                <XAxis dataKey="org" stroke="#9DB8C4" fontSize={12} />
-                <YAxis stroke="#9DB8C4" fontSize={12} allowDecimals={false} />
-                <Tooltip {...tooltipStyle} cursor={{ fill: '#FF602F14' }} />
-                <Bar dataKey="students" fill="#FF602F" radius={[6, 6, 0, 0]} animationDuration={900} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
-
-        {xpDistribution.length > 0 && (
-          <ChartCard title="XP Distribution" subtitle="Students grouped by total XP earned" index={3}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={xpDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" vertical={false} />
-                <XAxis dataKey="bucket" stroke="#9DB8C4" fontSize={12} />
-                <YAxis stroke="#9DB8C4" fontSize={12} allowDecimals={false} />
-                <Tooltip {...tooltipStyle} cursor={{ fill: '#FF602F14' }} />
-                <Bar dataKey="count" fill="#2DD4BF" radius={[6, 6, 0, 0]} animationDuration={900} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
-
-        {levelDistribution.length > 0 && (
-          <ChartCard title="Level Distribution" subtitle="How many students sit at each level" index={4}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={levelDistribution}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" vertical={false} />
-                <XAxis dataKey="level" stroke="#9DB8C4" fontSize={12} />
-                <YAxis stroke="#9DB8C4" fontSize={12} allowDecimals={false} />
-                <Tooltip {...tooltipStyle} cursor={{ fill: '#FF602F14' }} />
-                <Bar dataKey="count" fill="#5BC0BE" radius={[6, 6, 0, 0]} animationDuration={900} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
-
-        {topOrgsByXp.length > 0 && (
-          <ChartCard title="Top Orgs by XP" subtitle="Organizations whose students earned the most XP" index={5}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topOrgsByXp} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#FF602F29" horizontal={false} />
-                <XAxis type="number" stroke="#9DB8C4" fontSize={12} />
-                <YAxis type="category" dataKey="org" stroke="#9DB8C4" fontSize={12} width={110} />
-                <Tooltip {...tooltipStyle} cursor={{ fill: '#FF602F14' }} />
-                <Bar dataKey="xp" fill="#FF6A3D" radius={[0, 6, 6, 0]} animationDuration={900} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        )}
-      </div>
-
-      {/* Top orgs by students table */}
-      {topOrgsByStudents.length > 0 && (
-        <div className="k-card overflow-hidden">
-          <div className="border-b border-k-border p-4">
-            <h3 className="font-heading text-base font-bold text-text-primary">Top Organizations by Students</h3>
-            <p className="text-xs text-text-secondary/70">Largest learning communities on the platform</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-k-border bg-malt/40 text-xs uppercase tracking-wide text-text-secondary">
-                  <th className="px-4 py-3 font-semibold">#</th>
-                  <th className="px-4 py-3 font-semibold">Organization</th>
-                  <th className="px-4 py-3 font-semibold">Code</th>
-                  <th className="px-4 py-3 font-semibold">Students</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topOrgsByStudents.map((o, i) => (
-                  <tr key={o.code || o.org || i} className="border-b border-k-border/50 hover:bg-surface/40">
-                    <td className="px-4 py-3 font-heading font-bold text-turmeric">#{i + 1}</td>
-                    <td className="px-4 py-3 text-text-primary">
-                      <span className="block max-w-[280px] truncate">{o.org}</span>
-                    </td>
-                    <td className="px-4 py-3 text-text-secondary/70">{o.code || '—'}</td>
-                    <td className="px-4 py-3 font-semibold tabular-nums text-turmeric">
-                      {(o.students ?? 0).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* ---- Learning + content footer ---- */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatTile
+              index={0}
+              label="Quiz pass rate"
+              value={`${d?.learning?.quizPassRate ?? 0}%`}
+              delta={null}
+              direction="flat"
+              hint={`${(d?.learning?.totalQuizAttempts ?? 0).toLocaleString()} attempts`}
+              icon={TrendingUp}
+            />
+            <StatTile
+              index={1}
+              label="Average XP"
+              value={(d?.learning?.avgXp ?? 0).toLocaleString()}
+              delta={null}
+              direction="flat"
+              hint={`median ${(d?.learning?.medianXp ?? 0).toLocaleString()}`}
+              icon={Activity}
+            />
+            <StatTile
+              index={2}
+              label="Curriculum"
+              value={d?.content?.lessons ?? 0}
+              delta={null}
+              direction="flat"
+              hint={`${d?.content?.worlds ?? 0} worlds · ${d?.content?.quizzes ?? 0} quizzes`}
+              icon={BookOpen}
+            />
+            <StatTile
+              index={3}
+              label="Suspended schools"
+              value={d?.tenants?.suspended ?? 0}
+              delta={null}
+              direction="flat"
+              tone="inverse"
+              hint={`${d?.tenants?.active ?? 0} active`}
+              icon={ShieldCheck}
+            />
           </div>
         </div>
-      )}
+      </QueryState>
     </div>
   );
 }

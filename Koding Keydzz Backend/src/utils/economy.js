@@ -6,6 +6,9 @@
 export const LESSON_AWARD = { xp: 100, coins: 10 };
 export const QUIZ_AWARD = { xp: 50, coins: 15 };
 export const CHALLENGE_AWARD = { xp: 150, coins: 25 };
+// Winning a live coding battle. Kept here (rather than inline in the socket
+// handler) so every payout in the product is tuned from one place.
+export const BATTLE_AWARD = { xp: 100, coins: 25 };
 
 // Game-level completion base awards by difficulty (first completion only).
 export const GAME_DIFFICULTY_AWARDS = {
@@ -72,6 +75,7 @@ export default {
   LESSON_AWARD,
   QUIZ_AWARD,
   CHALLENGE_AWARD,
+  BATTLE_AWARD,
   GAME_DIFFICULTY_AWARDS,
   PERFECT_BONUS,
   computeGameAward,

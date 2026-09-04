@@ -6,7 +6,8 @@ import { equipAvatarSchema } from '../utils/validators.js';
 
 const router = Router();
 
-router.get('/items', avatarController.listItems);
+// AUTHENTICATED — the item catalogue drives the shop economy.
+router.get('/items', protect, avatarController.listItems);
 router.get('/me', protect, avatarController.getMyAvatar);
 router.put(
   '/me',

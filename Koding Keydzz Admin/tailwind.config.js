@@ -4,16 +4,26 @@ export default {
   theme: {
     extend: {
       colors: {
-        turmeric: '#FF602F',
-        malt: '#001621',
-        accent: '#FF6A3D',
-        success: '#34D399',
-        error: '#FF5470',
-        card: '#04212E',
-        surface: '#0A2E3C',
-        'text-primary': '#FFFFFF',
-        'text-secondary': '#9DB8C4',
-        'k-border': '#FF602F29',
+        // Resolved from CSS variables so each colour has one definition.
+        // `<alpha-value>` is what keeps the 138 `text-secondary/xx` and 70
+        // `error/xx` modifiers working — the variables therefore hold RGB
+        // CHANNELS, not hex. See src/theme.css.
+        turmeric: 'rgb(var(--c-primary) / <alpha-value>)',
+        malt: 'rgb(var(--c-bg) / <alpha-value>)',
+        'bg-elev': 'rgb(var(--c-bg-elev) / <alpha-value>)',
+        accent: 'rgb(var(--c-accent) / <alpha-value>)',
+        success: 'rgb(var(--c-success) / <alpha-value>)',
+        error: 'rgb(var(--c-error) / <alpha-value>)',
+        card: 'rgb(var(--c-card) / <alpha-value>)',
+        surface: 'rgb(var(--c-surface) / <alpha-value>)',
+        'text-primary': 'rgb(var(--c-text) / <alpha-value>)',
+        'text-secondary': 'rgb(var(--c-muted) / <alpha-value>)',
+        focus: 'rgb(var(--c-focus) / <alpha-value>)',
+        // Carries its own alpha, so it is composed rather than modified.
+        'k-border': 'rgb(var(--c-border-rgb) / var(--c-border-a))',
+        // The brand hue as a GRAPHIC: glows and decorative marks only, never
+        // text.
+        ember: 'rgb(var(--c-ember) / <alpha-value>)',
       },
       fontFamily: {
         heading: ['Poppins', 'sans-serif'],

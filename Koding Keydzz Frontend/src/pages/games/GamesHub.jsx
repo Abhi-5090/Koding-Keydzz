@@ -78,9 +78,24 @@ export default function GamesHub() {
                       </h3>
                       <p className="mt-1 flex-1 text-sm leading-snug text-text-secondary">{g.tagline}</p>
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                        {/*
+                          The tint stays as the BACKGROUND wash; the label is
+                          ordinary text.
+
+                          It used to be the tint on a 13% wash of the same
+                          tint, which is inherently low contrast — the audit
+                          measured 4.19:1 for the purple and 4.33:1 for the
+                          orange, both under the 4.5:1 this platform teaches.
+                          No amount of tuning fixes a colour against a pale
+                          wash of itself for every tint in the catalogue.
+
+                          The colour coding is carried by the wash, so moving
+                          the label to `text-text-primary` keeps the coding and
+                          makes the words legible.
+                        */}
                         <span
-                          className="game-text rounded-full px-2.5 py-1 text-xs font-bold"
-                          style={{ background: `${g.tint}22`, color: g.tint }}
+                          className="game-text rounded-full px-2.5 py-1 text-xs font-bold text-text-primary"
+                          style={{ background: `${g.tint}33` }}
                         >
                           {g.concept}
                         </span>

@@ -1,0 +1,16 @@
+{
+  "name": "koding-keydzz-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "End-to-end browser tests. Drives the REAL apps in a real browser, which is the one class of verification the unit and API suites cannot provide.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.62.1"
+  }
+}

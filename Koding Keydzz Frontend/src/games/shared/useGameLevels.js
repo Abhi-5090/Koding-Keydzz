@@ -24,8 +24,13 @@ import useLevelReward from '../../hooks/useLevelReward'
  *      updates the local best (keeps max) AND calls the backend reward path
  *      (useLevelReward -> POST /games/complete) with
  *      { gameKey, levelId:level.id, difficulty:level.difficulty, stars }.
- *      The optional `metrics = { moves, timeMs }` is forwarded to the backend
- *      for the move-count / time leaderboards (only finite values are sent).
+ *      `metrics = { moves, timeMs, performance }`:
+ *        - moves / timeMs feed the move-count and time leaderboards (only
+ *          finite values are sent),
+ *        - performance = { hintsUsed, mistakes, outcome?, optimalPath?,
+ *          cleanCode? } is HOW THE RUN WENT, and the server grades the stars
+ *          from it. Pass it: a run that reports nothing is graded at two
+ *          stars, so omitting it silently costs the player the perfect bonus.
  *      Resolves to the backend award result
  *      ({ awarded:{xp,coins}, alreadyCompleted, best, levelRank, ... }).
  *      Never throws.
@@ -58,11 +63,21 @@ export default function useGameLevels(gameKey, levels = []) {
     [levels, progress]
   )
 
+  /**
+   * Write a level's star count to local progress.
+   *
+   * By default this keeps the MAXIMUM, so replaying a level worse never erases
+   * a better result. `authoritative` overrides that: the server's `bestStars`
+   * is already the best-ever across every attempt, so when it comes back it
+   * REPLACES the local value — including downwards. Without that escape hatch
+   * an optimistic three would be permanently stuck above a server grade of
+   * two, and the player's total would never agree with their account.
+   */
   const recordLocal = useCallback(
-    (levelId, stars) => {
+    (levelId, stars, { authoritative = false } = {}) => {
       setProgress((prev) => {
         const current = prev[levelId] || 0
-        const next = Math.max(current, stars)
+        const next = authoritative ? stars : Math.max(current, stars)
         if (next === current && levelId in prev) return prev
         const updated = { ...prev, [levelId]: next }
         try {
@@ -79,8 +94,11 @@ export default function useGameLevels(gameKey, levels = []) {
   const completeLevel = useCallback(
     async (level, stars, metrics = {}) => {
       const clamped = Math.max(0, Math.min(3, Math.round(stars)))
+      // Record the local best straight away so the level grid updates even if
+      // the request is slow or the device is offline.
       recordLocal(level.id, clamped)
-      const { moves, timeMs } = metrics || {}
+
+      const { moves, timeMs, performance } = metrics || {}
       const result = await award({
         gameKey,
         levelId: level.id,
@@ -88,7 +106,17 @@ export default function useGameLevels(gameKey, levels = []) {
         stars: clamped,
         ...(Number.isFinite(moves) ? { moves } : {}),
         ...(Number.isFinite(timeMs) ? { timeMs } : {}),
+        ...(performance ? { performance } : {}),
       })
+
+      // The SERVER grades the stars, so its answer wins over the optimistic
+      // local one. Without this the grid could show three stars for a run the
+      // server graded at two, and the player would never see the real total.
+      if (!result?.error && Number.isFinite(result?.bestStars)) {
+        recordLocal(level.id, Math.max(0, Math.min(3, Math.round(result.bestStars))), {
+          authoritative: true,
+        })
+      }
       return result
     },
     [award, gameKey, recordLocal]

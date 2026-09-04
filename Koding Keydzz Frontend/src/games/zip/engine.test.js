@@ -180,25 +180,38 @@ describe('nextHintCell / matchedPrefixLength', () => {
 })
 
 describe('authored levels', () => {
-  it('there are 12 levels with unique ascending ids', () => {
-    expect(zipLevels).toHaveLength(12)
+  /**
+   * The level set is now GENERATED and tiered — 170 puzzles across five unlock
+   * tiers, rather than the original 12. Exact counts, the tier plan and
+   * single-solution fairness are asserted in levels.test.js. What remains here
+   * is the shape contract the engine depends on, independent of how many
+   * levels exist.
+   */
+  it('has unique, ascending ids', () => {
+    const ids = zipLevels.map((l) => l.id)
+    expect(new Set(ids).size).toBe(ids.length)
     zipLevels.forEach((l, i) => expect(l.id).toBe(i + 1))
   })
 
-  it('difficulty ramp: 5 easy, 4 medium, 3 hard', () => {
-    const by = (d) => zipLevels.filter((l) => l.difficulty === d).length
-    expect(by('easy')).toBe(5)
-    expect(by('medium')).toBe(4)
-    expect(by('hard')).toBe(3)
+  it('keeps each difficulty within its own board-size band', () => {
+    // Generated levels grow the board as the tiers climb, so exact per-size
+    // counts are no longer fixed. The bands still are, and must not overlap.
+    const cells = (d) => zipLevels.filter((l) => l.difficulty === d).map((l) => l.cols * l.rows)
+    const easy = cells('easy')
+    const medium = cells('medium')
+    const hard = cells('hard')
+    expect(easy.length).toBeGreaterThan(0)
+    expect(Math.max(...easy)).toBeLessThanOrEqual(Math.max(...medium))
+    expect(Math.max(...medium)).toBeLessThanOrEqual(Math.max(...hard))
   })
 
-  it('maxHints ramp within 0..2 (1–5 → 2, 6–9 → 1, 10–12 → 0)', () => {
+  it('ramps hints down by TIER rather than by level id', () => {
+    // Hints used to taper across a fixed 12-level list. With tiers the taper
+    // belongs to the tier, so a newly-unlocked level is not handed the same
+    // crutches as a beginner's first puzzle.
     for (const l of zipLevels) {
-      expect(l.maxHints).toBeGreaterThanOrEqual(0)
-      expect(l.maxHints).toBeLessThanOrEqual(2)
-      if (l.id <= 5) expect(l.maxHints).toBe(2)
-      else if (l.id <= 9) expect(l.maxHints).toBe(1)
-      else expect(l.maxHints).toBe(0)
+      const expected = l.tier >= 3 ? 0 : l.tier >= 1 ? 1 : 2
+      expect(l.maxHints, `level ${l.id} at tier ${l.tier}`).toBe(expected)
     }
   })
 

@@ -21,4 +21,9 @@ export const submitQuiz = asyncHandler(async (req, res) => {
   return sendSuccess(res, result, 'Quiz submitted');
 });
 
-export default { listQuizzes, getQuiz, submitQuiz };
+export const getMyAttempts = asyncHandler(async (req, res) => {
+  const attempts = await quizService.getAttemptHistory(req.user._id, req.params.id);
+  return sendSuccess(res, { attempts }, 'Quiz attempts');
+});
+
+export default { listQuizzes, getQuiz, submitQuiz, getMyAttempts };

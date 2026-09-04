@@ -253,8 +253,23 @@ export default function PlayScreen({
         stars: evald.stars,
         moves: evald.userSteps,
         timeMs,
+        // The two quality bits the star rule is built from. Deciding these
+        // needs the pupil's PROGRAM run against the maze, so unlike the other
+        // games the server cannot re-derive them — it bounds them to one star
+        // each on top of the star for finishing. See backend
+        // src/config/starPolicy.js ('program' model).
+        performance: {
+          hintsUsed: 0,
+          mistakes: 0,
+          optimalPath: evald.optimalPath === true,
+          cleanCode: evald.cleanCode === true,
+        },
       })
       if (cancelled.current) return
+      // The server grades the run; its count is the one that counts.
+      if (!res?.error && Number.isFinite(res?.bestStars)) {
+        recordStars(level.id, res.bestStars, { authoritative: true })
+      }
       setLevelRank(Number.isFinite(res?.levelRank) ? res.levelRank : null)
       const awarded = res?.awarded || { xp: 0, coins: 0 }
       if (res?.alreadyCompleted || (!awarded.xp && !awarded.coins)) {

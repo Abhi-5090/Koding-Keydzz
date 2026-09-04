@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion'
+import useGridKeyboardNav from '../../../games/shared/useGridKeyboardNav'
 
 /** Player (X) and bot (O) mark colours — Ember brand vs. the game's purple tint. */
 const X_COLOR = '#FF602F'
@@ -82,13 +83,18 @@ export default function TicTacToeBoard({ board, winLine, winMark, disabled, tint
   const winSet = new Set(winLine || [])
   const gameOver = winMark != null
 
+  // 3x3 arrow-key navigation. The cells are already buttons (so Enter/Space
+  // played a move), but reaching one required tabbing through the board.
+  const kb = useGridKeyboardNav({ rows: 3, cols: 3, wrap: true })
+
   return (
     <div className="board-fit mx-auto w-full max-w-[22rem]">
       <div
         className="grid grid-cols-3 gap-2.5 rounded-3xl p-2.5"
         style={{ background: `${tint}26`, boxShadow: `inset 0 0 0 1px ${tint}40` }}
         role="grid"
-        aria-label="Tic Tac Toe board"
+        aria-label="Tic Tac Toe board. Use the arrow keys to move, then press Enter to play."
+        {...kb.containerProps}
       >
         {board.map((cell, i) => {
           const isWin = winSet.has(i)
@@ -99,6 +105,7 @@ export default function TicTacToeBoard({ board, winLine, winMark, disabled, tint
               key={i}
               type="button"
               role="gridcell"
+              {...kb.cellProps(Math.floor(i / 3), i % 3)}
               disabled={!playable}
               onClick={() => playable && onCell(i)}
               whileTap={playable && !reduce ? { scale: 0.97 } : undefined}

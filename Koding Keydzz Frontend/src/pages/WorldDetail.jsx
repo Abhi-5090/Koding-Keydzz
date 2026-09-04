@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Lock, Sparkles, Play, Gamepad2, Brain, ScrollText, GraduationCap, BookOpen, CheckCircle2, Circle, Map } from 'lucide-react'
-import { useGetWorldsQuery, useGetDashboardQuery } from '../features/student/studentApi'
+import { useGetWorldsQuery, useGetDashboardQuery, useGetLessonsQuery, useCompleteLessonMutation } from '../features/student/studentApi'
 import { worldIcon } from '../data/iconMap'
 import { worldTheme, buildLearnList } from '../data/worldThemes'
-import { getLesson, normalizeTopic } from '../data/lessons'
-import { isTopicComplete, markTopicComplete } from '../features/lessons/lessonProgress'
 import PageTransition from '../components/layout/PageTransition'
 import Button from '../components/ui/Button'
 import AnimatedIcon from '../components/ui/AnimatedIcon'
@@ -14,6 +12,12 @@ import TopicLessonModal from '../components/lessons/TopicLessonModal'
 import { LoadingState, ErrorState, EmptyState } from '../components/ui/QueryState'
 
 const EASE_OUT = [0.23, 1, 0.32, 1]
+
+/** Normalise a topic label so `world.topics` entries line up with a lesson's
+ *  `title` regardless of casing/whitespace: trimmed + lower-cased. */
+function normalizeTopic(topic) {
+  return String(topic ?? '').trim().toLowerCase()
+}
 
 // Deterministic-ish scatter so decorative elements don't jump every render.
 const DECOR_SLOTS = [
@@ -72,7 +76,7 @@ export default function WorldDetail() {
   const [activeTopic, setActiveTopic] = useState(null)
 
   // Completed sessions for THIS world, as a Set of NORMALISED topic keys.
-  // Seeded from persisted lesson progress; flips live when a lesson finishes.
+  // Seeded from the API (dashboard.completedLessonIds); flips live on finish.
   const [completed, setCompleted] = useState(() => new Set())
 
   const playerLevel = dash?.level ?? 1
@@ -82,20 +86,55 @@ export default function WorldDetail() {
     [rawWorlds, slug]
   )
 
-  // Seed / re-seed the completed set from storage whenever the world changes.
+  // Fetch this world's lessons from the API (content lives in the DB now).
+  const worldId = world?.id || world?._id
+  const {
+    data: rawLessons,
+    isLoading: lessonsLoading,
+    isError: lessonsError,
+  } = useGetLessonsQuery(worldId, { skip: !worldId })
+
+  const [completeLesson] = useCompleteLessonMutation()
+
+  // Tolerate both `{ data: [lesson] }` and `{ data: { items: [lesson] } }`
+  // envelope shapes (already unwrapped to array-or-object at this point).
+  const lessons = useMemo(() => {
+    if (Array.isArray(rawLessons)) return rawLessons
+    if (Array.isArray(rawLessons?.items)) return rawLessons.items
+    return []
+  }, [rawLessons])
+
+  // topic key (normalised lesson.title) -> lesson. Titles now equal the plain
+  // topic, so this lines up with `world.topics` case-insensitively.
+  const lessonMap = useMemo(() => {
+    const map = new Map()
+    lessons.forEach((l) => {
+      if (l?.title) map.set(normalizeTopic(l.title), l)
+    })
+    return map
+  }, [lessons])
+
+  // Seed / re-seed the completed set from the API whenever the world, its
+  // lessons, or the dashboard's completedLessonIds change.
   useEffect(() => {
     if (!world) return
+    const completedIds = new Set((dash?.completedLessonIds || []).map(String))
     const done = new Set()
     ;(world.topics || []).forEach((t) => {
-      if (isTopicComplete(world.slug, t)) done.add(normalizeTopic(t))
+      const lesson = lessonMap.get(normalizeTopic(t))
+      const id = lesson?._id || lesson?.id
+      if (id && completedIds.has(String(id))) done.add(normalizeTopic(t))
     })
     setCompleted(done)
-  }, [world])
+  }, [world, lessonMap, dash])
 
-  // Called when a lesson is completed in the modal: persist + flip the tag live.
+  // Called when a lesson is completed in the modal: report to the backend and
+  // flip the tag live (optimistic). The dashboard refetch reconciles the truth.
   const handleTopicComplete = (topic) => {
     if (!world) return
-    markTopicComplete(world.slug, topic)
+    const lesson = lessonMap.get(normalizeTopic(topic))
+    const id = lesson?._id || lesson?.id
+    if (id) completeLesson(id)
     setCompleted((prev) => {
       const next = new Set(prev)
       next.add(normalizeTopic(topic))
@@ -407,18 +446,24 @@ export default function WorldDetail() {
 
       {/* Interactive topic lesson — shared-element fly-to-center + flip. */}
       <AnimatePresence>
-        {activeTopic && (
-          <TopicLessonModal
-            key={activeTopic}
-            slug={world.slug}
-            topic={activeTopic}
-            tint={theme.tint}
-            lesson={getLesson(world.slug, activeTopic)}
-            layoutId={`topic-${world.slug}-${normalizeTopic(activeTopic)}`}
-            onComplete={handleTopicComplete}
-            onClose={() => setActiveTopic(null)}
-          />
-        )}
+        {activeTopic && (() => {
+          const dbLesson = lessonMap.get(normalizeTopic(activeTopic))
+          return (
+            <TopicLessonModal
+              key={activeTopic}
+              slug={world.slug}
+              topic={activeTopic}
+              tint={theme.tint}
+              lesson={dbLesson ? { title: dbLesson.title, ...dbLesson.body } : null}
+              loading={lessonsLoading}
+              error={lessonsError}
+              alreadyComplete={completed.has(normalizeTopic(activeTopic))}
+              layoutId={`topic-${world.slug}-${normalizeTopic(activeTopic)}`}
+              onComplete={handleTopicComplete}
+              onClose={() => setActiveTopic(null)}
+            />
+          )
+        })()}
       </AnimatePresence>
       </div>
     </PageTransition>

@@ -200,35 +200,46 @@ describe('nextHintRect', () => {
 })
 
 describe('authored levels', () => {
-  it('has 20 levels with unique ascending ids 1..20', () => {
-    expect(patchesLevels).toHaveLength(20)
+  /**
+   * The level set is now GENERATED and tiered — 170 puzzles across five unlock
+   * tiers, rather than the original 20 hand-authored ones. Exact counts, the
+   * per-tier distribution and single-solution fairness are asserted in
+   * levels.test.js. What remains here is the shape contract the engine relies
+   * on, which is independent of how many levels exist.
+   */
+  it('has unique, ascending ids', () => {
     const ids = patchesLevels.map((l) => l.id)
-    expect(new Set(ids).size).toBe(20)
+    expect(new Set(ids).size).toBe(ids.length)
     patchesLevels.forEach((l, i) => expect(l.id).toBe(i + 1))
   })
 
-  it('matches the grid-size / difficulty distribution', () => {
-    const bucket = {}
-    for (const l of patchesLevels) {
-      const k = `${l.difficulty}-${l.size}`
-      bucket[k] = (bucket[k] || 0) + 1
+  it('keeps each difficulty within its own grid-size band', () => {
+    // Generated levels widen the grid as the tiers climb, so exact per-size
+    // counts are no longer fixed. The band each difficulty occupies still is:
+    // easy stays small, hard stays large, and they must not overlap.
+    const range = (d) => {
+      const sizes = patchesLevels.filter((l) => l.difficulty === d).map((l) => l.size)
+      return { min: Math.min(...sizes), max: Math.max(...sizes) }
     }
-    expect(bucket).toEqual({
-      'easy-3': 3,
-      'easy-4': 3,
-      'easy-5': 4,
-      'medium-5': 2,
-      'medium-6': 2,
-      'medium-7': 2,
-      'hard-7': 2,
-      'hard-8': 2,
-    })
+    const easy = range('easy')
+    const medium = range('medium')
+    const hard = range('hard')
+
+    expect(easy.min).toBeGreaterThanOrEqual(3)
+    expect(easy.max).toBeLessThanOrEqual(medium.max)
+    expect(medium.max).toBeLessThanOrEqual(hard.max)
+    expect(hard.max).toBeLessThanOrEqual(9)
   })
 
-  it('maxHints follows the ramp (1–8 → 2, 9–15 → 1, 16–20 → 0)', () => {
+  it('ramps hints down by TIER, not by level id', () => {
+    // Hints used to taper across a fixed 20-level list. With five tiers the
+    // taper belongs to the tier: the base tier is generous, later tiers are
+    // solo, so a newly-unlocked level is not handed the same crutches.
     for (const l of patchesLevels) {
-      const expected = l.id <= 8 ? 2 : l.id <= 15 ? 1 : 0
-      expect(l.maxHints).toBe(expected)
+      expect(l.maxHints).toBeLessThanOrEqual(2)
+      expect(l.maxHints).toBeGreaterThanOrEqual(0)
+      if (l.tier >= 3) expect(l.maxHints, `level ${l.id}`).toBe(0)
+      if (l.tier === 0) expect(l.maxHints, `level ${l.id}`).toBe(2)
     }
   })
 

@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { MoveHorizontal, MoveVertical, Plus } from 'lucide-react'
 import { key } from '../../../games/patches/engine'
+import { BOARD_BG } from '../../../theme/tokens'
 
 /**
  * PatchesBoard — the interactive ORIENTED-clue Patches grid (LinkedIn mechanic).
@@ -26,6 +27,16 @@ import { key } from '../../../games/patches/engine'
  *     overlap with a placed box),
  *   - release attempts to place it (parent validates + commits),
  *   - a plain tap on an already-placed rectangle removes it.
+ *
+ * It is ALSO fully playable with the keyboard, since a drag-only board excludes
+ * anyone who cannot use a pointer. Drawing a rectangle is a two-press gesture,
+ * which is the keyboard equivalent of press-drag-release:
+ *   - a roving tabindex puts exactly ONE cell in the tab order (a single tab
+ *     stop, not `size²` of them); the arrow keys move that cursor,
+ *   - Enter anchors the rectangle at the cursor; the arrow keys then GROW the
+ *     live preview under the same orientation lock as a drag,
+ *   - a second Enter places it; Enter on a placed rectangle removes it,
+ *   - Escape abandons a half-drawn rectangle.
  *
  * Props:
  *   level        the Patches level ({ size, clues, ... })
@@ -134,6 +145,24 @@ export default function PatchesBoard({
     [cellFromEvent, rectFromDrag]
   )
 
+  // Placing a rectangle is identical whether it came from a pointer release or
+  // a second Enter, so both paths go through here.
+  const commitRect = useCallback(
+    (rect) => {
+      if (!rect) return
+      // A single-cell "tap" on an existing rectangle removes it.
+      if (rect.w === 1 && rect.h === 1) {
+        const idx = coverIndex.get(key(rect.x, rect.y))
+        if (idx != null) {
+          onRemoveAt(rect.x, rect.y)
+          return
+        }
+      }
+      onDraw(rect)
+    },
+    [coverIndex, onRemoveAt, onDraw]
+  )
+
   const endDrag = useCallback(
     (e) => {
       try {
@@ -147,19 +176,77 @@ export default function PatchesBoard({
       anchorRef.current = null
       anchorClueRef.current = null
       setPreview(null)
-      if (!rect) return
+      commitRect(rect)
+    },
+    [preview, commitRect]
+  )
 
-      // A single-cell "tap" on an existing rectangle removes it.
-      if (rect.w === 1 && rect.h === 1) {
-        const idx = coverIndex.get(key(rect.x, rect.y))
-        if (idx != null) {
-          onRemoveAt(rect.x, rect.y)
+  // ---- keyboard play ----------------------------------------------------
+  const [cursor, setCursor] = useState({ x: 0, y: 0 })
+  const [kbAnchor, setKbAnchor] = useState(null)
+  const cellRefs = useRef(new Map())
+
+  // A new level is a new board: drop the cursor and any half-drawn rectangle.
+  useEffect(() => {
+    setCursor({ x: 0, y: 0 })
+    setKbAnchor(null)
+    setPreview(null)
+  }, [level])
+
+  const onKeyDown = useCallback(
+    (e) => {
+      const deltas = {
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0],
+      }
+      const d = deltas[e.key]
+
+      if (d) {
+        e.preventDefault()
+        const nx = Math.min(size - 1, Math.max(0, cursor.x + d[0]))
+        const ny = Math.min(size - 1, Math.max(0, cursor.y + d[1]))
+        if (nx === cursor.x && ny === cursor.y) return // already at the edge
+        setCursor({ x: nx, y: ny })
+        // Anchored? Then the arrows are drawing, not just moving — and the
+        // preview obeys the clue's orientation lock exactly as a drag does.
+        if (kbAnchor) {
+          setPreview(rectFromDrag(kbAnchor, clueAt(kbAnchor.x, kbAnchor.y), { x: nx, y: ny }))
+        }
+        // Synchronously: the element already exists, only its tabIndex changes
+        // on re-render. Deferring this to a frame later leaves the OLD cell as
+        // document.activeElement in the meantime, which is what a screen
+        // reader announces.
+        cellRefs.current.get(key(nx, ny))?.focus?.()
+        return
+      }
+
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        if (!kbAnchor) {
+          setKbAnchor({ x: cursor.x, y: cursor.y })
+          setPreview({ x: cursor.x, y: cursor.y, w: 1, h: 1 })
           return
         }
+        const rect = preview
+        setKbAnchor(null)
+        setPreview(null)
+        commitRect(rect)
+        return
       }
-      onDraw(rect)
+
+      if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Delete') {
+        // Only swallow Escape when there IS something to abandon, so it still
+        // closes the surrounding help dialog otherwise.
+        if (!kbAnchor) return
+        e.preventDefault()
+        e.stopPropagation()
+        setKbAnchor(null)
+        setPreview(null)
+      }
     },
-    [preview, coverIndex, onRemoveAt, onDraw]
+    [cursor, kbAnchor, preview, size, rectFromDrag, clueAt, commitRect]
   )
 
   // Preview validity hint: green when it wraps exactly one clue, matches that
@@ -201,12 +288,13 @@ export default function PatchesBoard({
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
+          onKeyDown={onKeyDown}
           className="relative grid touch-none select-none overflow-hidden rounded-2xl border-2"
           style={{
             gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
             aspectRatio: '1 / 1',
             borderColor: `${tint}88`,
-            background: '#001621',
+            background: BOARD_BG,
           }}
           role="grid"
           aria-label={`${size} by ${size} Patches board`}
@@ -218,15 +306,39 @@ export default function PatchesBoard({
               const filled = idx != null
               const clue = clueAt(x, y)
               const fill = filled ? colorFor(rects[idx]) : 'transparent'
+              const isCursor = cursor.x === x && cursor.y === y
+              const isAnchor = kbAnchor && kbAnchor.x === x && kbAnchor.y === y
+              // Position AND state, because the fill colour says nothing to a
+              // pupil using a screen reader.
+              const stateLabel = clue != null
+                ? `clue ${clue.n}, ${
+                    clue.type === 'h' ? 'a row' : clue.type === 'v' ? 'a column' : 'any rectangle'
+                  }${filled ? ', covered' : ''}`
+                : filled
+                  ? 'covered'
+                  : 'empty'
               return (
                 <div
                   key={k}
                   role="gridcell"
-                  className="relative flex aspect-square items-center justify-center"
+                  ref={(el) => {
+                    if (el) cellRefs.current.set(k, el)
+                    else cellRefs.current.delete(k)
+                  }}
+                  tabIndex={isCursor ? 0 : -1}
+                  onFocus={() => setCursor({ x, y })}
+                  aria-label={`Row ${y + 1}, column ${x + 1}, ${stateLabel}`}
+                  aria-selected={isCursor}
+                  className="relative flex aspect-square items-center justify-center outline-none"
                   style={{
                     borderRight: x < size - 1 ? `1px solid ${tint}22` : undefined,
                     borderBottom: y < size - 1 ? `1px solid ${tint}22` : undefined,
                     background: fill,
+                    boxShadow: isAnchor
+                      ? `inset 0 0 0 3px #34D399`
+                      : isCursor
+                        ? `inset 0 0 0 3px ${tint}`
+                        : undefined,
                   }}
                 >
                   {clue != null && (

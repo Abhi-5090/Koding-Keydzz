@@ -101,7 +101,7 @@ function Field({ label, ...props }) {
       <input
         {...props}
         required
-        className="w-full rounded-xl border border-k-border bg-surface/60 px-4 py-3 text-text-primary outline-none transition-[background-color,border-color,color,box-shadow] duration-200 placeholder:text-text-secondary/50 focus:border-turmeric focus:shadow-golden-glow"
+        className="w-full rounded-xl border border-k-border bg-surface/60 px-4 py-3 text-text-primary outline-none transition-[background-color,border-color,color,box-shadow] duration-200 placeholder:text-text-secondary/70 focus:border-turmeric focus:shadow-golden-glow"
       />
     </label>
   )

@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { Eraser } from 'lucide-react'
+import { BOARD_MUTED, BOARD_SURFACE } from '../../../theme/tokens'
 
 /**
  * SudokuNumberPad — the 1..size buttons plus an erase button. Each number
@@ -25,9 +26,9 @@ export default function SudokuNumberPad({ size, onPick, onErase, remaining = {},
             whileTap={disabled || done ? undefined : { scale: 0.92 }}
             className="relative flex h-12 w-12 items-center justify-center rounded-xl border-2 font-game text-xl font-extrabold transition-colors duration-150 disabled:opacity-40 sm:h-14 sm:w-14"
             style={{
-              borderColor: done ? '#0A2E3C' : `${tint}66`,
+              borderColor: done ? BOARD_SURFACE : `${tint}66`,
               background: done ? 'transparent' : `${tint}18`,
-              color: done ? '#9DB8C4' : tint,
+              color: done ? BOARD_MUTED : tint,
             }}
             aria-label={`Place ${n}, ${left} left`}
           >

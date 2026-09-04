@@ -6,6 +6,7 @@ import mongoSanitize from 'express-mongo-sanitize';
 import { env } from './config/env.js';
 import apiRouter from './routes/index.js';
 import { notFound, errorHandler } from './middlewares/error.js';
+import { metricsMiddleware } from './middlewares/metrics.js';
 import { apiLimiter } from './middlewares/rateLimit.js';
 
 export function createApp() {
@@ -42,6 +43,13 @@ export function createApp() {
   if (env.NODE_ENV !== 'test') {
     app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
   }
+
+  /**
+   * Metrics BEFORE the rate limiter and the routes, so a request that is
+   * rejected or 404s is still counted. Metrics that only see successful
+   * requests would hide exactly the problems worth seeing.
+   */
+  app.use(metricsMiddleware);
 
   app.use('/api', apiLimiter);
 

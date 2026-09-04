@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import * as XLSX from 'xlsx';
 import {
   Download,
   UploadCloud,
@@ -21,6 +20,21 @@ import { bulkUploadStudents, downloadTemplate, downloadBlob } from '../../featur
 // when the column is blank. The kids log in with their username, not email.
 const TEMPLATE_COLUMNS = ['firstName', 'lastName', 'email', 'phone', 'username'];
 const ACCEPT = '.xlsx,.xls,.csv';
+
+/**
+ * Load SheetJS on demand.
+ *
+ * `xlsx` is ~490 kB (160 kB gzipped) — the single largest asset in the admin
+ * bundle — but it is only needed when a teacher actually downloads the roster
+ * template or picks a spreadsheet to import. Importing it statically made
+ * every admin page pay for it on first load. The module is cached after the
+ * first call, so a second import is instant.
+ */
+let xlsxPromise = null;
+function loadXlsx() {
+  if (!xlsxPromise) xlsxPromise = import('xlsx');
+  return xlsxPromise;
+}
 
 // Map a few common header spellings (case / spacing) to our canonical keys so
 // the preview still lines up if an admin tweaks the template headers slightly.
@@ -47,7 +61,7 @@ function cell(row, key) {
   return '';
 }
 
-function buildTemplateWorkbook() {
+function buildTemplateWorkbook(XLSX) {
   const ws = XLSX.utils.json_to_sheet([], { header: TEMPLATE_COLUMNS });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Students');
@@ -117,7 +131,8 @@ export default function BulkUploadModal({
     } catch {
       /* offline / no server -> generate locally below */
     }
-    const wb = buildTemplateWorkbook();
+    const XLSX = await loadXlsx();
+    const wb = buildTemplateWorkbook(XLSX);
     const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     downloadBlob(
       new Blob([out], {
@@ -132,8 +147,9 @@ export default function BulkUploadModal({
     setResult(null);
     setFile(f);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await loadXlsx();
         const wb = XLSX.read(e.target.result, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -287,8 +303,24 @@ export default function BulkUploadModal({
             <p className="mb-2 text-sm font-semibold text-text-primary">
               3. Upload your filled-in file
             </p>
-            <div
-              onClick={() => inputRef.current?.click()}
+            {/*
+              A LABEL WRAPPING A FOCUSABLE INPUT — the standard accessible
+              file-upload pattern, and the only one that works here.
+              
+              This was a <div onClick> that called `inputRef.current.click()`,
+              with the input itself `className="hidden"`. Both halves were
+              broken for keyboard users: a div cannot be focused or activated,
+              and `display: none` takes the input out of the tab order — so
+              bulk upload was impossible without a mouse.
+              
+              A <button> would not work either: a button may not contain an
+              <input>, which is invalid HTML and breaks the picker. A label
+              paired with the input by `htmlFor`/`id` is clickable, and the
+              `sr-only` input stays focusable and announces itself properly.
+              Drag-and-drop still lives on this element.
+            */}
+            <label
+              htmlFor="bulk-upload-file"
               onDragOver={(e) => {
                 e.preventDefault();
                 setDragOver(true);
@@ -311,15 +343,21 @@ export default function BulkUploadModal({
                   'Drag & drop or click to choose a file'
                 )}
               </p>
-              <p className="text-xs text-text-secondary/60">Accepts .xlsx, .xls or .csv</p>
+              <p className="text-xs text-text-secondary/70">Accepts .xlsx, .xls or .csv</p>
+              {/*
+                `sr-only`, NOT `hidden`: visually removed but still focusable
+                and announced. `display: none` would drop it from the tab order
+                and undo the whole point of this change.
+              */}
               <input
+                id="bulk-upload-file"
                 ref={inputRef}
                 type="file"
                 accept={ACCEPT}
-                className="hidden"
+                className="sr-only"
                 onChange={onPick}
               />
-            </div>
+            </label>
           </div>
 
           {parseError && (

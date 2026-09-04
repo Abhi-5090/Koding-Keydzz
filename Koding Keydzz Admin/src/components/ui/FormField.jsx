@@ -66,7 +66,7 @@ export default function FormField({
         />
       )}
 
-      {hint && <p className="mt-1 text-xs text-text-secondary/60">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-text-secondary/70">{hint}</p>}
     </div>
   );
 }

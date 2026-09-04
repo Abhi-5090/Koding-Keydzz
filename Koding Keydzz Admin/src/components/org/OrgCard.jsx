@@ -78,7 +78,7 @@ export default function OrgCard({
             <p className="truncate font-heading text-base font-bold leading-tight text-text-primary">
               {org.name}
             </p>
-            <p className="truncate font-mono text-xs text-text-secondary/60">{org.code}</p>
+            <p className="truncate font-mono text-xs text-text-secondary/70">{org.code}</p>
           </div>
         </div>
         <span className="shrink-0">
@@ -88,7 +88,7 @@ export default function OrgCard({
 
       <div className="relative mt-4 space-y-3">
         <p className="truncate text-sm text-text-secondary">
-          <span className="text-text-secondary/60">Admin: </span>
+          <span className="text-text-secondary/70">Admin: </span>
           {org.admin?.email || '—'}
         </p>
 

@@ -7,12 +7,16 @@ import {
   useGetOrgStudentsQuery,
   useCreateOrgStudentMutation,
   useSuspendSuperStudentMutation,
+  useUpdateSuperStudentMutation,
+  useDeleteSuperStudentMutation,
   useResetSuperStudentPasswordMutation,
 } from '../../features/superadmin/superadminApi';
 import {
   useGetStudentsQuery,
   useCreateStudentMutation,
   useSuspendStudentMutation,
+  useUpdateStudentMutation,
+  useDeleteStudentMutation,
   useResetStudentPasswordMutation,
   exportStudentsCsv,
 } from '../../features/admin/adminApi';
@@ -28,9 +32,13 @@ export function useSuperadminOrgSource(orgId) {
       return [create, state];
     },
     useSuspend: () => useSuspendSuperStudentMutation(),
+    useUpdate: () => useUpdateSuperStudentMutation(),
+    useDelete: () => useDeleteSuperStudentMutation(),
     useReset: () => useResetSuperStudentPasswordMutation(),
     templatePath: '/superadmin/students/template',
     uploadPath: `/superadmin/orgs/${orgId}/students/bulk`,
+    // Per-student detail is fetched by student id via the superadmin endpoint.
+    detailRole: 'superadmin',
   };
 }
 
@@ -40,9 +48,12 @@ export function useAdminOrgSource() {
     useStudents: () => useGetStudentsQuery(),
     useCreate: () => useCreateStudentMutation(),
     useSuspend: () => useSuspendStudentMutation(),
+    useUpdate: () => useUpdateStudentMutation(),
+    useDelete: () => useDeleteStudentMutation(),
     useReset: () => useResetStudentPasswordMutation(),
     templatePath: '/admin/students/template',
     uploadPath: '/admin/students/bulk',
     exportRoster: exportStudentsCsv,
+    detailRole: 'admin',
   };
 }

@@ -101,7 +101,14 @@ export default function ZipPlayScreen({ level, onExit, onNext, hasNext, complete
       setAlreadyMastered(false)
       setLevelRank(null)
       setAwarding(true)
-      const res = await completeLevel(level, stars, { moves: total, timeMs })
+      const res = await completeLevel(level, stars, {
+        moves: total,
+        timeMs,
+        // Reported so the SERVER can grade the stars from the same rule the
+        // player was shown; its verdict is what the account records.
+        // A Zip "mistake" is an illegal square the player tried to draw into.
+        performance: { hintsUsed, mistakes: invalidsUsed },
+      })
       if (cancelled.current) return
       setLevelRank(Number.isFinite(res?.levelRank) ? res.levelRank : null)
       const awarded = res?.awarded || { xp: 0, coins: 0 }
@@ -259,9 +266,16 @@ export default function ZipPlayScreen({ level, onExit, onNext, hasNext, complete
         </div>
 
         {path.length === 0 && (
-          <p className="game-text mt-1 text-center text-xs text-text-secondary">
-            Start on <span className="font-bold text-success">1</span>, then drag to fill every square in order.
-          </p>
+          <>
+            <p className="game-text mt-1 text-center text-xs text-text-secondary">
+              Start on <span className="font-bold text-success">1</span>, then drag to fill every square in order.
+            </p>
+            {/* Named on screen, because a keyboard route nobody knows about is
+                the same as not having one. */}
+            <p className="game-text mt-1 text-center text-[0.68rem] text-text-secondary/70">
+              No mouse? Use the arrow keys to move, Enter to draw, Backspace to undo.
+            </p>
+          </>
         )}
 
         <div className="mt-4 flex flex-wrap justify-center gap-2">

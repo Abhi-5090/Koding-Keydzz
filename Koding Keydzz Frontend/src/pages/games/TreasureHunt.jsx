@@ -26,7 +26,7 @@ export default function TreasureHunt() {
           onExit={onExit}
           onNext={onNext}
           hasNext={hasNext}
-          onComplete={(stars) => completeLevel(level, stars)}
+          onComplete={(stars, performance) => completeLevel(level, stars, { performance })}
         />
       )}
     />

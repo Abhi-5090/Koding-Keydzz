@@ -107,11 +107,17 @@ describe('findSolution', () => {
 })
 
 describe('authored n-queens levels', () => {
-  it('has the expected counts', () => {
-    expect(nqueensLevels).toHaveLength(10)
-    expect(nqueensLevels.filter((l) => l.difficulty === 'easy')).toHaveLength(3)
-    expect(nqueensLevels.filter((l) => l.difficulty === 'medium')).toHaveLength(4)
-    expect(nqueensLevels.filter((l) => l.difficulty === 'hard')).toHaveLength(3)
+  /**
+   * The level set is now GENERATED and tiered — 170 levels using pre-placed
+   * queens, a capability the engine always had. Exact counts, the tier plan and
+   * completability are asserted in levels.test.js. What remains here is the
+   * shape contract, independent of how many levels exist.
+   */
+  it('has levels in every difficulty', () => {
+    expect(nqueensLevels.length).toBeGreaterThan(0)
+    for (const d of ['easy', 'medium', 'hard']) {
+      expect(nqueensLevels.filter((l) => l.difficulty === d).length, d).toBeGreaterThan(0)
+    }
   })
 
   it('every level is solvable (incl. fixed-queen variants)', () => {

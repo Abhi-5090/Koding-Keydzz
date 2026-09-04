@@ -111,7 +111,7 @@ function LevelNode({ level, index, tint, stars, unlocked, onPlay }) {
                 key={s}
                 size={9}
                 strokeWidth={2.5}
-                className={s < stars ? 'text-turmeric' : 'text-text-secondary/40'}
+                className={s < stars ? 'text-turmeric' : 'text-text-secondary/70'}
                 fill={s < stars ? '#FF602F' : 'transparent'}
               />
             ))}

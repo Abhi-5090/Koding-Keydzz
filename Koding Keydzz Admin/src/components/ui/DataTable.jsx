@@ -67,7 +67,7 @@ export default function DataTable({
         <div className="relative w-full sm:max-w-xs">
           <Search
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/60"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/70"
           />
           <input
             value={query}
@@ -116,7 +116,7 @@ export default function DataTable({
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-4 py-10 text-center text-text-secondary/60"
+                  className="px-4 py-10 text-center text-text-secondary/70"
                 >
                   {emptyMessage}
                 </td>
@@ -149,22 +149,37 @@ export default function DataTable({
           of <span className="text-text-primary">{sorted.length}</span>
         </p>
         <div className="flex items-center gap-2">
+          {/*
+            ICON-ONLY BUTTONS NEED A NAME.
+            axe flagged both of these as critical `button-name` violations: a
+            screen reader announced "button" with no indication of what it
+            does. The icon is decorative once the button itself is labelled,
+            so it is hidden to avoid announcing it twice.
+          */}
           <button
+            type="button"
+            aria-label="Previous page"
             disabled={safePage <= 1}
             onClick={() => setPage((p) => p - 1)}
             className="rounded-lg border border-k-border p-1.5 text-text-secondary transition-colors duration-150 ease-out hover:border-turmeric hover:text-turmeric active:scale-95 disabled:opacity-40"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={16} aria-hidden="true" />
           </button>
-          <span className="px-2 text-text-secondary">
+          {/*
+            Announced when it changes, so a screen-reader user knows the page
+            moved — otherwise activating "Next page" gives no feedback at all.
+          */}
+          <span className="px-2 text-text-secondary" aria-live="polite">
             Page {safePage} / {totalPages}
           </span>
           <button
+            type="button"
+            aria-label="Next page"
             disabled={safePage >= totalPages}
             onClick={() => setPage((p) => p + 1)}
             className="rounded-lg border border-k-border p-1.5 text-text-secondary transition-colors duration-150 ease-out hover:border-turmeric hover:text-turmeric active:scale-95 disabled:opacity-40"
           >
-            <ChevronRight size={16} />
+            <ChevronRight size={16} aria-hidden="true" />
           </button>
         </div>
       </div>

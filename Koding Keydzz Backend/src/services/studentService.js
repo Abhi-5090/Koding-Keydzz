@@ -4,6 +4,7 @@ import { lessonRepository } from '../repositories/lessonRepository.js';
 import { challengeRepository } from '../repositories/challengeRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { nextLevelXp, levelProgress } from '../utils/xp.js';
+import { streakSummary } from './streakService.js';
 import { listAchievementsForUser } from './achievementService.js';
 
 export async function getDashboard(userId) {
@@ -59,7 +60,13 @@ export async function getDashboard(userId) {
     achievements,
     dailyChallenges,
     progress,
+    // Flat list of completed lesson ids so the student app can compute
+    // per-lesson done-state directly from the dashboard payload.
+    completedLessonIds: user.completedLessons.map((c) => String(c.lesson)),
     nextLevelXp: nextLevelXp(user.xp),
+    // The daily streak, so the dashboard can show a real number instead of the
+    // bonus the XP legend used to promise and never pay.
+    streak: streakSummary(user),
   };
 }
 

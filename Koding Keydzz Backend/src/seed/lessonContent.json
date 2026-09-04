@@ -1,0 +1,1724 @@
+{
+  "coding-forest": [
+    {
+      "topic": "Variables",
+      "title": "Variables",
+      "order": 1,
+      "language": "python",
+      "body": {
+        "tagline": "Labelled boxes your program can remember things in.",
+        "intro": "A variable is a named box where your program keeps a value so it can use it again later. Instead of writing the same number or word over and over, you tuck it into a box, give the box a clear name, and reach for it whenever you need it. Almost every program you will ever write is really just a story about variables changing over time.",
+        "sections": [
+          {
+            "heading": "What a variable really is",
+            "body": "Picture a shelf full of labelled boxes. When you write name = \"Aria\", Python makes a box, drops the word \"Aria\" inside, and sticks the label name on the front. From then on, whenever you say name, Python opens that box and hands you what is inside.",
+            "bullets": [
+              "The = sign means \"put this value into this box\" — it is NOT \"equals\" like in maths.",
+              "The name goes on the LEFT, the value goes on the RIGHT.",
+              "You can look inside a box as many times as you like without emptying it."
+            ]
+          },
+          {
+            "heading": "Naming rules (Python is picky)",
+            "body": "A good variable name tells the reader what is inside. Python only allows certain names, so it helps to know the rules before you get a red error.",
+            "bullets": [
+              "Use letters, numbers and underscores: score, player_2, high_score.",
+              "A name may NOT start with a number: 2fast is not allowed, fast2 is fine.",
+              "No spaces — use an underscore instead: top score becomes top_score.",
+              "Names are case-sensitive: Score and score are two different boxes.",
+              "Pick meaningful names: lives beats x every single time."
+            ]
+          },
+          {
+            "heading": "Values come in different types",
+            "body": "The thing you store has a type — a kind. Python figures out the type automatically from what you put in the box.",
+            "bullets": [
+              "int — a whole number, like 7 or -3 (age = 12).",
+              "float — a number with a decimal point, like 3.14 (price = 2.5).",
+              "str — a string of text in quotes, like \"hello\" (name = \"Aria\").",
+              "bool — a yes/no value, either True or False (is_ready = True).",
+              "list — an ordered collection in square brackets (pets = [\"cat\", \"dog\"])."
+            ]
+          },
+          {
+            "heading": "Reassigning: boxes can change",
+            "body": "A variable can hold a new value at any time. The old value is simply forgotten and the new one takes its place — this is called reassignment.",
+            "bullets": [
+              "score = 0 then later score = score + 10 makes score become 10.",
+              "The right side is worked out FIRST, then stored back into the box.",
+              "A box can even change type: x = 5 then x = \"five\" is legal (but usually confusing)."
+            ]
+          },
+          {
+            "heading": "Common mistakes to dodge",
+            "body": "Everybody hits these at the start — spotting them early saves a lot of head-scratching.",
+            "bullets": [
+              "Forgetting quotes on text: name = Aria breaks; name = \"Aria\" works.",
+              "Using a box before you fill it gives a NameError.",
+              "Mixing up = (store a value) with == (check if equal).",
+              "Reading name when you stored Name — the capital letters must match."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# Make some variables",
+            "name = \"Aria\"      # a str (text)",
+            "age = 12           # an int (whole number)",
+            "height = 1.4       # a float (decimal)",
+            "is_coder = True    # a bool (yes/no)",
+            "",
+            "print(name, \"is\", age, \"years old\")",
+            "",
+            "# Boxes can change!",
+            "age = age + 1",
+            "print(\"Next birthday:\", age)"
+          ],
+          "caption": "Four types of value, then a box that changes with reassignment."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Store YOUR details in variables, then print them.\nname = \"your name here\"\nfavourite_number = 7\n\nprint(\"Hi, I am\", name)\nprint(\"My favourite number is\", favourite_number)\n",
+          "challenge": "Add a variable called age with your age, then print a sentence that uses all three variables.",
+          "hint": "Make a new line: age = 12. Then print(\"I am\", name, \"and I am\", age). Numbers do not need quotes, text does!"
+        },
+        "guide": [
+          {
+            "step": "Think of a labelled box",
+            "body": "A variable is a box with a name label. You put a value in, and the label lets you find it again. Say it out loud: \"name holds Aria\"."
+          },
+          {
+            "step": "Write name = value",
+            "body": "The name goes on the left, an = sign in the middle, and the value on the right. Example: score = 0. Python builds the box and fills it."
+          },
+          {
+            "step": "Choose the right type",
+            "body": "Whole numbers (int) and decimals (float) need no quotes. Text (str) must sit inside \"quotes\". Yes/no values are True or False (bool)."
+          },
+          {
+            "step": "Use the box by name",
+            "body": "Anywhere you write the variable name, Python swaps in its value. print(score) shows what is currently inside score."
+          },
+          {
+            "step": "Change it whenever you like",
+            "body": "Store a new value to replace the old one: score = score + 10. Python works out the right side first, then puts the answer back in the box."
+          },
+          {
+            "step": "Name things clearly",
+            "body": "Future-you will thank present-you. lives, player_name and high_score explain themselves; a, b and x do not."
+          }
+        ],
+        "takeaways": [
+          "A variable is a named box that remembers a value for later.",
+          "Write it as name = value — name on the left, value on the right.",
+          "Values have types: int, float, str, bool and list.",
+          "Reassigning stores a new value and forgets the old one.",
+          "Clear, meaningful names make your code read like a sentence."
+        ]
+      }
+    },
+    {
+      "topic": "Stored Values",
+      "title": "Stored Values",
+      "order": 2,
+      "language": "python",
+      "body": {
+        "tagline": "The actual stuff kept inside your boxes.",
+        "intro": "If a variable is a box, the stored value is the treasure inside it. Values are the numbers, words, and yes/no answers your program works with. Learning the different kinds of values — and how to combine them — is what turns a pile of boxes into a real program.",
+        "sections": [
+          {
+            "heading": "The main kinds of value",
+            "body": "Every value in Python has a type. The type decides what you can do with it — you can add numbers, but you cannot really subtract two words.",
+            "bullets": [
+              "Numbers: int (12) for whole numbers, float (12.5) for decimals.",
+              "Text: str (\"hello\") — always wrapped in quotes.",
+              "Truth: bool — either True or False, used for decisions.",
+              "Collections: list ([\"a\", \"b\", \"c\"]) — many values in order."
+            ]
+          },
+          {
+            "heading": "Combining values",
+            "body": "Values love to be combined. How they combine depends on their type.",
+            "bullets": [
+              "Add numbers with +: 2 + 3 gives 5.",
+              "Join text with + too: \"code\" + \"kid\" gives \"codekid\".",
+              "Repeat text with *: \"ha\" * 3 gives \"hahaha\".",
+              "You cannot add a number to text directly — turn the number into text first with str(7)."
+            ]
+          },
+          {
+            "heading": "Peeking at a value",
+            "body": "Two friendly built-in tools help you understand what you are holding.",
+            "bullets": [
+              "print(value) shows the value on screen.",
+              "type(value) tells you its kind: type(12) is <class 'int'>.",
+              "Converting types: int(\"5\") makes the number 5, str(5) makes the text \"5\"."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "points = 42          # an int value",
+            "player = \"Sam\"       # a str value",
+            "won = True           # a bool value",
+            "",
+            "# Join text and a (converted) number",
+            "print(player + \" scored \" + str(points))",
+            "print(\"Winner?\", won)"
+          ],
+          "caption": "Different value types combined into one friendly message."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Try combining values.\nword = \"code\"\nprint(word * 3)          # repeat text\nprint(10 + 5)            # add numbers\n",
+          "challenge": "Make a str variable for a fruit and an int variable for how many you have, then print \"I have 3 apples\" using both.",
+          "hint": "Numbers must become text before you join them with +. Use str(count), or just pass them to print separated by commas: print(\"I have\", count, fruit)."
+        },
+        "guide": [
+          {
+            "step": "Know your value types",
+            "body": "int and float are numbers, str is text in quotes, bool is True/False, and list holds many values."
+          },
+          {
+            "step": "Add numbers, join text",
+            "body": "The + sign adds numbers but glues text together. \"a\" + \"b\" makes \"ab\", while 1 + 2 makes 3."
+          },
+          {
+            "step": "Match your types",
+            "body": "You cannot glue a number onto text directly. Convert first with str(number), or let print handle it with commas."
+          },
+          {
+            "step": "Inspect what you have",
+            "body": "Use type(value) to check a kind and print(value) to see it. This is how you debug surprises."
+          }
+        ],
+        "takeaways": [
+          "A stored value is the treasure inside a variable.",
+          "Main types: int, float, str, bool and list.",
+          "+ adds numbers but joins text; * can repeat text.",
+          "Convert between types with int(), float() and str()."
+        ]
+      }
+    },
+    {
+      "topic": "Input",
+      "title": "Input",
+      "order": 3,
+      "language": "python",
+      "body": {
+        "tagline": "How your program asks the player a question.",
+        "intro": "Input is how a program listens. When you call input(), the program pauses, waits for the person to type something and press Enter, and then hands you back whatever they typed. This is what makes a program feel alive — it can respond to a real person instead of only doing what you hard-coded.",
+        "sections": [
+          {
+            "heading": "The input() function",
+            "body": "input() shows an optional prompt, waits for the user to type, and returns their answer as a string. You almost always store that answer in a variable so you can use it.",
+            "bullets": [
+              "name = input(\"What is your name? \") stores the reply in name.",
+              "The prompt is the message shown before the cursor.",
+              "The program WAITS at input() until Enter is pressed."
+            ]
+          },
+          {
+            "heading": "Input is always text",
+            "body": "This trips up almost everyone: input() always gives back a string, even when the person types a number. \"5\" is text, not the number 5.",
+            "bullets": [
+              "age = input(\"Age? \") gives text like \"12\", not the number 12.",
+              "To do maths, convert it: age = int(input(\"Age? \")).",
+              "Use float(...) for decimals: price = float(input(\"Price? \")).",
+              "If someone types letters into int(), Python raises a ValueError."
+            ]
+          },
+          {
+            "heading": "Using what you collected",
+            "body": "Once the answer is in a variable, it behaves like any other value — you can print it, do maths, or make decisions with it.",
+            "bullets": [
+              "Greet them: print(\"Hello, \" + name + \"!\").",
+              "Do maths: next_year = age + 1.",
+              "In this app the player types their answers in the box below the code."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# Ask two questions",
+            "name = input(\"What is your name? \")",
+            "age = int(input(\"How old are you? \"))",
+            "",
+            "# Use the answers",
+            "print(\"Nice to meet you, \" + name + \"!\")",
+            "print(\"Next year you will be\", age + 1)"
+          ],
+          "caption": "input() collects text; int() turns the age into a real number."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Type an answer in the input box below, then Run.\ncolour = input(\"What is your favourite colour? \")\nprint(\"Wow,\", colour, \"is a great colour!\")\n",
+          "challenge": "Ask the player for a number, turn it into an int, and print that number doubled.",
+          "hint": "Wrap input in int(): num = int(input(\"Pick a number: \")). Then print(num * 2). Remember to type your answer in the input box before running!"
+        },
+        "guide": [
+          {
+            "step": "Call input() to ask",
+            "body": "input(\"your question \") shows a prompt and waits for the person to type and press Enter."
+          },
+          {
+            "step": "Store the answer",
+            "body": "Catch the reply in a variable: answer = input(\"...?\"). Now you can use it later."
+          },
+          {
+            "step": "Remember: it is text",
+            "body": "Whatever the user types comes back as a string, even \"42\". Numbers must be converted before you do maths."
+          },
+          {
+            "step": "Convert when you need numbers",
+            "body": "Wrap it: int(input(\"...\")) for whole numbers or float(input(\"...\")) for decimals."
+          },
+          {
+            "step": "Use the answer",
+            "body": "Now print it, add to it, or make a decision with it — it is a normal value like any other."
+          }
+        ],
+        "takeaways": [
+          "input() pauses the program and returns what the user types.",
+          "The answer always comes back as a string.",
+          "Wrap it in int() or float() to do maths.",
+          "Store the reply in a variable so you can reuse it."
+        ]
+      }
+    },
+    {
+      "topic": "Output",
+      "title": "Output",
+      "order": 4,
+      "language": "python",
+      "body": {
+        "tagline": "How your program shows results to the world.",
+        "intro": "Output is how a program speaks. The print() function takes whatever you give it and shows it on the screen so a real person can read it. Without output your program could do amazing calculations in secret — but nobody would ever see them. Output is how your code says \"look what I did!\"",
+        "sections": [
+          {
+            "heading": "The print() function",
+            "body": "print() displays one or more values, then moves to a new line. It is the friendliest tool in Python and you will use it constantly.",
+            "bullets": [
+              "print(\"Hello!\") shows Hello! on its own line.",
+              "You can print numbers, text, variables — anything.",
+              "Each print() call starts a fresh line by default."
+            ]
+          },
+          {
+            "heading": "Printing several things at once",
+            "body": "Give print() several values separated by commas and it shows them all, automatically putting a space between each one.",
+            "bullets": [
+              "print(\"Score:\", 42) shows: Score: 42 (note the space).",
+              "Commas handle the type-mixing for you — no str() needed.",
+              "print(name, \"has\", lives, \"lives\") reads like a sentence."
+            ]
+          },
+          {
+            "heading": "Neat, readable output",
+            "body": "A few small touches make your output clearer and more fun to read.",
+            "bullets": [
+              "Empty line for spacing: print() with nothing inside.",
+              "Combine text with + when you want NO extra spaces: \"Hi\" + name.",
+              "f-strings are a tidy way to mix text and values: f\"Score: {points}\"."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "name = \"Aria\"",
+            "points = 42",
+            "",
+            "print(\"=== Score Card ===\")",
+            "print(\"Player:\", name)",
+            "print(\"Points:\", points)",
+            "print()                       # blank line",
+            "print(f\"Well done, {name}!\")  # f-string"
+          ],
+          "caption": "Commas add spaces, an empty print() adds a gap, f-strings mix in values."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Show a fun message.\nhero = \"Sam\"\nlevel = 3\nprint(\"Hello,\", hero)\nprint(\"You reached level\", level)\n",
+          "challenge": "Print a small three-line score card that shows a name, a score, and a cheerful \"Great job!\" message.",
+          "hint": "Use three print() lines. Mix text and variables with commas: print(\"Score:\", score). Try an f-string for the last line: print(f\"Great job, {hero}!\")."
+        },
+        "guide": [
+          {
+            "step": "Call print() to show things",
+            "body": "print(something) displays that something on screen and then moves to a new line."
+          },
+          {
+            "step": "Print variables, not just text",
+            "body": "print(score) shows the value inside the box, so your output changes as your data changes."
+          },
+          {
+            "step": "Separate with commas",
+            "body": "print(\"Score:\", points) shows both, with a tidy space between — and no type errors."
+          },
+          {
+            "step": "Add spacing for clarity",
+            "body": "An empty print() drops a blank line, which makes long output easier to read."
+          },
+          {
+            "step": "Try an f-string",
+            "body": "f\"Hi {name}\" slots a variable straight into your text — clean and readable."
+          }
+        ],
+        "takeaways": [
+          "print() shows values on screen so people can see results.",
+          "Commas print several values with spaces between them.",
+          "An empty print() adds a blank line for spacing.",
+          "f-strings like f\"Hi {name}\" mix text and values neatly."
+        ]
+      }
+    }
+  ],
+  "loop-mountain": [
+    {
+      "topic": "For Loops",
+      "title": "For Loops",
+      "order": 1,
+      "language": "python",
+      "body": {
+        "tagline": "Repeat an exact number of times without copy-pasting.",
+        "intro": "A for loop repeats a block of code a set number of times. When you already know how many steps to take — like climbing 10 stairs or greeting every friend in a list — a for loop does the counting and the walking for you. Instead of writing the same line ten times, you write it once and let the loop run it again and again.",
+        "sections": [
+          {
+            "heading": "The shape of a for loop",
+            "body": "A for loop has three parts: the word for, a loop variable, and a collection of things to walk through. Write for i in range(5): and Python runs the indented block five times. The colon and the indentation together tell Python exactly which lines belong to the loop.",
+            "bullets": [
+              "for i in range(5): repeats the indented block five times.",
+              "The loop variable (often i) holds the current value each time around.",
+              "Everything indented under the for line is the loop body — it repeats.",
+              "Do not forget the colon : at the end of the for line."
+            ]
+          },
+          {
+            "heading": "range() makes number sequences",
+            "body": "range() is the loop's best friend — it hands the loop a run of numbers. It comes in three flavours depending on how many values you give it.",
+            "bullets": [
+              "range(5) counts 0, 1, 2, 3, 4 — it starts at 0 and STOPS BEFORE 5.",
+              "range(1, 6) counts 1, 2, 3, 4, 5 — from start up to (but not including) stop.",
+              "range(0, 10, 2) counts 0, 2, 4, 6, 8 — the third number is the step (jump size).",
+              "range(10, 0, -1) counts down 10, 9, 8 … 1 using a negative step."
+            ]
+          },
+          {
+            "heading": "Looping over lists and strings",
+            "body": "A for loop does not only count numbers. It can walk straight through the items of a list or the letters of a string, handing you one item at a time — no range() needed.",
+            "bullets": [
+              "for pet in [\"cat\", \"dog\", \"fox\"]: gives pet each animal in turn.",
+              "for letter in \"hi\": gives letter as \"h\", then \"i\".",
+              "The loop variable holds the actual item, not a position number.",
+              "Use range(len(mylist)) only when you truly need the index."
+            ]
+          },
+          {
+            "heading": "Accumulating a total",
+            "body": "One of the most useful loop patterns is building up an answer as you go. You start a variable OUTSIDE the loop, then add to it INSIDE the loop each time around. This is called accumulating.",
+            "bullets": [
+              "Start the total before the loop: total = 0.",
+              "Add to it each time inside the loop: total = total + number.",
+              "After the loop finishes, total holds the whole sum.",
+              "The same trick counts things (count = count + 1) or joins text."
+            ]
+          },
+          {
+            "heading": "Common mistakes to dodge",
+            "body": "Almost every new coder hits these snags. Spotting them early saves a lot of red errors.",
+            "bullets": [
+              "Off-by-one: range(1, 5) stops at 4, not 5. Add one to the stop to include it.",
+              "Forgetting the colon : at the end of the for line breaks the loop.",
+              "Wrong indentation — the body must be indented, and all lines the same amount.",
+              "Resetting the total inside the loop wipes your running answer every time."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# Climb five steps, counting as we go",
+            "for step in range(1, 6):",
+            "    print(\"Climbing step\", step)",
+            "",
+            "# Add up the numbers 1 to 5 with an accumulator",
+            "total = 0",
+            "for number in range(1, 6):",
+            "    total = total + number",
+            "",
+            "print(\"Total climb:\", total)   # 1+2+3+4+5 = 15"
+          ],
+          "caption": "range(1, 6) gives 1..5; the total box grows by each number."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Print each number from 1 to 5.\nfor i in range(1, 6):\n    print(i)\n",
+          "challenge": "Add up all the numbers from 1 to 10 using a total variable, then print the final total (it should be 55).",
+          "hint": "Start total = 0 BEFORE the loop. Loop with range(1, 11). Inside, write total = total + i. Print total AFTER the loop, not inside it."
+        },
+        "guide": [
+          {
+            "step": "Write the for line",
+            "body": "Start with for, a loop variable, in, and something to walk through: for i in range(5):. End it with a colon."
+          },
+          {
+            "step": "Indent the body",
+            "body": "The code you want repeated is indented under the for line. Everything at that indent runs once per loop."
+          },
+          {
+            "step": "Pick the right range",
+            "body": "range(n) counts 0..n-1. Use range(start, stop) to choose where it begins, and a third number for the step size."
+          },
+          {
+            "step": "Use the loop variable",
+            "body": "Each time around, the loop variable holds the current value — a number from range(), or the current item of a list or string."
+          },
+          {
+            "step": "Accumulate outside, add inside",
+            "body": "To build a total, make total = 0 before the loop, then total = total + value inside it. Read the answer after the loop ends."
+          },
+          {
+            "step": "Watch the boundaries",
+            "body": "Remember range stops one BEFORE the stop number. If you want to include it, add one to the stop."
+          }
+        ],
+        "takeaways": [
+          "Use a for loop when you know how many times to repeat.",
+          "range(n) counts 0 to n-1; range(start, stop, step) gives you full control.",
+          "A for loop can walk over a list or string, item by item.",
+          "Accumulate a total by starting at 0 and adding inside the loop.",
+          "Watch for off-by-one errors — range stops just before the stop value."
+        ]
+      }
+    },
+    {
+      "topic": "While Loops",
+      "title": "While Loops",
+      "order": 2,
+      "language": "python",
+      "body": {
+        "tagline": "Keep going until a condition stops being true.",
+        "intro": "A while loop repeats as long as a condition stays true. Use it when you do not know the exact number of repeats in advance — you only know the goal that ends the loop. \"Keep asking until the answer is right\" or \"keep climbing while there is daylight\" are perfect while-loop jobs.",
+        "sections": [
+          {
+            "heading": "The shape of a while loop",
+            "body": "Write while condition: and Python checks the condition. If it is True, it runs the indented body, then checks again. It keeps looping until the condition becomes False, then moves on. The condition is checked at the TOP, before every single pass.",
+            "bullets": [
+              "while count > 0: repeats while count is greater than 0.",
+              "The condition is a yes/no (True/False) test.",
+              "Python re-checks the condition before every loop.",
+              "When the condition is False, the loop stops and the program continues."
+            ]
+          },
+          {
+            "heading": "Using a counter",
+            "body": "A very common pattern is a counter — a variable you set before the loop and change inside it. The counter is what eventually makes the condition False so the loop can end.",
+            "bullets": [
+              "Set the counter before the loop: count = 5.",
+              "Check it in the condition: while count > 0:.",
+              "Change it inside the loop: count = count - 1 (or count -= 1).",
+              "Without changing the counter, the condition never flips and the loop never ends."
+            ]
+          },
+          {
+            "heading": "When while beats for",
+            "body": "A for loop is best when you know the count up front. A while loop shines when you do NOT — when the number of repeats depends on what happens while the program runs.",
+            "bullets": [
+              "Keep asking the player until they type the correct password.",
+              "Keep rolling a dice until you get a six.",
+              "Repeat a menu until the user chooses \"quit\".",
+              "In short: for = known count, while = repeat until something happens."
+            ]
+          },
+          {
+            "heading": "break and continue",
+            "body": "Two special words give you extra control inside any loop. break jumps out immediately, and continue skips to the next pass.",
+            "bullets": [
+              "break stops the loop right away, even if the condition is still true.",
+              "continue skips the rest of this pass and jumps back to the condition.",
+              "break is handy for \"stop as soon as we find it\" searches.",
+              "Use them sparingly — too many can make a loop hard to follow."
+            ]
+          },
+          {
+            "heading": "Infinite loops (and how to avoid them)",
+            "body": "An infinite loop is one that never stops because its condition never becomes False. It is the number-one while-loop bug. The cure is simple: make sure something inside the loop moves the condition toward False.",
+            "bullets": [
+              "while True: with no break inside runs forever.",
+              "Forgetting to update the counter (count = count - 1) loops forever.",
+              "Always ask: \"what makes this loop STOP?\" before you run it.",
+              "If a program hangs, an infinite loop is usually the culprit."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# A countdown using a counter",
+            "count = 3",
+            "while count > 0:",
+            "    print(\"Countdown:\", count)",
+            "    count = count - 1   # this is what ends the loop",
+            "",
+            "print(\"Blast off!\")"
+          ],
+          "caption": "count shrinks each pass until count > 0 becomes False."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Count down from 5 to 1.\ncount = 5\nwhile count > 0:\n    print(count)\n    count = count - 1\n",
+          "challenge": "Change it to count UP from 1 to 5 instead — print 1, 2, 3, 4, 5, one per line.",
+          "hint": "Start count at 1. Loop while count <= 5. Print count, then add one with count = count + 1. Make sure the counter changes, or the loop never ends!"
+        },
+        "guide": [
+          {
+            "step": "Write the condition",
+            "body": "Start with while and a yes/no test, then a colon: while count > 0:. Python runs the body only while the test is True."
+          },
+          {
+            "step": "Set up before the loop",
+            "body": "Give the condition something to check. A counter set before the loop, like count = 5, is the classic setup."
+          },
+          {
+            "step": "Change something inside",
+            "body": "Update the variable the condition checks — count = count - 1. This is what lets the loop eventually stop."
+          },
+          {
+            "step": "Know when to reach for while",
+            "body": "Pick while over for when you do not know the number of repeats ahead of time, like asking until the answer is right."
+          },
+          {
+            "step": "Steer with break and continue",
+            "body": "break leaves the loop immediately; continue skips to the next check. Use them to handle special cases neatly."
+          },
+          {
+            "step": "Avoid the infinite loop",
+            "body": "Before running, ask \"what makes this stop?\" If nothing moves the condition toward False, the loop runs forever."
+          }
+        ],
+        "takeaways": [
+          "A while loop repeats while its condition stays true.",
+          "Use it when you do not know the number of repeats ahead of time.",
+          "A counter that changes inside the loop is what lets it end.",
+          "break exits the loop now; continue skips to the next pass.",
+          "Always give a while loop a way to stop, or it runs forever."
+        ]
+      }
+    },
+    {
+      "topic": "Nested Loops",
+      "title": "Nested Loops",
+      "order": 3,
+      "language": "python",
+      "body": {
+        "tagline": "A loop inside a loop for grids, rows and patterns.",
+        "intro": "A nested loop is a loop inside another loop. The inner loop finishes completely for every single step of the outer loop — like a clock where the minute hand sweeps all the way around for each single move of the hour hand. Nested loops are how you build grids, tables and patterns.",
+        "sections": [
+          {
+            "heading": "Loops within loops",
+            "body": "Put one loop in the body of another and you have a nested loop. For every turn of the outer loop, the inner loop runs all the way through from start to finish. The inner loop is indented one level deeper than the outer loop.",
+            "bullets": [
+              "The outer loop is the slow hand; the inner loop is the fast hand.",
+              "The inner loop runs FULLY for each single outer step.",
+              "The inner loop is indented inside the outer loop.",
+              "Think outer = rows, inner = columns."
+            ]
+          },
+          {
+            "heading": "Iterations multiply",
+            "body": "The total number of times the innermost body runs is the outer count TIMES the inner count. This is why nested loops are so powerful — and why they can get slow if the counts are big.",
+            "bullets": [
+              "3 outer steps × 4 inner steps = 12 runs of the inner body.",
+              "A 5×5 grid means the inner line runs 25 times.",
+              "More nesting multiplies further: 10×10×10 is 1000 runs.",
+              "Small grids are instant; huge ones can be slow, so choose sizes wisely."
+            ]
+          },
+          {
+            "heading": "Building grids and patterns",
+            "body": "To draw a grid you print each cell with the inner loop, then move to a new line after each row. The trick is print(\"*\", end=\" \") which stays on the same line, and a bare print() to break to the next row.",
+            "bullets": [
+              "end=\" \" keeps print on the same line, adding a space instead of a newline.",
+              "A bare print() after the inner loop starts a fresh row.",
+              "Outer loop = one pass per row; inner loop = one cell per column.",
+              "Swap the star for numbers or letters to make different patterns."
+            ]
+          },
+          {
+            "heading": "A times table",
+            "body": "Nested loops are perfect for a multiplication table. The outer loop picks a row number, the inner loop picks a column number, and you print row times column in each cell.",
+            "bullets": [
+              "Outer variable = the first number, inner variable = the second.",
+              "Print row * col to fill each cell of the table.",
+              "range(1, 6) for both gives a neat 5×5 table.",
+              "The inner loop rebuilds a full row for every outer number."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# A 3x3 grid of stars",
+            "for row in range(3):",
+            "    for col in range(3):",
+            "        print(\"*\", end=\" \")   # stay on the same line",
+            "    print()                   # new line after each row"
+          ],
+          "caption": "Outer loop makes rows; inner loop fills each row with columns."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Print a small grid of stars.\nfor row in range(3):\n    for col in range(3):\n        print(\"*\", end=\" \")\n    print()\n",
+          "challenge": "Change the grid to 5 rows by 5 columns, then try replacing \"*\" with the number row * col to make a pattern.",
+          "hint": "Change both range(3) values to range(5). To show numbers instead of stars, use print(row * col, end=\" \") in the inner loop."
+        },
+        "guide": [
+          {
+            "step": "Put a loop inside a loop",
+            "body": "Write your outer loop, then indent a second loop inside its body. That inner loop is now nested."
+          },
+          {
+            "step": "Understand the order",
+            "body": "For every single step of the outer loop, the inner loop runs all the way through before the outer loop moves on."
+          },
+          {
+            "step": "Count the iterations",
+            "body": "The inner body runs outer × inner times. A 4×3 nest runs the inner line 12 times in total."
+          },
+          {
+            "step": "Use end=\" \" for a row",
+            "body": "print(\"*\", end=\" \") stays on the same line so a whole row prints across, instead of one item per line."
+          },
+          {
+            "step": "Break to the next row",
+            "body": "After the inner loop, a bare print() drops to a new line, starting the next row of your grid."
+          },
+          {
+            "step": "Swap in your own pattern",
+            "body": "Replace the star with numbers, letters, or row * col to turn the same grid into tables and patterns."
+          }
+        ],
+        "takeaways": [
+          "A nested loop is a loop inside another loop.",
+          "The inner loop runs fully for each single step of the outer loop.",
+          "Total inner runs = outer count × inner count.",
+          "Outer loop makes rows, inner loop makes columns — perfect for grids.",
+          "end=\" \" keeps a row on one line; a bare print() starts the next row."
+        ]
+      }
+    }
+  ],
+  "function-castle": [
+    {
+      "topic": "Functions",
+      "title": "Functions",
+      "order": 1,
+      "language": "python",
+      "body": {
+        "tagline": "Build a machine once, then use it again and again.",
+        "intro": "A function is a reusable machine: you build it once, give it a name, and call on it whenever you need its work done. Instead of copying the same lines all over your program, you wrap them in a function and just say its name. Functions keep your code tidy, save you from repeating yourself, and let you name a task so the rest of your code reads like plain English.",
+        "sections": [
+          {
+            "heading": "Why functions exist",
+            "body": "Imagine writing the same ten lines to draw a castle in five different places. If you find a bug, you must fix it five times! A function lets you write those lines once, name them draw_castle, and reuse them everywhere. Functions give you three big wins.",
+            "bullets": [
+              "Reuse — write it once, use it as many times as you like.",
+              "Organise — a big program becomes a set of small, named machines.",
+              "Name a task — greet() explains itself better than five loose lines.",
+              "Fix once — change the function in one place and every call gets the fix."
+            ]
+          },
+          {
+            "heading": "Defining a function",
+            "body": "You build a function with the word def, a name, a pair of brackets, and a colon. The lines that do the work go INDENTED underneath. Defining a function only builds the machine — it does not run it yet.",
+            "bullets": [
+              "def greet(): starts a function definition named greet.",
+              "The brackets () will later hold inputs (parameters).",
+              "The colon : and indentation mark the function body.",
+              "Choose a clear, verb-like name: greet, save_score, roll_dice."
+            ]
+          },
+          {
+            "heading": "Defining vs calling",
+            "body": "This is the idea that unlocks functions: defining and calling are two separate steps. def builds the machine but does not switch it on. Writing the name with brackets — greet() — is what actually runs it.",
+            "bullets": [
+              "Defining (def greet():) builds the machine but runs nothing.",
+              "Calling (greet()) switches the machine on and runs its body.",
+              "You must define a function BEFORE you call it.",
+              "Nothing you put in a function happens until it is called."
+            ]
+          },
+          {
+            "heading": "Calling it many times",
+            "body": "The whole point of a function is reuse. Once it is defined, you can call it as often as you like, and its body runs fresh every single time. That is how one small definition can do a lot of work.",
+            "bullets": [
+              "Each call runs the whole body again from the top.",
+              "greet() written three times greets three times.",
+              "Calls can even be inside loops: for i in range(3): greet().",
+              "One definition, unlimited calls."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# Define the machine once",
+            "def greet():",
+            "    print(\"Welcome to the castle!\")",
+            "",
+            "# Now switch it on as many times as we like",
+            "greet()   # call the machine",
+            "greet()   # use it again"
+          ],
+          "caption": "def builds greet; each greet() call runs its body afresh."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Define and call a function.\ndef cheer():\n    print(\"You can do it!\")\n\ncheer()\n",
+          "challenge": "Make a function called wave that prints a friendly wave message, then call it three times.",
+          "hint": "Define it with def wave(): and an indented print inside. Then write wave() on three separate lines below the definition."
+        },
+        "guide": [
+          {
+            "step": "Decide what task to name",
+            "body": "Spot some lines you repeat, or a job worth naming. That job becomes your function — for example, greeting the player."
+          },
+          {
+            "step": "Define with def",
+            "body": "Write def, a clear name, brackets and a colon: def greet():. This starts a new function definition."
+          },
+          {
+            "step": "Indent the body",
+            "body": "The code the function should run is indented underneath the def line. That indented block is the machine's job."
+          },
+          {
+            "step": "Remember: defining is not running",
+            "body": "Writing def only builds the machine. Nothing inside runs until you actually call it."
+          },
+          {
+            "step": "Call it by name",
+            "body": "Write the name with brackets, greet(), to switch the machine on and run its body."
+          },
+          {
+            "step": "Reuse it freely",
+            "body": "Call the same function as many times as you need. Each call runs the body again from the start."
+          }
+        ],
+        "takeaways": [
+          "A function is a reusable, named block of code.",
+          "Define it with def name(): and an indented body.",
+          "Defining builds the machine; calling name() runs it.",
+          "Functions let you reuse code, organise programs, and name tasks.",
+          "One definition can be called as many times as you like."
+        ]
+      }
+    },
+    {
+      "topic": "Parameters",
+      "title": "Parameters",
+      "order": 2,
+      "language": "python",
+      "body": {
+        "tagline": "The ingredients you hand your machine.",
+        "intro": "Parameters let a function work on different things each time you call it. Instead of always doing the exact same job, the function accepts inputs — like ingredients handed into a recipe — and uses them inside its body. One greet function can then welcome Aria, Sam, or anyone else, all depending on what you pass in.",
+        "sections": [
+          {
+            "heading": "Passing in a value",
+            "body": "To give a function an input, put a parameter name inside its brackets when you define it. When you call the function, you hand in a real value that flows into that parameter for that one run.",
+            "bullets": [
+              "def greet(name): defines a function that expects one input.",
+              "Inside the body, name behaves just like a variable.",
+              "greet(\"Aria\") sends \"Aria\" in, so name becomes \"Aria\" for that call.",
+              "The same function gives different results for different inputs."
+            ]
+          },
+          {
+            "heading": "Argument vs parameter",
+            "body": "These two words are easy to mix up. A parameter is the name in the definition — the empty slot. An argument is the actual value you pass in when you call. Same slot, different fillings each time.",
+            "bullets": [
+              "Parameter — the name in the definition: def greet(name).",
+              "Argument — the real value you pass: greet(\"Sam\").",
+              "Think of the parameter as a labelled cup, the argument as the drink poured in.",
+              "One parameter can receive a different argument on every call."
+            ]
+          },
+          {
+            "heading": "Several parameters (positional)",
+            "body": "A function can take more than one input — just separate the parameters with commas. When you call it, the arguments line up by POSITION: the first argument fills the first parameter, the second fills the second, and so on. So order matters!",
+            "bullets": [
+              "def power(base, exp): takes two inputs.",
+              "power(2, 3) sets base = 2 and exp = 3 (first goes to first).",
+              "Swapping the order swaps the meaning: power(3, 2) is different.",
+              "These are called positional arguments because position decides the match."
+            ]
+          },
+          {
+            "heading": "Default parameter values",
+            "body": "You can give a parameter a default value in the definition using an equals sign. If the caller leaves that argument out, the default is used. This makes some inputs optional and keeps common calls short.",
+            "bullets": [
+              "def power(base, exp=2): makes exp default to 2.",
+              "power(5) uses the default, so exp is 2 and you get 25.",
+              "power(5, 3) overrides the default, so exp is 3 and you get 125.",
+              "Parameters with defaults must come AFTER ones without."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# One parameter: name",
+            "def greet(name):",
+            "    print(\"Hello,\", name)",
+            "",
+            "greet(\"Aria\")",
+            "greet(\"Sam\")",
+            "",
+            "# Two parameters, one with a default",
+            "def power(base, exp=2):",
+            "    print(base, \"to the\", exp, \"=\", base ** exp)",
+            "",
+            "power(5)      # uses the default exp = 2  -> 25",
+            "power(2, 3)   # overrides exp = 3          -> 8"
+          ],
+          "caption": "Arguments fill parameters by position; exp=2 supplies a default."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# A function with a parameter.\ndef greet(name):\n    print(\"Hi,\", name)\n\ngreet(\"Coder\")\n",
+          "challenge": "Add a second parameter for age so the function prints \"Aria is 12 years old\", then call it with greet(\"Aria\", 12).",
+          "hint": "Change the definition to def greet(name, age): and print(name, \"is\", age, \"years old\"). Then call greet(\"Aria\", 12) — the values line up by position."
+        },
+        "guide": [
+          {
+            "step": "Add a parameter slot",
+            "body": "Put a name inside the brackets of the definition: def greet(name):. That name is the input the function expects."
+          },
+          {
+            "step": "Use it inside the body",
+            "body": "Inside the function, the parameter behaves like a normal variable holding whatever was passed in."
+          },
+          {
+            "step": "Pass an argument when calling",
+            "body": "Give a real value in the brackets when you call: greet(\"Aria\"). That value flows into the parameter."
+          },
+          {
+            "step": "Add more, separated by commas",
+            "body": "Need more inputs? List several parameters: def power(base, exp):. Arguments match them by position, left to right."
+          },
+          {
+            "step": "Mind the order",
+            "body": "The first argument fills the first parameter. Swapping the order changes the meaning, so keep them lined up."
+          },
+          {
+            "step": "Set defaults for optional inputs",
+            "body": "Write exp=2 in the definition to give a fallback. Callers can leave it out to use the default, or pass a value to override it."
+          }
+        ],
+        "takeaways": [
+          "Parameters are the named input slots in a function definition.",
+          "Arguments are the real values you pass when you call it.",
+          "Multiple positional arguments match parameters by their order.",
+          "A default like exp=2 makes an input optional.",
+          "Parameters let one function handle many different inputs."
+        ]
+      }
+    },
+    {
+      "topic": "Return Values",
+      "title": "Return Values",
+      "order": 3,
+      "language": "python",
+      "body": {
+        "tagline": "The prize your function hands back.",
+        "intro": "A return value is the result a function gives back after it finishes its work. Instead of only printing something on the screen, a function can hand you an answer that you catch in a variable and reuse later. This is the difference between a machine that just flashes a light and one that hands you a finished product you can carry away.",
+        "sections": [
+          {
+            "heading": "The return keyword",
+            "body": "The return keyword sends a value back to whoever called the function, and it ends the function right there. Whatever you write after return is the answer the call becomes.",
+            "bullets": [
+              "return a + b hands the sum back to the caller.",
+              "return immediately ends the function — lines after it do not run.",
+              "A function can compute something complex, then return just the answer.",
+              "Without return, a function hands back None (nothing useful)."
+            ]
+          },
+          {
+            "heading": "Capturing the result",
+            "body": "A returned value is worthless if you throw it away. Catch it in a variable, and now you own the answer — you can print it, do maths with it, or pass it into another function.",
+            "bullets": [
+              "total = add(2, 3) stores the returned 5 in total.",
+              "The call add(2, 3) becomes its return value right where you wrote it.",
+              "You can use the returned value straight away: print(add(2, 3)).",
+              "Store it once and reuse it many times."
+            ]
+          },
+          {
+            "heading": "return vs print",
+            "body": "This is the trickiest idea in the whole topic. print shows a value on the screen for a human to read — but the program cannot reuse it. return hands the value back to the program so it CAN be reused. print is for people; return is for your code.",
+            "bullets": [
+              "print(a + b) shows the answer but nothing keeps it.",
+              "return a + b gives the answer back so you can store and reuse it.",
+              "A function that returns can feed its answer into other code.",
+              "You often return the answer, then print the returned value separately."
+            ]
+          },
+          {
+            "heading": "Functions that return nothing (None)",
+            "body": "Not every function returns a useful value. If a function has no return statement (or a bare return), Python quietly hands back a special value called None, which means \"nothing here\". That is fine for functions whose job is just to do something, like printing.",
+            "bullets": [
+              "A function with no return gives back None automatically.",
+              "None means \"no value\" — it is not zero and not empty text.",
+              "A print-only function does its job but returns None.",
+              "Do not try to store and reuse the result of a None-returning function as an answer."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# A function that returns its result",
+            "def add(a, b):",
+            "    return a + b",
+            "",
+            "# Catch the returned value in a variable",
+            "total = add(2, 3)",
+            "print(\"The total is\", total)   # 5",
+            "",
+            "# Reuse it — the answer is a real value",
+            "print(\"Double that is\", total * 2)   # 10"
+          ],
+          "caption": "add hands back a + b; we store it in total and reuse it."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# A function that returns a value.\ndef double(n):\n    return n * 2\n\nprint(double(5))\n",
+          "challenge": "Write a function square(n) that RETURNS n times itself, store square(4) in a variable, and print it (it should be 16).",
+          "hint": "Inside the function write return n * n. Then result = square(4) and print(result). Use return, not print, so the answer can be stored."
+        },
+        "guide": [
+          {
+            "step": "Do the work, then return",
+            "body": "Inside the function, compute what you need, then hand the answer back with return, for example return a + b."
+          },
+          {
+            "step": "Know that return ends the function",
+            "body": "As soon as return runs, the function stops. Any lines written after it never execute."
+          },
+          {
+            "step": "Catch the result",
+            "body": "The call becomes its returned value, so store it: total = add(2, 3). Now total holds the answer."
+          },
+          {
+            "step": "Choose return over print to reuse",
+            "body": "print only shows a value; return gives it back to your code. Return when you need to keep or reuse the answer."
+          },
+          {
+            "step": "Reuse the answer anywhere",
+            "body": "A returned value is an ordinary value — print it, add to it, or feed it into another function."
+          },
+          {
+            "step": "Remember None",
+            "body": "A function with no return hands back None, meaning \"nothing\". Do not try to reuse that as a real answer."
+          }
+        ],
+        "takeaways": [
+          "return sends a value back from a function and ends it.",
+          "Catch the returned value in a variable to keep and reuse it.",
+          "return gives a value to your code; print only shows it to a person.",
+          "A function with no return hands back None (nothing useful).",
+          "Returning a computed result lets one function feed another."
+        ]
+      }
+    }
+  ],
+  "algorithm-desert": [
+    {
+      "topic": "Conditions",
+      "title": "Conditions",
+      "order": 1,
+      "language": "python",
+      "body": {
+        "tagline": "Let your program choose its own path.",
+        "intro": "A condition is a yes/no question your program asks itself before it decides what to do next. Should the umbrella come out? Is the score high enough for a gold star? With if, elif and else, your code stops doing the exact same thing every time and starts making real decisions — just like you do a hundred times a day.",
+        "sections": [
+          {
+            "heading": "The if statement",
+            "body": "if means \"only do this when the answer is yes\". You write if, then a question that is either True or False, then a colon. The lines you want to run when the answer is yes go underneath, indented to the right.",
+            "bullets": [
+              "The line always ends with a colon: if it is raining:.",
+              "The indented block runs ONLY when the question is True.",
+              "If the question is False, Python simply skips the whole block."
+            ]
+          },
+          {
+            "heading": "Comparison operators ask the questions",
+            "body": "A condition needs something to compare. Comparison operators take two values and hand back True or False. They are the questions inside every if.",
+            "bullets": [
+              "== asks \"are these equal?\" — score == 100 (note the DOUBLE equals).",
+              "!= asks \"are these different?\" — name != \"Sam\".",
+              "> and < ask \"bigger?\" and \"smaller?\" — age > 12, temp < 0.",
+              ">= and <= add \"or equal\" — score >= 50 means 50 counts too.",
+              "Remember: = stores a value, but == checks if two values match."
+            ]
+          },
+          {
+            "heading": "else: the catch-all path",
+            "body": "else means \"otherwise, do this instead\". It has no question of its own — it simply runs whenever the if above it was False. Together, if/else guarantee exactly one of the two blocks runs.",
+            "bullets": [
+              "else always pairs with an if above it.",
+              "else ends with a colon too, but never has a condition.",
+              "One of the two paths ALWAYS runs — never zero, never both."
+            ]
+          },
+          {
+            "heading": "elif: checking more than two paths",
+            "body": "When there are several possibilities, elif (short for \"else if\") lets you check extra questions in order. Python tries each one from the top and stops at the first that is True.",
+            "bullets": [
+              "Order matters: put the strictest test (score >= 90) first.",
+              "You can have as many elif branches as you need.",
+              "Only ONE branch ever runs — the first True one wins.",
+              "A final else catches everything none of the tests matched."
+            ]
+          },
+          {
+            "heading": "Indentation and nesting",
+            "body": "Indentation is how Python knows which lines belong to a branch. Line up the spaces and Python understands the shape. You can even put an if inside another if — that is called nesting, and it lets you ask a follow-up question only after the first one passed.",
+            "bullets": [
+              "Every line inside a branch uses the same indent (4 spaces is standard).",
+              "A nested if goes one extra level in, deeper to the right.",
+              "The inner question is only asked when the outer one was True.",
+              "Wrong indentation gives an IndentationError — line things up neatly."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "score = 75",
+            "",
+            "# Only ONE of these branches will run",
+            "if score >= 90:",
+            "    print(\"Gold star! Amazing!\")",
+            "elif score >= 50:",
+            "    print(\"Nice work — you passed!\")",
+            "else:",
+            "    print(\"Keep trying, you will get there!\")",
+            "",
+            "print(\"Your score was\", score)"
+          ],
+          "caption": "Python checks each test top to bottom and runs exactly one branch."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Decide what to wear based on the weather.\nraining = True\n\nif raining:\n    print(\"Take an umbrella!\")\nelse:\n    print(\"Leave the umbrella at home.\")\n",
+          "challenge": "Add a temperature variable, then use elif so it prints \"Wear a coat!\" when it is not raining but the temperature is below 10.",
+          "hint": "Between the if and the else, add a new branch: elif temperature < 10: with its own indented print line. Set temperature = 5 to test it."
+        },
+        "guide": [
+          {
+            "step": "Ask a yes/no question",
+            "body": "Start with if and a comparison, like if score >= 50:. This is the question Python will answer as True or False."
+          },
+          {
+            "step": "Indent what happens when yes",
+            "body": "Put the lines to run under the if, all indented by the same 4 spaces. Python runs them only when the answer is True."
+          },
+          {
+            "step": "Add else for the other path",
+            "body": "else: with an indented block runs whenever the if was False. Now one of the two paths always runs."
+          },
+          {
+            "step": "Slot in elif for extra paths",
+            "body": "Need more than two options? Add elif question: branches between if and else. Python stops at the first True one."
+          },
+          {
+            "step": "Mind the order and the equals",
+            "body": "Put the strictest test first, and use == to compare (two equals), not = which stores a value."
+          },
+          {
+            "step": "Nest to ask follow-ups",
+            "body": "Put an if inside another if, indented one level deeper, to ask a second question only after the first passes."
+          }
+        ],
+        "takeaways": [
+          "A condition is a True/False question that chooses which code runs.",
+          "if / elif / else pick exactly one path — never zero, never two.",
+          "Comparison operators (==, !=, <, >, <=, >=) ask the questions.",
+          "Indentation shows which lines belong to each branch.",
+          "A nested if asks a follow-up only after the outer question is True."
+        ]
+      }
+    },
+    {
+      "topic": "Boolean Logic",
+      "title": "Boolean Logic",
+      "order": 2,
+      "language": "python",
+      "body": {
+        "tagline": "Reasoning with just True and False.",
+        "intro": "Boolean logic is the maths of yes and no. Every value in it is one of only two things: True or False. Named after the thinker George Boole, it is the secret engine behind every decision a computer makes. Once you can combine True and False with and, or and not, you can ask your program exactly the right question — no more, no less.",
+        "sections": [
+          {
+            "heading": "True and False are values",
+            "body": "True and False are not text — they are a special type called bool. You can store them in variables just like numbers, and Python treats them as the answers to yes/no questions.",
+            "bullets": [
+              "Write them with a capital letter: True and False (not \"true\").",
+              "Store them like anything else: is_ready = True.",
+              "They have their own type: type(True) is <class 'bool'>."
+            ]
+          },
+          {
+            "heading": "Comparisons make booleans",
+            "body": "Every comparison you write actually produces a boolean. When you type 5 > 3, Python quietly works it out to True and hands that back. That is why comparisons fit so neatly inside if statements.",
+            "bullets": [
+              "10 > 3 becomes True; 3 > 10 becomes False.",
+              "You can store the result: passed = score >= 50.",
+              "Print one to see it: print(7 == 7) shows True."
+            ]
+          },
+          {
+            "heading": "and — both must be True",
+            "body": "and joins two conditions and is only True when BOTH sides are True. If either side is False, the whole thing is False. It is like a strict club with two entry rules.",
+            "bullets": [
+              "age > 8 and age < 13 is True only for ages 9, 10, 11, 12.",
+              "This \"between two numbers\" pattern is a range check.",
+              "If the first side is False, the answer is already False."
+            ]
+          },
+          {
+            "heading": "or — at least one must be True",
+            "body": "or is the easy-going one: it is True when AT LEAST ONE side is True. It is only False when both sides are False.",
+            "bullets": [
+              "day == \"Sat\" or day == \"Sun\" is True on either weekend day.",
+              "or is friendlier than and — it says yes more often.",
+              "Only two falses make an or False."
+            ]
+          },
+          {
+            "heading": "not — flip the answer",
+            "body": "not takes a single boolean and turns it upside down: True becomes False, and False becomes True. It is handy for asking \"when this is NOT the case\".",
+            "bullets": [
+              "not True is False; not False is True.",
+              "if not game_over: means \"while the game is still going\".",
+              "You can combine all three: has_key and not is_locked."
+            ]
+          },
+          {
+            "heading": "Truthiness: a quick peek",
+            "body": "Python also lets some non-boolean values stand in for True or False in a condition. This is called truthiness, and it is a handy shortcut once you know it.",
+            "bullets": [
+              "Empty things are \"falsy\": 0, \"\" (empty text), and [] (empty list).",
+              "Anything with something in it is \"truthy\": 5, \"hi\", [1, 2].",
+              "So if name: means \"if name is not empty\"."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "age = 11",
+            "has_ticket = True",
+            "",
+            "# A range check with and",
+            "is_kid_price = age > 8 and age < 13",
+            "print(\"Kid price?\", is_kid_price)",
+            "",
+            "# Combine conditions to decide entry",
+            "if has_ticket and not age < 6:",
+            "    print(\"Enjoy the ride!\")",
+            "else:",
+            "    print(\"Sorry, you cannot board.\")"
+          ],
+          "caption": "Comparisons become booleans, then and / not combine them into a decision."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Combine two true/false values.\nsunny = True\nwarm = True\n\nif sunny and warm:\n    print(\"Perfect for the beach!\")\nelse:\n    print(\"Maybe stay inside.\")\n",
+          "challenge": "Change the code so the beach message shows when it is sunny OR warm (you do not need both). Then try setting one of them to False and predict the result before you Run.",
+          "hint": "Swap the word and for or in the if line. With or, only one of the two needs to be True for the message to appear."
+        },
+        "guide": [
+          {
+            "step": "Meet True and False",
+            "body": "Booleans have exactly two values, written with capitals: True and False. They are the answers to yes/no questions."
+          },
+          {
+            "step": "See comparisons make booleans",
+            "body": "Every comparison like 5 > 3 works out to True or False. You can even store that answer in a variable."
+          },
+          {
+            "step": "Use and for \"both\"",
+            "body": "a and b is True only when both a and b are True. Great for range checks like age > 8 and age < 13."
+          },
+          {
+            "step": "Use or for \"either\"",
+            "body": "a or b is True when at least one side is True. It says yes more easily than and."
+          },
+          {
+            "step": "Use not to flip",
+            "body": "not turns True into False and False into True. if not finished: means \"while it is not finished\"."
+          },
+          {
+            "step": "Drop them into decisions",
+            "body": "Because if needs a True/False answer, booleans and the words and/or/not are what power every decision."
+          }
+        ],
+        "takeaways": [
+          "Booleans are the type with only two values: True and False.",
+          "Comparisons like > and == produce booleans behind the scenes.",
+          "and needs both sides True; or needs at least one; not flips the answer.",
+          "age > 8 and age < 13 is the classic \"between two numbers\" range check.",
+          "Empty values (0, \"\", []) count as falsy; filled ones count as truthy."
+        ]
+      }
+    },
+    {
+      "topic": "Problem Solving",
+      "title": "Problem Solving",
+      "order": 3,
+      "language": "python",
+      "body": {
+        "tagline": "Think like a programmer, one step at a time.",
+        "intro": "The biggest secret in coding is not memorising commands — it is learning how to think. Programmers take a big, scary problem and quietly break it into small steps so simple that a computer could follow them. That ordered list of steps is called an algorithm. Master this way of thinking and you can solve problems you have never seen before.",
+        "sections": [
+          {
+            "heading": "The four-step method",
+            "body": "Great problem-solvers do not leap straight to code. They follow a rhythm that keeps them out of trouble: understand, plan, code, then test. Skipping the first two is why code so often breaks.",
+            "bullets": [
+              "Understand: what exactly must the program do? What comes in, what goes out?",
+              "Plan: list the steps in plain words — this is your algorithm.",
+              "Code: translate each step into Python, one line at a time.",
+              "Test: run it with example values and check the answers are right."
+            ]
+          },
+          {
+            "heading": "Write pseudocode first",
+            "body": "Pseudocode is a plan written in plain language that looks a little like code but breaks no rules. It lets you think about the steps without worrying about exact Python syntax yet.",
+            "bullets": [
+              "Use everyday words: \"if the score is over 90, print gold star\".",
+              "One idea per line, in the order it should happen.",
+              "When the plan feels right, swap each line for real Python."
+            ]
+          },
+          {
+            "heading": "Break the problem down",
+            "body": "A big problem is really lots of tiny problems hiding together. Splitting it up — a skill called decomposition — turns \"impossible\" into a to-do list you can tick off.",
+            "bullets": [
+              "Ask: what is the very first small thing I need?",
+              "Solve that, then ask what comes next.",
+              "Small wins stack up into the whole solution."
+            ]
+          },
+          {
+            "heading": "Worked example: largest of three numbers",
+            "body": "Imagine you must find the biggest of three numbers a, b and c. In plain words: first find the bigger of a and b, remember it, then compare that winner against c. Whichever is bigger is your answer. Notice we solved a two-number problem first, then reused it.",
+            "bullets": [
+              "Plan: biggest = a if a > b else b, then compare biggest with c.",
+              "Each comparison is one small, testable step.",
+              "Test with numbers where you already know the answer, like 4, 9, 2."
+            ]
+          },
+          {
+            "heading": "Always test with examples",
+            "body": "A plan is only a guess until you try it. Run your code with values where you already know the right answer, then check. If it is wrong, you have found a bug to fix — that is progress, not failure.",
+            "bullets": [
+              "Pick easy examples first (largest of 4, 9, 2 should be 9).",
+              "Then try tricky ones: what if two numbers are equal?",
+              "A wrong answer tells you exactly which step to revisit."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# Goal: find the largest of three numbers",
+            "# Plan: compare a with b, then the winner with c",
+            "a = 4",
+            "b = 9",
+            "c = 2",
+            "",
+            "if a >= b and a >= c:",
+            "    print(\"Largest:\", a)",
+            "elif b >= c:",
+            "    print(\"Largest:\", b)",
+            "else:",
+            "    print(\"Largest:\", c)"
+          ],
+          "caption": "A plain-words plan turned into if/elif — the largest number wins exactly one branch."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Start small: find the biggest of TWO numbers.\na = 4\nb = 9\n\nif a > b:\n    print(a)\nelse:\n    print(b)\n",
+          "challenge": "Add a third number c and print the biggest of all three. Write your plan as a comment first, then turn it into code.",
+          "hint": "Reuse what you have: find the bigger of a and b and store it in a variable called biggest, then compare biggest with c using another if/else."
+        },
+        "guide": [
+          {
+            "step": "Understand the goal",
+            "body": "Say in one clear sentence what the program must do, and what information goes in and comes out. You cannot solve a problem you have not defined."
+          },
+          {
+            "step": "Write the plan in words",
+            "body": "List the steps as pseudocode — plain language, one idea per line, in order. No Python rules to worry about yet."
+          },
+          {
+            "step": "Break it into small pieces",
+            "body": "Split the plan into the smallest steps you can. Solve the easiest piece first, then build on it."
+          },
+          {
+            "step": "Translate each step to code",
+            "body": "Turn one pseudocode line at a time into real Python. Keep the code and the plan side by side."
+          },
+          {
+            "step": "Test with known answers",
+            "body": "Run it using examples where you already know the result. Compare what you got with what you expected."
+          },
+          {
+            "step": "Fix and repeat",
+            "body": "A wrong answer points at the step to revisit. Adjust, run again, and keep going until it is right."
+          }
+        ],
+        "takeaways": [
+          "Problem solving is a process: understand, plan, code, then test.",
+          "An algorithm is just an ordered list of small, clear steps.",
+          "Write pseudocode in plain words before you write real Python.",
+          "Break a big problem into tiny problems you can solve one by one.",
+          "Test with examples whose answers you already know — bugs are clues, not failures."
+        ]
+      }
+    }
+  ],
+  "python-kingdom": [
+    {
+      "topic": "Python Syntax",
+      "title": "Python Syntax",
+      "order": 1,
+      "language": "python",
+      "body": {
+        "tagline": "The grammar rules that make Python work.",
+        "intro": "Syntax is the grammar of a programming language — the rules about where things go and how they are spelled. Just as English needs spaces and full stops to make sense, Python needs colons, indentation and neat lines. The good news: Python has some of the tidiest, friendliest syntax of any language, and once the shape clicks, your code just works.",
+        "sections": [
+          {
+            "heading": "One statement per line",
+            "body": "A statement is a single instruction. In Python you normally write one statement on each line, and you do NOT need a semicolon at the end. Press Enter and start the next instruction on a fresh line.",
+            "bullets": [
+              "One instruction per line keeps code easy to read.",
+              "No semicolons needed — the end of the line is the end of the statement.",
+              "Blank lines are fine and help group related code."
+            ]
+          },
+          {
+            "heading": "Indentation defines blocks",
+            "body": "This is Python's signature idea. Instead of curly braces, Python uses INDENTATION — the spaces at the start of a line — to show which lines belong together inside a block. The standard is 4 spaces per level, and every line in the same block must line up exactly.",
+            "bullets": [
+              "Lines indented the same amount belong to the same block.",
+              "Use 4 spaces per level — be consistent, never mix tabs and spaces.",
+              "Getting the spacing wrong gives an IndentationError.",
+              "The indentation is not just for looks — it is part of the meaning."
+            ]
+          },
+          {
+            "heading": "Colons open a block",
+            "body": "Lines that begin a block — like if, for, while and def — end with a colon. The colon is Python's way of saying \"the indented lines below are mine\".",
+            "bullets": [
+              "End the header line with a colon: if score > 10:.",
+              "The very next line steps in one indent level.",
+              "Forgetting the colon gives a SyntaxError."
+            ]
+          },
+          {
+            "heading": "Comments with #",
+            "body": "Anything after a # on a line is a comment: a note for humans that Python completely ignores. Comments explain WHY your code does something, which future-you will be grateful for.",
+            "bullets": [
+              "Everything after # on a line is skipped by Python.",
+              "Put a comment on its own line, or after code: x = 5  # the score.",
+              "Good comments explain the reason, not the obvious."
+            ]
+          },
+          {
+            "heading": "print() and case-sensitivity",
+            "body": "print() is the built-in tool that shows output on screen, and it must be spelled in lower case with round brackets. Python is case-sensitive, meaning Print, PRINT and print are three different things — only print works.",
+            "bullets": [
+              "Spelling and case must match exactly: print, not Print.",
+              "Round brackets hold what you want to show: print(\"Hi\").",
+              "name and Name are two different variables to Python."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# A tidy little Python program",
+            "name = \"Coder\"          # store a value in a variable",
+            "level = 3               # numbers need no quotes",
+            "",
+            "if level >= 3:          # header line ends with a colon",
+            "    print(\"Welcome,\", name)   # indented 4 spaces",
+            "    print(\"You reached level\", level)",
+            "",
+            "print(\"Goodbye!\")       # back out of the block"
+          ],
+          "caption": "Comments explain, a colon opens the block, and 4-space indents show what is inside."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Just run this and read how the shape works.\nfor i in range(3):\n    print(\"Line\", i)\n",
+          "challenge": "Add a comment above the loop that explains what it does, then add a second indented print inside the loop so each pass prints two lines.",
+          "hint": "Start a new line above the for with # and your explanation. For the second print, add another line indented the same 4 spaces as the first print."
+        },
+        "guide": [
+          {
+            "step": "Write one instruction per line",
+            "body": "Each statement goes on its own line, with no semicolon needed. Press Enter to start the next one."
+          },
+          {
+            "step": "End block headers with a colon",
+            "body": "Lines like if, for and def finish with a colon. The colon promises an indented block is coming next."
+          },
+          {
+            "step": "Indent the block by 4 spaces",
+            "body": "Everything inside a block lines up at the same indent. Consistent 4-space indents are the Python standard."
+          },
+          {
+            "step": "Add comments with #",
+            "body": "Use # to leave notes for humans. Python ignores everything after the # on that line."
+          },
+          {
+            "step": "Watch your spelling and case",
+            "body": "Python is case-sensitive. print must be lower case, and name is different from Name."
+          }
+        ],
+        "takeaways": [
+          "Syntax is the grammar of Python — the rules for how code is written.",
+          "Indentation (4 spaces) defines which lines belong to a block.",
+          "Block headers like if and for end with a colon.",
+          "Comments start with # and are ignored by Python.",
+          "Python is case-sensitive: print, Print and PRINT are not the same."
+        ]
+      }
+    },
+    {
+      "topic": "Running Python",
+      "title": "Running Python",
+      "order": 2,
+      "language": "python",
+      "body": {
+        "tagline": "Write code, press Run, watch it come alive.",
+        "intro": "Writing code is only half the fun — running it is where the magic happens. When you run a Python program, the computer reads your instructions from the top of the file to the bottom, doing exactly what each line says, in order. In this Playground you type your code, press Run, and the results appear in the output panel below.",
+        "sections": [
+          {
+            "heading": "Top to bottom, in order",
+            "body": "Python is a careful reader. It starts at the very first line and works its way down, one line at a time, never skipping ahead. This means the ORDER you write things in really matters — a value has to be created before you can use it.",
+            "bullets": [
+              "Line 1 runs first, then line 2, then line 3, and so on.",
+              "You must create a variable before the line that uses it.",
+              "Swap two lines around and the output can change completely."
+            ]
+          },
+          {
+            "heading": "How the Playground runs your code",
+            "body": "When you press Run, the Playground hands your whole program to Python, which carries out every line and collects anything you print(). That collected text appears in the output panel so you can read it.",
+            "bullets": [
+              "Press Run to send your code to Python.",
+              "Everything you print() shows up in the output panel.",
+              "No print()? Then even correct code shows nothing — that is normal."
+            ]
+          },
+          {
+            "heading": "Errors are normal (really!)",
+            "body": "Every coder on Earth sees errors constantly — they are not a sign you are bad at this. An error just means Python got confused at one line and stopped so it could tell you where. Fixing errors is a huge part of coding.",
+            "bullets": [
+              "An error pauses the program at the line that confused Python.",
+              "Lines before the error still ran; lines after it did not.",
+              "Seeing an error means you are coding, not failing."
+            ]
+          },
+          {
+            "heading": "Reading a traceback",
+            "body": "When something breaks, Python prints a traceback — a short report about what went wrong. The trick is to read the LAST line first: it names the type of error and gives a short message. The lines above point at where in your code it happened.",
+            "bullets": [
+              "Read the last line first — it names the error and the problem.",
+              "NameError means you used a variable you never created.",
+              "SyntaxError means the shape is wrong, like a missing colon.",
+              "The line number tells you where to start looking."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# Python runs these in order, top to bottom",
+            "print(\"Step 1: wake up\")",
+            "print(\"Step 2: get dressed\")",
+            "print(\"Step 3: eat breakfast\")",
+            "",
+            "score = 0            # create the box first...",
+            "score = score + 10   # ...then we can use it",
+            "print(\"Score is now\", score)",
+            "",
+            "# print(mystery)   # would cause a NameError — try un-commenting it!"
+          ],
+          "caption": "Each line runs top to bottom; the commented last line shows a common error to explore."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# Press Run and watch the lines appear in order.\nprint(\"Loading...\")\nprint(\"Ready!\")\nprint(\"Go!\")\n",
+          "challenge": "Swap two of the print lines and predict how the output changes before you Run. Then remove the quotes from one line and Run again to see a real error message.",
+          "hint": "Order matters, so moving a line moves its output. When you break a line on purpose, read the LAST line of the error first — it names the problem."
+        },
+        "guide": [
+          {
+            "step": "Write your instructions",
+            "body": "Type your code in the editor, one statement per line, in the order you want it to happen."
+          },
+          {
+            "step": "Press Run",
+            "body": "The Playground hands your program to Python, which carries out each line from top to bottom."
+          },
+          {
+            "step": "Read the output panel",
+            "body": "Anything you print() appears below. No print means no visible output — that is expected."
+          },
+          {
+            "step": "Expect the occasional error",
+            "body": "Errors are a normal part of coding. Python stops at the confusing line so it can tell you where to look."
+          },
+          {
+            "step": "Read the traceback bottom-up",
+            "body": "Start at the last line of the error — it names the error and the message — then use the line number to find the spot."
+          }
+        ],
+        "takeaways": [
+          "Python runs your code from the top line to the bottom, in order.",
+          "Order matters — create a value before the line that uses it.",
+          "Press Run and your print() output appears in the panel.",
+          "Errors are normal; they pause the program and point at the problem.",
+          "Read a traceback's last line first to learn what went wrong."
+        ]
+      }
+    },
+    {
+      "topic": "Putting It Together",
+      "title": "Putting It Together",
+      "order": 3,
+      "language": "python",
+      "body": {
+        "tagline": "Build a real little program from all your pieces.",
+        "intro": "This is the moment everything connects. You have met variables, input, output, conditions, loops and functions on their own — now you combine them into one small, complete program that actually does something fun. When you finish this lesson you will have built a real thing you can play with. That is the whole point of coding.",
+        "sections": [
+          {
+            "heading": "The pieces you already have",
+            "body": "A complete program is just your familiar tools working as a team. Before we build, let us name the players so you can spot each one in the finished code.",
+            "bullets": [
+              "Variables store the values your program needs to remember.",
+              "input() asks the player a question; output with print() shows results.",
+              "Conditions (if/elif/else) let the program make decisions.",
+              "Loops repeat steps; functions bundle steps under a reusable name."
+            ]
+          },
+          {
+            "heading": "Wrapping steps in a function",
+            "body": "A function lets you name a bunch of steps and reuse them. Here we build a tiny number-guessing game and tuck the whole thing inside a function called play() so it reads cleanly and could be run again.",
+            "bullets": [
+              "def play(): gives the block of steps a name.",
+              "Everything the game does lives indented inside the function.",
+              "Calling play() at the bottom actually runs the game."
+            ]
+          },
+          {
+            "heading": "Looping until the player wins",
+            "body": "Our game keeps asking for guesses until the player gets it right. A while loop is perfect: it repeats \"while\" the guess is wrong, and stops the moment it is correct.",
+            "bullets": [
+              "while guess != secret: repeats until the guess matches.",
+              "Each pass reads a new guess and gives a hint.",
+              "When the guess is right, the loop ends and we celebrate."
+            ]
+          },
+          {
+            "heading": "Deciding with conditions",
+            "body": "Inside the loop, if/elif/else compares the guess to the secret number and prints a helpful \"too high\" or \"too low\" hint. This is what makes the game feel smart.",
+            "bullets": [
+              "Compare guess with secret to give a direction.",
+              "if too high, elif too low, else it must be correct.",
+              "Good hints turn random guessing into clever play."
+            ]
+          },
+          {
+            "heading": "Runnable now, interactive next",
+            "body": "Real input() waits for a person to type, so the snippet below uses a fixed list of guesses to demonstrate the exact same logic without needing you to type. The tryIt version uses live input() so you can play it for real.",
+            "bullets": [
+              "The snippet simulates guesses so it runs and prints on its own.",
+              "The tryIt version swaps in input() so YOU play it.",
+              "The decision-making logic is identical in both."
+            ]
+          }
+        ],
+        "snippet": {
+          "language": "python",
+          "lines": [
+            "# A tiny number-guessing game — everything working together!",
+            "secret = 7",
+            "guesses = [4, 9, 7]   # pretend the player typed these",
+            "",
+            "def play():",
+            "    for guess in guesses:",
+            "        print(\"You guessed\", guess)",
+            "        if guess > secret:",
+            "            print(\"Too high!\")",
+            "        elif guess < secret:",
+            "            print(\"Too low!\")",
+            "        else:",
+            "            print(\"Correct! You win!\")",
+            "            return",
+            "",
+            "play()   # run the game"
+          ],
+          "caption": "Variables, a list, a function, a loop and if/elif/else — one complete program."
+        },
+        "tryIt": {
+          "language": "python",
+          "starter": "# The REAL game — type your guesses in the input box, then Run.\nsecret = 7\nguess = 0\n\nwhile guess != secret:\n    guess = int(input(\"Guess a number 1-10: \"))\n    if guess > secret:\n        print(\"Too high!\")\n    elif guess < secret:\n        print(\"Too low!\")\n\nprint(\"Correct! You win!\")\n",
+          "challenge": "Add a counter that starts at 0 and goes up by 1 each guess, then print how many tries it took to win.",
+          "hint": "Before the loop write tries = 0. Inside the loop add tries = tries + 1. After the loop print(\"You won in\", tries, \"tries!\"). Remember to type each guess in the input box."
+        },
+        "guide": [
+          {
+            "step": "Gather your pieces",
+            "body": "List what the program needs: variables to remember, input to ask, conditions to decide, a loop to repeat, and print to show results."
+          },
+          {
+            "step": "Set up your variables",
+            "body": "Create the values the program starts with, like a secret number and a first guess, before the action begins."
+          },
+          {
+            "step": "Loop until the goal is met",
+            "body": "Use a while loop that keeps asking until the guess is correct, so the game does not stop too early."
+          },
+          {
+            "step": "Decide with conditions",
+            "body": "Inside the loop, use if/elif/else to compare the guess and give a helpful \"too high\" or \"too low\" hint."
+          },
+          {
+            "step": "Show a satisfying result",
+            "body": "When the loop ends, print a clear win message so the player knows they succeeded."
+          },
+          {
+            "step": "Tweak and make it yours",
+            "body": "Change the secret number, add a try counter, or wrap it in a function. Small tweaks turn an example into your own creation."
+          }
+        ],
+        "takeaways": [
+          "A real program is your small pieces working together as a team.",
+          "Variables, input, conditions, loops and functions each play a role.",
+          "A while loop repeats until a goal is reached, then stops.",
+          "if/elif/else lets the program respond smartly to the player.",
+          "Start from a working example, then tweak it into something of your own."
+        ]
+      }
+    }
+  ]
+}

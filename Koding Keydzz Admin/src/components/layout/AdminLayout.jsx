@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
@@ -18,6 +18,12 @@ import {
   Building2,
   Gauge,
   KeyRound,
+  Globe,
+  School,
+  GraduationCap,
+  ScrollText,
+  FileQuestion,
+  ClipboardCheck,
 } from 'lucide-react';
 import AnimatedIcon from '../ui/AnimatedIcon';
 import {
@@ -25,33 +31,90 @@ import {
   selectAdminName,
   selectAuth,
   selectRole,
+  selectCapabilities,
 } from '../../features/auth/authSlice';
+import { useLogoutMutation } from '../../features/auth/authApi';
 
-const adminNav = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/organization', label: 'My Organization', icon: Building2 },
-  { to: '/students', label: 'Students', icon: Users },
-  { to: '/courses', label: 'Courses', icon: BookOpen },
-  { to: '/challenges', label: 'Challenges', icon: Swords },
-  { to: '/quizzes', label: 'Quizzes', icon: HelpCircle },
-  { to: '/achievements', label: 'Achievements', icon: Award },
-  { to: '/shop-items', label: 'Shop & Avatars', icon: ShoppingBag },
-  { to: '/leaderboards', label: 'Leaderboards', icon: Trophy },
-  { to: '/notifications', label: 'Notifications', icon: Bell },
+/**
+ * Navigation is CAPABILITY-DRIVEN, grouped, and labelled in school language.
+ *
+ * Each item declares the capability it needs; items the signed-in user cannot
+ * use are not rendered, so a teacher never sees a "Teachers & administrators"
+ * link that would only return 403. Curriculum items are `content:read` — org
+ * staff can look at the curriculum but only the platform owner may change it.
+ *
+ * Grouping matters for the audience: these are teachers and school office
+ * staff, and a flat list of eleven links is harder to scan than three short
+ * labelled groups.
+ *
+ * `orgOnly: true` marks a TENANT-SCOPED destination. A capability alone is not
+ * enough for these: the superadmin holds `staff:read` (so it can manage a
+ * school's staff through /superadmin/orgs/:id) but is tenant-less, so the
+ * org-scoped /staff route rejects it with a 403. Without this flag the
+ * platform owner was shown a link that could only fail — the precise thing
+ * capability-driven navigation exists to prevent.
+ */
+const NAV_GROUPS = [
+  {
+    label: null, // ungrouped, sits at the top
+    items: [
+      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, cap: 'student:read', orgOnly: true },
+      { to: '/superadmin', label: 'Platform overview', icon: Gauge, end: true, cap: 'platform:analytics' },
+    ],
+  },
+  {
+    label: 'My school',
+    items: [
+      { to: '/students', label: 'Students', icon: Users, cap: 'student:read', orgOnly: true },
+      { to: '/classrooms', label: 'Classes', icon: School, cap: 'classroom:read', orgOnly: true },
+      { to: '/test-results', label: 'Final test results', icon: ClipboardCheck, cap: 'student:read', orgOnly: true },
+      { to: '/staff', label: 'Teachers & admins', icon: GraduationCap, cap: 'staff:read', orgOnly: true },
+      { to: '/organization', label: 'School details', icon: Building2, cap: 'audit:org', orgOnly: true },
+      { to: '/notifications', label: 'Announcements', icon: Bell, cap: 'announce:class', orgOnly: true },
+      { to: '/audit', label: 'Activity log', icon: ScrollText, cap: 'audit:org', orgOnly: true },
+    ],
+  },
+  {
+    label: 'Platform',
+    items: [
+      { to: '/superadmin/orgs', label: 'Schools', icon: Building2, cap: 'org:list_all' },
+      { to: '/superadmin/students', label: 'All students', icon: Users, cap: 'org:list_all' },
+      // Superadmin-only, and grouped with the platform pages rather than the
+      // curriculum ones: the bank holds the mark scheme for every final test.
+      { to: '/superadmin/questions', label: 'Question bank', icon: FileQuestion, cap: 'org:list_all' },
+    ],
+  },
+  {
+    label: 'Curriculum',
+    items: [
+      { to: '/worlds', label: 'Worlds', icon: Globe, cap: 'content:read' },
+      { to: '/courses', label: 'Courses', icon: BookOpen, cap: 'content:read' },
+      { to: '/challenges', label: 'Challenges', icon: Swords, cap: 'content:read' },
+      { to: '/quizzes', label: 'Quizzes', icon: HelpCircle, cap: 'content:read' },
+      { to: '/achievements', label: 'Achievements', icon: Award, cap: 'content:read' },
+      { to: '/shop-items', label: 'Shop & avatars', icon: ShoppingBag, cap: 'content:read' },
+      { to: '/leaderboards', label: 'Leaderboards', icon: Trophy, cap: 'student:read', orgOnly: true },
+    ],
+  },
 ];
 
-const superadminNav = [
-  { to: '/superadmin', label: 'Analytics', icon: Gauge, end: true },
-  { to: '/superadmin/orgs', label: 'Organizations', icon: Building2 },
-  { to: '/superadmin/students', label: 'All Students', icon: Users },
-  { to: '/courses', label: 'Courses', icon: BookOpen },
-  { to: '/challenges', label: 'Challenges', icon: Swords },
-  { to: '/quizzes', label: 'Quizzes', icon: HelpCircle },
-  { to: '/achievements', label: 'Achievements', icon: Award },
-  { to: '/shop-items', label: 'Shop & Avatars', icon: ShoppingBag },
-  { to: '/leaderboards', label: 'Leaderboards', icon: Trophy },
-  { to: '/notifications', label: 'Notifications', icon: Bell },
-];
+/**
+ * Keep only the groups and items this user can actually reach.
+ *
+ * Two conditions, both required:
+ *   • the capability, from the server's permission map;
+ *   • an organization, for anything tenant-scoped (`orgOnly`).
+ */
+function visibleGroups(capabilities, hasOrg) {
+  const reachable = (item) => {
+    if (item.cap && !capabilities.includes(item.cap)) return false;
+    if (item.orgOnly && !hasOrg) return false;
+    return true;
+  };
+  return NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(reachable) })).filter(
+    (g) => g.items.length > 0
+  );
+}
 
 export default function AdminLayout() {
   const dispatch = useDispatch();
@@ -59,14 +122,51 @@ export default function AdminLayout() {
   const adminName = useSelector(selectAdminName);
   const { user } = useSelector(selectAuth);
   const role = useSelector(selectRole);
+  const refreshToken = useSelector((state) => state.auth?.refreshToken);
+  const [revokeSession] = useLogoutMutation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const isSuper = role === 'superadmin';
-  const nav = isSuper ? superadminNav : adminNav;
-  const roleLabel = isSuper ? 'Super Admin' : 'Administrator';
-  const portalLabel = isSuper ? 'Super Admin' : 'Admin Portal';
+  /**
+   * Escape closes the mobile drawer.
+   *
+   * It had none: the only way to dismiss the drawer was clicking the backdrop,
+   * which a keyboard user cannot do. Opening the menu on a tablet therefore
+   * trapped them in it.
+   */
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMobileOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileOpen]);
 
-  const handleLogout = () => {
+  const capabilities = useSelector(selectCapabilities);
+  const isSuper = role === 'superadmin';
+  // Navigation is derived from the caller's capabilities, so introducing the
+  // faculty role required no branching here.
+  const groups = visibleGroups(capabilities, Boolean(user?.org?.id));
+
+  // Role labels in the words a school uses, not the words the database uses.
+  const roleLabel =
+    role === 'superadmin'
+      ? 'Platform owner'
+      : role === 'admin'
+        ? 'Administrator'
+        : role === 'faculty'
+          ? 'Teacher'
+          : 'Staff';
+  const portalLabel = isSuper ? 'Platform console' : user?.org?.name || 'School portal';
+
+  const handleLogout = async () => {
+    // Revoke server-side first so the refresh token can't be reused, then
+    // clear local state regardless of the network result.
+    try {
+      if (refreshToken) await revokeSession(refreshToken).unwrap();
+    } catch {
+      /* offline or already expired — still sign out locally */
+    }
     dispatch(logout());
     navigate('/login', { replace: true });
   };
@@ -85,38 +185,59 @@ export default function AdminLayout() {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3">
-        {nav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) =>
-              `group flex min-w-0 items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors duration-150 ease-out active:scale-[0.98] ${
-                isActive
-                  ? 'bg-turmeric text-malt shadow-glow'
-                  : 'text-text-secondary hover:bg-surface hover:text-text-primary'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <AnimatedIcon
-                  icon={item.icon}
-                  size={18}
-                  animation={isActive ? 'pulse' : 'hover'}
-                  glow={isActive}
-                  className={`shrink-0 ${isActive ? 'text-malt' : ''}`}
-                />
-                <span className="truncate">{item.label}</span>
-              </>
+      <nav className="flex-1 overflow-y-auto px-3 pb-2" aria-label="Main navigation">
+        {groups.map((group, gi) => (
+          <div key={group.label || `top-${gi}`} className="mb-3">
+            {group.label && (
+              <h2 className="px-4 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-wider text-text-secondary/70">
+                {group.label}
+              </h2>
             )}
-          </NavLink>
+            <div className="space-y-1">
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    `group flex min-w-0 items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out active:scale-[0.98] ${
+                      isActive
+                        ? 'bg-turmeric text-malt shadow-glow'
+                        : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <AnimatedIcon
+                        icon={item.icon}
+                        size={18}
+                        animation={isActive ? 'pulse' : 'hover'}
+                        glow={isActive}
+                        className={`shrink-0 ${isActive ? 'text-malt' : ''}`}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
       <div className="border-t border-k-border p-3">
+        {/* Every staff account can now change its own password, so there has to
+            be a way to reach the screen without being forced there. */}
+        <NavLink
+          to="/change-password"
+          onClick={() => setMobileOpen(false)}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-text-primary active:scale-[0.98]"
+        >
+          <AnimatedIcon icon={KeyRound} size={18} animation="hover" />
+          Change password
+        </NavLink>
         <button
           onClick={handleLogout}
           aria-label="Logout"
@@ -131,6 +252,20 @@ export default function AdminLayout() {
 
   return (
     <div className="flex min-h-screen bg-malt">
+      {/*
+        SKIP LINK — the first focusable thing on the page.
+        Staff use assistive technology too: a teacher should not have to tab
+        through the whole sidebar to reach a roster. Visually hidden until
+        focused, then shown — `sr-only` alone would make it a trap nobody can
+        see. Mirrors the student app's, added at the same time.
+      */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:border focus:border-turmeric focus:bg-card focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-turmeric"
+      >
+        Skip to main content
+      </a>
+
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-k-border bg-card lg:flex">
         <SidebarContent />
@@ -139,7 +274,14 @@ export default function AdminLayout() {
       {/* Mobile sidebar */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
+          {/*
+            Decorative: a convenience for pointer users. Keyboard users close
+            the drawer with Escape (wired above) — which it previously had NO
+            handler for, making this unlabelled div the only way to dismiss it
+            and leaving keyboard users stuck in an open drawer.
+          */}
           <div
+            aria-hidden="true"
             className="absolute inset-0 bg-black/60"
             onClick={() => setMobileOpen(false)}
           />
@@ -182,7 +324,7 @@ export default function AdminLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6">
+        <main id="main-content" className="flex-1 p-4 sm:p-6">
           <Outlet />
         </main>
       </div>

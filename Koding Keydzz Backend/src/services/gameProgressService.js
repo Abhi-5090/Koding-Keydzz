@@ -2,8 +2,10 @@ import { userRepository } from '../repositories/userRepository.js';
 import { gameScoreRepository } from '../repositories/gameScoreRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { computeLevel } from '../utils/xp.js';
+import { recordLearningActivity } from './streakService.js';
 import { computeGameAward } from '../utils/economy.js';
 import { isBetterScore } from '../utils/leaderboard.js';
+import { validateCompletion } from '../config/gameCatalog.js';
 import { createNotification } from './notificationService.js';
 import { checkAndUnlockAchievements } from './achievementService.js';
 
@@ -70,10 +72,16 @@ async function recordGameScore(user, { gameKey, levelId, stars, moves, timeMs })
  * by difficulty on first completion, grant a one-time 3-star bonus, recompute
  * level, update cumulative counters, run achievement checks, and notify.
  */
-export async function completeGameLevel(
-  userId,
-  { gameKey, levelId, difficulty, stars, moves, timeMs }
-) {
+export async function completeGameLevel(userId, payload) {
+  // Validate against the server-side catalogue FIRST. This rejects fabricated
+  // games/levels and implausible metrics, and — critically — returns the two
+  // values that decide the payout from the SERVER rather than the request:
+  // `difficulty` from the catalogue, and `stars` graded from the reported
+  // run counters (config/starPolicy.js). Whatever the body claimed for either
+  // is discarded here.
+  const { gameKey, levelId, difficulty, stars, moves, timeMs } =
+    validateCompletion(payload);
+
   const user = await userRepository.findById(userId);
   if (!user) throw ApiError.notFound('User not found');
 
@@ -108,8 +116,12 @@ export async function completeGameLevel(
     user.xp += awarded.xp;
     user.coins += awarded.coins;
     user.totalCoinsEarned += awarded.coins;
-    user.level = computeLevel(user.xp);
   }
+
+  // Clearing a game level is learning activity, so it keeps the streak alive.
+  // Before computeLevel, because the bonus is XP.
+  const streak = await recordLearningActivity(user);
+  user.level = computeLevel(user.xp);
 
   await user.save();
 
@@ -137,6 +149,9 @@ export async function completeGameLevel(
 
   return {
     awarded,
+    // Echo back the difficulty the server actually paid out at, so the client
+    // never has to guess (and so a mismatch is visible in the response).
+    difficulty,
     alreadyCompleted,
     bestStars,
     totalXp: user.xp,

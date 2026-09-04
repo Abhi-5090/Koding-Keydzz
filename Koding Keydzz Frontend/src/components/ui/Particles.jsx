@@ -30,7 +30,9 @@ export default function Particles({ count = 24, className = '' }) {
             left: `${p.left}%`,
             top: `${p.top}%`,
             fontSize: p.size,
-            opacity: p.opacity,
+            // Scaled by the theme: the same speck density that reads as
+            // depth on deep navy reads as dust on parchment.
+            opacity: `calc(${p.opacity} * var(--deco-opacity-mult, 1))`,
           }}
           animate={{ y: [0, -40, 0], rotate: [0, 12, -12, 0] }}
           transition={{ duration: p.duration, repeat: Infinity, delay: p.delay, ease: 'easeInOut' }}

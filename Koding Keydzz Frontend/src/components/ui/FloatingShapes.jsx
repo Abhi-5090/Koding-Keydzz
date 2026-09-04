@@ -18,7 +18,16 @@ export default function FloatingShapes({ className = '' }) {
       {SHAPES.map((s, i) => (
         <motion.div
           key={i}
-          className="absolute text-turmeric opacity-60 drop-shadow-[0_0_18px_rgba(255,96,47,0.5)]"
+          /* Decoration tuned for a DARK ground. On the light parchment the
+             same 60% ember reads as clutter instead of atmosphere, and the
+             halo reads as smudge — so both are scaled by the theme:
+             --deco-opacity and --glow-strength (see theme.css). */
+          className="absolute text-turmeric"
+          style={{
+            opacity: 'var(--deco-opacity, 0.6)',
+            filter:
+              'drop-shadow(0 0 calc(18px * var(--glow-strength, 1)) rgb(var(--c-ember) / 0.5))',
+          }}
           style={{ left: s.x, top: s.y }}
           animate={{ y: [0, -28, 0], rotate: [0, 8, -8, 0] }}
           transition={{ duration: s.dur, repeat: Infinity, ease: 'easeInOut' }}

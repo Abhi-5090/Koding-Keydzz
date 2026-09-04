@@ -13,6 +13,7 @@ import FormField from '../components/ui/FormField';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import PageHeader from '../components/ui/PageHeader';
 import QueryState from '../components/ui/QueryState';
+import { formatApiError } from '../utils/apiError';
 
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 const emptyChallenge = {
@@ -79,7 +80,7 @@ export default function Challenges() {
       }
       setModal(null);
     } catch (err) {
-      setFormError(err?.data?.message || 'Could not save the challenge. Please try again.');
+      setFormError(formatApiError(err, 'Could not save the challenge. Please try again.'));
     }
   };
 
@@ -107,7 +108,7 @@ export default function Challenges() {
       render: (r) => (
         <div className="min-w-0 max-w-xs">
           <p className="truncate font-medium text-text-primary">{r.title}</p>
-          <p className="truncate text-xs text-text-secondary/60">{r.description}</p>
+          <p className="truncate text-xs text-text-secondary/70">{r.description}</p>
         </div>
       ),
     },
@@ -140,7 +141,7 @@ export default function Challenges() {
             Daily
           </span>
         ) : (
-          <span className="text-xs text-text-secondary/50">—</span>
+          <span className="text-xs text-text-secondary/70">—</span>
         ),
     },
     {

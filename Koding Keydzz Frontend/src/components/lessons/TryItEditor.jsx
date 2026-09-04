@@ -15,7 +15,8 @@ import { runCode, isPythonReady } from '../../features/playground/runners'
  *
  * Props:
  *   starter:    string   initial code
- *   language?:  'python' | 'javascript'  (default python)
+ *   language?:  'python'  (the only runnable language — see
+ *               features/playground/runners.js)
  *   challenge?: string   the task shown above the editor
  *   hint?:      string   revealed on demand
  *   tint?:      string   world accent for headings/buttons
@@ -123,7 +124,7 @@ export default function TryItEditor({
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={Math.min(Math.max(code.split('\n').length, 4), 16)}
-          className="scrollbar-thin block w-full resize-y bg-transparent p-3 font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-secondary/50 focus:outline-none"
+          className="scrollbar-thin block w-full resize-y bg-transparent p-3 font-mono text-[13px] leading-relaxed text-text-primary placeholder:text-text-secondary/70 focus:outline-none"
           aria-label="Code editor"
         />
       </div>
@@ -131,15 +132,26 @@ export default function TryItEditor({
       {/* Optional program input for input()-driven code */}
       {needsStdin && (
         <div className="mt-3">
-          <label className="game-text mb-1 block text-xs text-text-secondary">
+          {/*
+            `htmlFor` paired with the textarea's `id`.
+            It looked like a label and was not one: text merely sitting beside
+            a box is not connected to it, so clicking it did nothing and a
+            screen reader announced only "edit text". This is the exact mistake
+            the HTML course teaches against.
+          */}
+          <label
+            htmlFor="tryit-stdin"
+            className="game-text mb-1 block text-xs text-text-secondary"
+          >
             Program input (one answer per line)
           </label>
           <textarea
+            id="tryit-stdin"
             value={stdin}
             onChange={(e) => setStdin(e.target.value)}
             rows={2}
             placeholder="Type what the player would answer here…"
-            className="scrollbar-thin block w-full resize-y rounded-lg border border-k-border bg-malt/60 p-2 font-mono text-xs text-text-primary placeholder:text-text-secondary/50 focus:outline-none"
+            className="scrollbar-thin block w-full resize-y rounded-lg border border-k-border bg-malt/60 p-2 font-mono text-xs text-text-primary placeholder:text-text-secondary/70 focus:outline-none"
           />
         </div>
       )}
@@ -210,7 +222,7 @@ export default function TryItEditor({
         </div>
         <div className="scrollbar-thin max-h-40 min-h-[3rem] overflow-auto p-3 font-mono text-[13px]">
           {!ran && !running && (
-            <p className="text-text-secondary/60">Press Run to see your output here.</p>
+            <p className="text-text-secondary/70">Press Run to see your output here.</p>
           )}
           {loadingPython && (
             <p className="flex items-center gap-1.5" style={{ color: tint }}>

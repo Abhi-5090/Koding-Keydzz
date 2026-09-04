@@ -18,7 +18,11 @@ const embeddedQuestionSchema = new mongoose.Schema(
 
 const quizSchema = new mongoose.Schema(
   {
-    lesson: { type: mongoose.Schema.Types.ObjectId, ref: 'Lesson', required: true },
+    // Content is platform-level. A quiz is usually attached to a lesson (whose
+    // world it inherits), but admins may also create a stand-alone quiz and pin
+    // it directly to a world — hence both refs are optional.
+    lesson: { type: mongoose.Schema.Types.ObjectId, ref: 'Lesson', default: null },
+    world: { type: mongoose.Schema.Types.ObjectId, ref: 'World', default: null },
     title: { type: String, default: 'Quiz' },
     type: {
       type: String,

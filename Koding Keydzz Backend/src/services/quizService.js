@@ -4,6 +4,7 @@ import { userRepository } from '../repositories/userRepository.js';
 import { QuizAttempt } from '../models/QuizAttempt.js';
 import { ApiError } from '../utils/ApiError.js';
 import { computeLevel } from '../utils/xp.js';
+import { recordLearningActivity } from './streakService.js';
 import { QUIZ_AWARD } from '../utils/economy.js';
 import { createNotification } from './notificationService.js';
 import { checkAndUnlockAchievements } from './achievementService.js';
@@ -11,6 +12,11 @@ import { checkAndUnlockAchievements } from './achievementService.js';
 const PASS_THRESHOLD = 0.7; // 70%
 const PASS_XP = QUIZ_AWARD.xp; // 50
 const PASS_COINS = QUIZ_AWARD.coins; // 15
+
+// After this many attempts, per-question feedback is shown even on a fail, so a
+// struggling student isn't left with no signal at all. Below it, feedback is
+// withheld on failed attempts to stop the quiz being brute-forced.
+export const MAX_FEEDBACK_ATTEMPTS = 3;
 
 /* -------------------------------------------------------------------------- */
 /* Pure grading helpers (exported for unit testing).                          */
@@ -210,54 +216,82 @@ export async function listQuizzes() {
   });
 }
 
+/**
+ * Grade and record a quiz submission.
+ *
+ * RETRIES ARE ALLOWED AND CREDITED. Previously XP was gated on `firstAttempt`,
+ * so a child who failed once could never earn that quiz's credit and the
+ * teacher only ever saw the failing score. Now:
+ *
+ *   • every attempt is recorded (attempt history for reporting);
+ *   • XP/coins are granted on the first PASSING attempt, whenever it happens;
+ *   • the award is still idempotent — a second pass pays nothing, tracked by
+ *     the `awarded` flag rather than by attempt ordinality.
+ *
+ * Per-question feedback is withheld until the student has passed or has used up
+ * MAX_FEEDBACK_ATTEMPTS, so the quiz can't be reduced to brute-forcing the
+ * answer key by resubmitting.
+ */
 export async function submitQuiz(userId, quizId, answers = {}) {
   const quiz = await quizRepository.findById(quizId);
   if (!quiz) throw ApiError.notFound('Quiz not found');
 
   const graded = gradeQuiz(quiz.questions, answers);
 
-  // Idempotent award: only grant XP/coins the first time this user attempts it.
-  const existing = await quizAttemptRepository.findByUserAndQuiz(userId, quizId);
-  const firstAttempt = !existing;
-  const xpEarned = firstAttempt && graded.passed ? PASS_XP : 0;
-  const coinsEarned = firstAttempt && graded.passed ? PASS_COINS : 0;
+  const [priorCount, alreadyAwarded] = await Promise.all([
+    quizAttemptRepository.countByUserAndQuiz(userId, quizId),
+    quizAttemptRepository.findAwardedByUserAndQuiz(userId, quizId),
+  ]);
 
-  if (firstAttempt) {
-    await QuizAttempt.create({
-      user: userId,
-      quiz: quizId,
-      score: graded.score,
-      total: graded.total,
-      correctCount: graded.correctCount,
-      passed: graded.passed,
-      xpEarned,
-    });
+  const attemptNumber = priorCount + 1;
+  // Pay out on the first pass — not the first attempt.
+  const shouldAward = graded.passed && !alreadyAwarded;
+  const xpEarned = shouldAward ? PASS_XP : 0;
+  const coinsEarned = shouldAward ? PASS_COINS : 0;
 
-    // A first passing attempt persists XP/coins to the user, increments the
-    // lifetime quizzesPassed + totalCoinsEarned counters, and runs achievement
-    // checks. (xpEarned/coinsEarned are non-zero only when firstAttempt+passed.)
-    if (graded.passed) {
-      const user = await userRepository.findById(userId);
-      if (user) {
-        const previousLevel = user.level;
-        user.xp += xpEarned;
-        user.coins += coinsEarned;
-        user.totalCoinsEarned += coinsEarned;
-        user.quizzesPassed += 1;
-        user.level = computeLevel(user.xp);
-        await user.save();
-        if (user.level > previousLevel) {
-          await createNotification(user._id, {
-            type: 'levelup',
-            title: 'Level Up!',
-            body: `Congratulations! You reached level ${user.level}.`,
-            meta: { level: user.level },
-          });
-        }
-        await checkAndUnlockAchievements(user);
+  await QuizAttempt.create({
+    user: userId,
+    quiz: quizId,
+    attemptNumber,
+    score: graded.score,
+    total: graded.total,
+    correctCount: graded.correctCount,
+    passed: graded.passed,
+    xpEarned,
+    coinsEarned,
+    awarded: shouldAward,
+  });
+
+  let leveledUp = false;
+  if (shouldAward) {
+    const user = await userRepository.findById(userId);
+    if (user) {
+      const previousLevel = user.level;
+      user.xp += xpEarned;
+      user.coins += coinsEarned;
+      user.totalCoinsEarned += coinsEarned;
+      user.quizzesPassed += 1;
+      // Passing a quiz keeps the streak alive. Before computeLevel: the streak
+      // bonus is XP and must count toward the level in the same response.
+      await recordLearningActivity(user);
+      user.level = computeLevel(user.xp);
+      await user.save();
+      leveledUp = user.level > previousLevel;
+      if (leveledUp) {
+        await createNotification(user._id, {
+          type: 'levelup',
+          title: 'Level Up!',
+          body: `Congratulations! You reached level ${user.level}.`,
+          meta: { level: user.level },
+        });
       }
+      await checkAndUnlockAchievements(user);
     }
   }
+
+  // Reveal which questions were right only once it can no longer be used to
+  // farm the answer key.
+  const revealFeedback = graded.passed || attemptNumber >= MAX_FEEDBACK_ATTEMPTS;
 
   return {
     score: graded.score,
@@ -266,13 +300,37 @@ export async function submitQuiz(userId, quizId, answers = {}) {
     passed: graded.passed,
     xpEarned,
     coinsEarned,
+    leveledUp,
     pending: graded.hasPending,
-    alreadyAttempted: !firstAttempt,
-    perQuestion: graded.perQuestion.map(({ questionId, correct }) => ({
-      questionId,
-      correct,
-    })),
+    attemptNumber,
+    // True when this quiz's credit was earned on an earlier attempt. Retries
+    // are still graded and recorded — they just don't pay twice.
+    alreadyAwarded: Boolean(alreadyAwarded),
+    // Kept for backward compatibility with existing clients.
+    alreadyAttempted: priorCount > 0,
+    feedbackRevealed: revealFeedback,
+    perQuestion: revealFeedback
+      ? graded.perQuestion.map(({ questionId, correct }) => ({ questionId, correct }))
+      : [],
   };
+}
+
+/**
+ * Attempt history for one student on one quiz — the teacher-facing view that
+ * was impossible before, since only the first attempt was stored.
+ */
+export async function getAttemptHistory(userId, quizId) {
+  const attempts = await quizAttemptRepository.listByUserAndQuiz(userId, quizId);
+  return attempts.map((a) => ({
+    attemptNumber: a.attemptNumber,
+    score: a.score,
+    total: a.total,
+    percent: a.total > 0 ? Math.round((a.score / a.total) * 100) : 0,
+    correctCount: a.correctCount,
+    passed: a.passed,
+    awarded: a.awarded,
+    at: a.createdAt,
+  }));
 }
 
 export default {
@@ -287,4 +345,6 @@ export default {
   countQuestionTypes,
   listQuizzes,
   submitQuiz,
+  getAttemptHistory,
+  MAX_FEEDBACK_ATTEMPTS,
 };

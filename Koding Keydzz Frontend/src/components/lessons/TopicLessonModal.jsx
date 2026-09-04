@@ -9,11 +9,12 @@ import {
   PartyPopper,
   CheckCircle2,
   GraduationCap,
+  Loader2,
+  Hourglass,
 } from 'lucide-react'
 import CodeReveal from './CodeReveal'
 import TryItEditor from './TryItEditor'
 import Confetti from '../ui/Confetti'
-import { isTopicComplete } from '../../features/lessons/lessonProgress'
 
 const EASE_OUT = [0.23, 1, 0.32, 1]
 
@@ -38,32 +39,37 @@ const EASE_OUT = [0.23, 1, 0.32, 1]
  * Props:
  *   slug, topic       identify the lesson
  *   tint              world accent colour
- *   lesson            the authored lesson object (may be null → graceful stub)
+ *   lesson            the DB lesson object `{ title, ...body }` (null when the
+ *                     API has none for this topic → graceful empty state)
+ *   loading           lessons query still in flight → show a spinner
+ *   error             lessons query failed → surface a light error note
+ *   alreadyComplete   was this session already done? (derived from the API)
  *   layoutId          shared-element id matching the originating card
- *   onComplete(topic) fired on "Got it!" — parent marks the session complete
+ *   onComplete(topic) fired on "Got it!" — parent reports completion to backend
  *   onClose()         close handler (parent unmounts via AnimatePresence)
  */
-export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson, layoutId, onComplete, onClose }) {
+export default function TopicLessonModal({
+  slug,
+  topic,
+  tint = '#FF602F',
+  lesson,
+  loading = false,
+  error = false,
+  alreadyComplete = false,
+  layoutId,
+  onComplete,
+  onClose,
+}) {
   const reduce = useReducedMotion()
   const [guideStep, setGuideStep] = useState(1)
   const [celebrate, setCelebrate] = useState(false)
-  // Was this session already completed before opening? (Re-reading is harmless.)
-  const [alreadyComplete] = useState(() => isTopicComplete(slug, topic))
 
-  // Graceful fallback if a topic has no authored lesson yet.
-  const data = lesson || {
-    title: topic,
-    tagline: 'A fresh lesson is being prepared for this topic.',
-    intro:
-      'We are still writing the full lesson for this topic. In the meantime, explore the playground to experiment with code, and check back soon for the complete guide!',
-    sections: [],
-    snippet: null,
-    tryIt: null,
-    guide: [{ step: 'Coming soon', body: 'The step-by-step guide for this topic is on its way.' }],
-    takeaways: ['This lesson is coming soon — keep exploring the other realms!'],
-  }
-
-  const guide = data.guide || []
+  // API-only content: no hardcoded fallback. When the lesson is missing we show
+  // a graceful "being prepared" state; while loading we show a spinner.
+  const data = lesson
+  const hasLesson = !!data
+  const title = data?.title || topic
+  const guide = data?.guide || []
   const guideComplete = guideStep >= guide.length
 
   // Esc to close + lock body scroll while open.
@@ -95,7 +101,7 @@ export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`Lesson: ${data.title}`}
+      aria-label={`Lesson: ${title}`}
     >
       {/* backdrop */}
       <motion.div
@@ -152,10 +158,12 @@ export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson
               <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: `${tint}22`, color: tint, border: `1.5px solid ${tint}` }}>
                 <GraduationCap size={26} />
               </div>
-              <h2 className="font-heading text-3xl font-extrabold sm:text-4xl" style={{ color: tint }}>
-                {data.title}
+              <h2 className="font-heading text-3xl font-extrabold sm:text-4xl capitalize" style={{ color: tint }}>
+                {title}
               </h2>
-              <p className="game-text mt-1 text-base text-text-primary/90">{data.tagline}</p>
+              {data?.tagline && (
+                <p className="game-text mt-1 text-base text-text-primary/90">{data.tagline}</p>
+              )}
               {alreadyComplete && (
                 <span
                   className="game-text mt-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold"
@@ -168,9 +176,34 @@ export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson
               <div className="mt-4 h-1 w-24 rounded-full" style={{ background: tint }} />
             </div>
 
+            {loading ? (
+              /* LOADING — lessons query still in flight. */
+              <div className="flex flex-col items-center justify-center gap-4 px-6 py-20 text-center">
+                <Loader2 size={40} className="animate-spin" style={{ color: tint }} />
+                <p className="game-text text-sm text-text-secondary">Opening this lesson…</p>
+              </div>
+            ) : !hasLesson ? (
+              /* EMPTY — no authored lesson exists for this topic yet. */
+              <div className="flex flex-col items-center justify-center gap-4 px-6 py-20 text-center">
+                <div
+                  className="flex h-16 w-16 items-center justify-center rounded-2xl"
+                  style={{ background: `${tint}18`, color: tint, border: `1.5px solid ${tint}55` }}
+                >
+                  <Hourglass size={30} />
+                </div>
+                <h3 className="game-text text-lg font-bold text-text-primary">This lesson is being prepared</h3>
+                <p className="max-w-sm text-sm leading-relaxed text-text-secondary">
+                  {error
+                    ? 'We could not load this lesson right now. Please close and try again in a moment.'
+                    : 'Our mentors are still crafting this session. Explore the other topics and check back soon!'}
+                </p>
+              </div>
+            ) : (
             <div className="space-y-8 px-6 pb-8 sm:px-8">
               {/* INTRO */}
-              <p className="text-[15px] leading-relaxed text-text-primary/90">{data.intro}</p>
+              {data.intro && (
+                <p className="text-[15px] leading-relaxed text-text-primary/90">{data.intro}</p>
+              )}
 
               {/* SECTIONS */}
               {data.sections && data.sections.length > 0 && (
@@ -318,6 +351,7 @@ export default function TopicLessonModal({ slug, topic, tint = '#FF602F', lesson
                 </div>
               )}
             </div>
+            )}
           </div>
         </motion.div>
       </motion.div>

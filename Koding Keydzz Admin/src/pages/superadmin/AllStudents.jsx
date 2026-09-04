@@ -3,15 +3,21 @@ import {
   Ban,
   CheckCircle2,
   KeyRound,
+  Eye,
+  Pencil,
+  Trash2,
   Search,
   Users as UsersIcon,
   AlertTriangle,
   Copy,
   Check,
+  Building2,
 } from 'lucide-react';
 import {
   useGetSuperStudentsQuery,
   useSuspendSuperStudentMutation,
+  useUpdateSuperStudentMutation,
+  useDeleteSuperStudentMutation,
   useResetSuperStudentPasswordMutation,
 } from '../../features/superadmin/superadminApi';
 import DataTable from '../../components/ui/DataTable';
@@ -20,6 +26,10 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Button from '../../components/ui/Button';
 import PageHeader from '../../components/ui/PageHeader';
 import QueryState from '../../components/ui/QueryState';
+import StudentDetailModal from '../../components/students/StudentDetailModal';
+import StudentEditModal from '../../components/students/StudentEditModal';
+import AssignOrgModal from '../../components/org/AssignOrgModal';
+import { formatApiError } from '../../utils/apiError';
 
 function StatusBadge({ status }) {
   const map = {
@@ -50,6 +60,8 @@ export default function AllStudents() {
     org: org || undefined,
   });
   const [suspendStudent, { isLoading: suspending }] = useSuspendSuperStudentMutation();
+  const [updateStudent, { isLoading: updating }] = useUpdateSuperStudentMutation();
+  const [deleteStudent, { isLoading: deleting }] = useDeleteSuperStudentMutation();
   const [resetPassword, { isLoading: resetting }] = useResetSuperStudentPasswordMutation();
 
   const students = asList(data);
@@ -63,6 +75,10 @@ export default function AllStudents() {
     return Array.from(set.values()).sort();
   }, [students]);
 
+  const [viewing, setViewing] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [assignTarget, setAssignTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [confirmTarget, setConfirmTarget] = useState(null);
   const [resetTarget, setResetTarget] = useState(null);
   const [resetResult, setResetResult] = useState(null);
@@ -77,6 +93,15 @@ export default function AllStudents() {
       /* table reflects server state */
     }
     setConfirmTarget(null);
+  };
+
+  const doDelete = async () => {
+    try {
+      await deleteStudent(deleteTarget.id).unwrap();
+    } catch {
+      /* table reflects server state */
+    }
+    setDeleteTarget(null);
   };
 
   const openReset = (student) => {
@@ -95,7 +120,7 @@ export default function AllStudents() {
         password: res?.password,
       });
     } catch (err) {
-      setResetError(err?.data?.message || 'Could not reset the password. Please try again.');
+      setResetError(formatApiError(err, 'Could not reset the password. Please try again.'));
     }
   };
 
@@ -124,7 +149,7 @@ export default function AllStudents() {
           </div>
           <div className="min-w-0 max-w-[220px]">
             <p className="truncate font-medium text-text-primary">{r.name}</p>
-            <p className="truncate text-xs text-text-secondary/60">{r.email || '—'}</p>
+            <p className="truncate text-xs text-text-secondary/70">{r.email || '—'}</p>
           </div>
         </div>
       ),
@@ -146,9 +171,25 @@ export default function AllStudents() {
       key: 'org',
       header: 'Organization',
       sortValue: (r) => orgName(r),
-      render: (r) => (
-        <span className="block max-w-[200px] truncate text-text-secondary">{orgName(r)}</span>
-      ),
+      render: (r) => {
+        // A pupil with no school is a real problem, not a blank field: no
+        // admin can see them and every org-scoped query filters them out.
+        // An em-dash hid that; this states it and offers the fix.
+        const name = orgName(r);
+        if (name === '—') {
+          return (
+            <button
+              onClick={() => setAssignTarget(r)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-error/50 bg-error/10 px-2 py-1 text-xs font-semibold text-error transition-colors hover:bg-error/20"
+              title={`${r.name} belongs to no school — click to assign one`}
+            >
+              <AlertTriangle size={12} aria-hidden="true" />
+              No school — assign
+            </button>
+          );
+        }
+        return <span className="block max-w-[200px] truncate text-text-secondary">{name}</span>;
+      },
     },
     {
       key: 'xp',
@@ -169,6 +210,30 @@ export default function AllStudents() {
       render: (r) => (
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setViewing(r)}
+            title="View progress"
+            aria-label={`View progress for ${r.name}`}
+            className="rounded-lg p-1.5 text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-turmeric active:scale-95"
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            onClick={() => setEditTarget(r)}
+            title="Edit student"
+            aria-label={`Edit ${r.name}`}
+            className="rounded-lg p-1.5 text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-turmeric active:scale-95"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={() => setAssignTarget(r)}
+            title={orgName(r) === '—' ? 'Assign to a school' : 'Move to another school'}
+            aria-label={`Change the school for ${r.name}`}
+            className="rounded-lg p-1.5 text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-turmeric active:scale-95"
+          >
+            <Building2 size={16} />
+          </button>
+          <button
             onClick={() => openReset(r)}
             title="Reset password"
             aria-label={`Reset password for ${r.name}`}
@@ -186,6 +251,14 @@ export default function AllStudents() {
           >
             {r.suspended ? <CheckCircle2 size={16} /> : <Ban size={16} />}
           </button>
+          <button
+            onClick={() => setDeleteTarget(r)}
+            title="Delete student"
+            aria-label={`Delete ${r.name}`}
+            className="rounded-lg p-1.5 text-error transition-colors duration-150 ease-out hover:bg-surface active:scale-95"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
       ),
     },
@@ -200,7 +273,7 @@ export default function AllStudents() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative w-full sm:max-w-xs">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/60" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/70" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -239,6 +312,14 @@ export default function AllStudents() {
         />
       </QueryState>
 
+      <StudentDetailModal
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        studentId={viewing?.id}
+        fallbackName={viewing?.name}
+        role="superadmin"
+      />
+
       <ConfirmDialog
         open={!!confirmTarget}
         onClose={() => setConfirmTarget(null)}
@@ -252,6 +333,33 @@ export default function AllStudents() {
             ? `Restore access for ${confirmTarget?.name}?`
             : `${confirmTarget?.name} will lose access to the platform until reinstated.`
         }
+      />
+
+      {/* Edit student (PATCH /superadmin/students/:id) */}
+      <AssignOrgModal
+        open={Boolean(assignTarget)}
+        user={assignTarget}
+        onClose={() => setAssignTarget(null)}
+      />
+
+      <StudentEditModal
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        student={editTarget}
+        loading={updating}
+        onSubmit={(id, patch) => updateStudent({ id, ...patch }).unwrap()}
+      />
+
+      {/* Delete student (DELETE /superadmin/students/:id) */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={doDelete}
+        loading={deleting}
+        title="Delete student?"
+        confirmLabel="Delete"
+        variant="danger"
+        message={`Delete ${deleteTarget?.name}? This permanently removes the student and their progress. This cannot be undone.`}
       />
 
       <Modal
@@ -284,7 +392,7 @@ export default function AllStudents() {
               </div>
               <div className="min-w-0">
                 <p className="truncate font-medium text-text-primary">{resetTarget.name}</p>
-                <p className="truncate text-xs text-text-secondary/60">
+                <p className="truncate text-xs text-text-secondary/70">
                   {resetTarget.username || resetTarget.email || '—'} · {orgName(resetTarget)}
                 </p>
               </div>

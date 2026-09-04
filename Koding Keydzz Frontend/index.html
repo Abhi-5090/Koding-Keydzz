@@ -7,11 +7,18 @@
     <meta name="theme-color" content="#001621" />
     <meta name="description" content="Koding Keydzz — Learn Coding Through Adventure. A premium coding game for kids 6-16." />
     <title>Koding Keydzz</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Fonts are served from THIS origin, not Google's CDN. School networks
+         routinely block fonts.googleapis.com, and a CDN request would send
+         every pupil's IP to a third party. See public/fonts/fonts.css. -->
+    <!-- Installable on a school tablet, and gives the app its own window. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/fonts/fonts.css" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&family=Inter:wght@400;500;600;700&family=Fredoka:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="/fonts/inter-var-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
   </head>
   <body>

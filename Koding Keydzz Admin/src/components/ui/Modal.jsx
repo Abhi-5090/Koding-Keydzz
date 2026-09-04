@@ -34,7 +34,15 @@ export default function Modal({ open, onClose, title, children, footer, size = '
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
         >
+          {/*
+            The backdrop is DECORATIVE, and its click is a convenience.
+            Keyboard and screen-reader users close this dialog with Escape
+            (wired above), so `aria-hidden` keeps assistive technology from
+            announcing a nameless clickable region that duplicates a control
+            they already have.
+          */}
           <div
+            aria-hidden="true"
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={onClose}
           />

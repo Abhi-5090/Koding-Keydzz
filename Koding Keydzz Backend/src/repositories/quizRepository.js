@@ -17,6 +17,24 @@ class QuizRepository extends BaseRepository {
       .sort({ createdAt: -1 })
       .populate({ path: 'lesson', select: 'title world', populate: { path: 'world', select: 'name slug' } });
   }
+
+  // Admin listing: also populate the quiz's direct world ref (a stand-alone quiz
+  // may be pinned to a world without a lesson).
+  listForAdmin() {
+    return this.model
+      .find({})
+      .sort({ createdAt: -1 })
+      .populate({ path: 'lesson', select: 'title world', populate: { path: 'world', select: 'name slug' } })
+      .populate({ path: 'world', select: 'name slug' });
+  }
+
+  // A single quiz with its lesson/world context populated (admin detail view).
+  findByIdPopulated(id) {
+    return this.model
+      .findById(id)
+      .populate({ path: 'lesson', select: 'title world', populate: { path: 'world', select: 'name slug' } })
+      .populate({ path: 'world', select: 'name slug' });
+  }
 }
 
 export const quizRepository = new QuizRepository();

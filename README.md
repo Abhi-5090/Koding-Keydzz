@@ -25,7 +25,9 @@ cp .env.example .env          # set MONGO_URI + JWT secrets (PORT=5500, CLIENT_O
 npm run seed                  # seeds 7 worlds, achievements, admin user
 npm run dev                   # http://localhost:5500/api/v1
 ```
-Seeded admin login: `admin@kodingkeydzz.com` / `Admin@123`
+Seeded admin login (LOCAL DEVELOPMENT ONLY): `admin@kodingkeydzz.com` / `Admin@123`.
+In production the seed refuses to create these accounts without `SEED_SUPERADMIN_PASSWORD`
+and `SEED_ADMIN_PASSWORD` set to strong values — see `DEPLOYMENT.md`.
 
 **2. Student frontend**
 ```bash

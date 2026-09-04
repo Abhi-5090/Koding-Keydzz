@@ -2,11 +2,54 @@ import xlsx from 'xlsx';
 import { userRepository } from '../repositories/userRepository.js';
 import { orgRepository } from '../repositories/orgRepository.js';
 import { ApiError } from '../utils/ApiError.js';
-import { slugifyName, uniqueUsername } from '../utils/username.js';
+import { uniqueUsername } from '../utils/username.js';
 
 export const DEFAULT_STUDENT_PASSWORD = 'Keydzz@123';
 
-const TEMPLATE_HEADERS = ['firstName', 'lastName', 'email', 'phone', 'username'];
+/**
+ * Hard cap on rows per upload.
+ *
+ * Each row costs a bcrypt hash (~70ms measured), so an uncapped file could run
+ * for hours and hold the request open. 2,000 rows ≈ 2–3 minutes, which fits
+ * inside the proxy's 600s read timeout with a wide margin. Larger schools
+ * should split the roster by class/grade — the import is idempotent, so
+ * uploading several files (or re-uploading one) is safe.
+ */
+export const MAX_BULK_ROWS = 2000;
+
+/**
+ * Refuse to exceed the organization's contracted student seats.
+ *
+ * `seatLimit` of 0 means unlimited. Checked before creating accounts so a
+ * school cannot silently drift past what it is paying for, and the message
+ * tells the admin exactly how many seats are left.
+ */
+async function assertSeatsAvailable(orgId, wanted = 1) {
+  const org = await orgRepository.findById(orgId);
+  if (!org || !org.seatLimit) return; // unlimited
+  const current = await userRepository.count({
+    role: 'student',
+    org: orgId,
+    deletedAt: null,
+  });
+  const remaining = org.seatLimit - current;
+  if (wanted > remaining) {
+    throw ApiError.badRequest(
+      remaining <= 0
+        ? `This organization has used all ${org.seatLimit} of its student seats. Contact Koding Keydzz to add more.`
+        : `Only ${remaining} student seat${remaining === 1 ? '' : 's'} remain (limit ${org.seatLimit}). This upload needs ${wanted}.`
+    );
+  }
+}
+
+const TEMPLATE_HEADERS = [
+  'rollNumber',
+  'firstName',
+  'lastName',
+  'email',
+  'phone',
+  'username',
+];
 
 /** Normalize a supplied username: trim + lowercase. Returns '' for nullish. */
 export function normalizeUsername(username) {
@@ -70,6 +113,20 @@ function pick(row, candidates) {
  */
 export function validateStudentRow(rawRow = {}, commonPassword = '') {
   const row = normalizeRowKeys(rawRow);
+  // The school's own pupil id. Optional, but it is the most reliable natural
+  // key for making a re-import idempotent, so we accept several spellings.
+  const rollNumber = pick(row, [
+    'rollnumber',
+    'roll number',
+    'roll no',
+    'rollno',
+    'roll',
+    'admissionnumber',
+    'admission number',
+    'admission no',
+    'studentid',
+    'student id',
+  ]);
   const firstName = pick(row, ['firstname', 'first name']);
   const lastName = pick(row, ['lastname', 'last name']);
   const email = normalizeEmail(pick(row, ['email']));
@@ -83,7 +140,10 @@ export function validateStudentRow(rawRow = {}, commonPassword = '') {
   // Per-row password wins, else the batch common password, else the default.
   const password = rawPassword || commonPassword || DEFAULT_STUDENT_PASSWORD;
   const name = composeName(firstName, lastName);
-  return { ok: true, value: { firstName, lastName, name, email, phone, username, password } };
+  return {
+    ok: true,
+    value: { rollNumber, firstName, lastName, name, email, phone, username, password },
+  };
 }
 
 /**
@@ -99,6 +159,7 @@ export function parseStudentRows(rows = [], commonPassword = '') {
   const skipped = [];
   const seenEmail = new Set();
   const seenUsername = new Set();
+  const seenRoll = new Set();
 
   rows.forEach((row, idx) => {
     const rowNumber = idx + 1;
@@ -107,7 +168,12 @@ export function parseStudentRows(rows = [], commonPassword = '') {
       skipped.push({ row: rowNumber, email: normalizeEmail(row.email), reason: result.reason });
       return;
     }
-    const { email, username } = result.value;
+    const { email, username, rollNumber } = result.value;
+    const rollKey = rollNumber ? rollNumber.toLowerCase() : '';
+    if (rollKey && seenRoll.has(rollKey)) {
+      skipped.push({ row: rowNumber, rollNumber, reason: 'Duplicate roll number in file' });
+      return;
+    }
     if (email && seenEmail.has(email)) {
       skipped.push({ row: rowNumber, email, reason: 'Duplicate in file' });
       return;
@@ -116,6 +182,7 @@ export function parseStudentRows(rows = [], commonPassword = '') {
       skipped.push({ row: rowNumber, email, username, reason: 'Duplicate username in file' });
       return;
     }
+    if (rollKey) seenRoll.add(rollKey);
     if (email) seenEmail.add(email);
     if (username) seenUsername.add(username);
     valid.push({ row: rowNumber, ...result.value });
@@ -157,6 +224,7 @@ export function buildTemplateBuffer() {
   const example = [
     {
       // First example: has an email, username left BLANK -> auto-generated.
+      rollNumber: '2024-001',
       firstName: 'Asha',
       lastName: 'Rao',
       email: 'asha.rao@example.com',
@@ -165,6 +233,7 @@ export function buildTemplateBuffer() {
     },
     {
       // Second example: NO email (young student), explicit username supplied.
+      rollNumber: '2024-002',
       firstName: 'Liam',
       lastName: 'Smith',
       email: '',
@@ -177,8 +246,15 @@ export function buildTemplateBuffer() {
   // ignored by the parser (only known header columns are read).
   xlsx.utils.sheet_add_aoa(
     sheet,
-    [['Note: email and username are OPTIONAL. Leave username blank to auto-generate a unique login id. firstName is required.']],
-    { origin: 'F1' }
+    [
+      [
+        'Only firstName is required. email and username are OPTIONAL — leave username blank to auto-generate a unique login id.',
+      ],
+      [
+        'rollNumber is your school\'s own pupil id. Strongly recommended: it lets you re-upload this file safely, because students that already exist are skipped instead of being added a second time.',
+      ],
+    ],
+    { origin: 'H1' }
   );
   const wb = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(wb, sheet, 'Students');
@@ -198,8 +274,19 @@ export async function bulkCreateStudents(buffer, { org, commonPassword = '' } = 
   if (!rawRows.length) {
     throw ApiError.badRequest('The uploaded file has no data rows');
   }
+  if (rawRows.length > MAX_BULK_ROWS) {
+    throw ApiError.badRequest(
+      `This file has ${rawRows.length} rows, which is over the ${MAX_BULK_ROWS}-row limit. ` +
+        'Split the roster into smaller files (by class or grade) and upload them one at a ' +
+        'time — re-uploading is safe, existing students are skipped rather than duplicated.'
+    );
+  }
 
   const { valid, skipped } = parseStudentRows(rawRows, commonPassword);
+
+  // Check seats BEFORE creating anything, so a capped org gets a clear refusal
+  // rather than a half-imported roster.
+  await assertSeatsAvailable(org, valid.length);
 
   const created = [];
   let createdCount = 0;
@@ -210,13 +297,83 @@ export async function bulkCreateStudents(buffer, { org, commonPassword = '' } = 
   const isUsernameTaken = async (candidate) =>
     takenUsernames.has(candidate) || userRepository.existsByUsername(candidate);
 
+  // Natural keys already seen in THIS file, so a roster that repeats a pupil
+  // internally doesn't create two records either.
+  const seenRolls = new Set();
+  const seenNames = new Set();
+
   for (const entry of valid) {
-    // Duplicate within this org (existing student, by email) → skip.
+    /* ---------------------------------------------------------------------
+     * IDEMPOTENCY.
+     *
+     * Duplicate detection previously keyed on email ONLY. Young students have
+     * no email — that is the whole reason username login exists — so a
+     * re-uploaded roster skipped nothing and created a second copy of every
+     * child. (Observed: a 200-pupil school went to 401 students on one retry,
+     * which is exactly what happens when an import times out and the admin
+     * clicks upload again.)
+     *
+     * We now check three keys in order of authority:
+     *   1. rollNumber — the school's own id, when the sheet provides it
+     *   2. email      — when present
+     *   3. firstName + lastName within the org — last resort
+     * ------------------------------------------------------------------- */
+    const rollKey = entry.rollNumber ? entry.rollNumber.toLowerCase() : '';
+    const nameKey = `${(entry.firstName || '').toLowerCase()}|${(entry.lastName || '').toLowerCase()}`;
+
+    if (rollKey) {
+      if (seenRolls.has(rollKey)) {
+        skipped.push({
+          row: entry.row,
+          rollNumber: entry.rollNumber,
+          reason: 'Duplicate roll number within this file',
+        });
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const byRoll = await userRepository.findStudentInOrgByRollNumber(entry.rollNumber, org);
+      if (byRoll) {
+        skipped.push({
+          row: entry.row,
+          rollNumber: entry.rollNumber,
+          reason: 'Already exists in organization (roll number)',
+        });
+        continue;
+      }
+    }
+
     if (entry.email) {
       // eslint-disable-next-line no-await-in-loop
       const existing = await userRepository.findStudentInOrg(entry.email, org);
       if (existing) {
         skipped.push({ row: entry.row, email: entry.email, reason: 'Already exists in organization' });
+        continue;
+      }
+    }
+
+    // Name fallback: only when the row gives us nothing more reliable.
+    if (!rollKey && !entry.email) {
+      if (seenNames.has(nameKey)) {
+        skipped.push({
+          row: entry.row,
+          name: entry.name,
+          reason: 'Duplicate name within this file — add a rollNumber column to import both',
+        });
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const byName = await userRepository.findStudentInOrgByName(
+        entry.firstName,
+        entry.lastName,
+        org
+      );
+      if (byName) {
+        skipped.push({
+          row: entry.row,
+          name: entry.name,
+          reason:
+            'Already exists in organization (name match) — add a rollNumber column if this is a different pupil',
+        });
         continue;
       }
     }
@@ -235,6 +392,8 @@ export async function bulkCreateStudents(buffer, { org, commonPassword = '' } = 
       username = await uniqueUsername(entry.firstName || entry.name, isUsernameTaken);
     }
     takenUsernames.add(username);
+    if (rollKey) seenRolls.add(rollKey);
+    if (!rollKey && !entry.email) seenNames.add(nameKey);
 
     try {
       const student = new userRepository.model({
@@ -244,6 +403,9 @@ export async function bulkCreateStudents(buffer, { org, commonPassword = '' } = 
         lastName: entry.lastName,
         phone: entry.phone,
         username,
+        // Only set when supplied, so the partial unique index ignores the
+        // (many) students who have no roll number.
+        ...(entry.rollNumber ? { rollNumber: entry.rollNumber } : {}),
         // Only set email when present so the sparse unique index isn't tripped
         // by many email-less students sharing an empty value.
         ...(entry.email ? { email: entry.email } : {}),
@@ -256,6 +418,7 @@ export async function bulkCreateStudents(buffer, { org, commonPassword = '' } = 
       created.push({
         name: entry.name,
         username,
+        rollNumber: entry.rollNumber || '',
         email: entry.email || '',
         phone: entry.phone,
         password: entry.password,
@@ -264,8 +427,10 @@ export async function bulkCreateStudents(buffer, { org, commonPassword = '' } = 
     } catch (err) {
       // Unique-index race or global email/username collision.
       const reason = err.code === 11000 ? 'Email or username already in use' : 'Failed to create';
-      // Free the just-reserved username so it can be retried by a later row.
+      // Free the just-reserved keys so a later row can retry.
       takenUsernames.delete(username);
+      if (rollKey) seenRolls.delete(rollKey);
+      if (!rollKey && !entry.email) seenNames.delete(nameKey);
       skipped.push({ row: entry.row, email: entry.email, username, reason });
     }
   }
@@ -288,9 +453,29 @@ export async function bulkCreateStudents(buffer, { org, commonPassword = '' } = 
  * Returns { student, username, password }.
  */
 export async function createStudent(
-  { firstName, lastName = '', phone = '', email, username, password },
+  {
+    firstName,
+    lastName = '',
+    phone = '',
+    grade,
+    school,
+    email,
+    username,
+    password,
+    rollNumber,
+  },
   orgId
 ) {
+  await assertSeatsAvailable(orgId, 1);
+
+  const roll = String(rollNumber || '').trim();
+  if (roll) {
+    const rollClash = await userRepository.findStudentInOrgByRollNumber(roll, orgId);
+    if (rollClash) {
+      throw ApiError.conflict('A student with this roll number already exists in your organization');
+    }
+  }
+
   const normalized = normalizeEmail(email);
   if (normalized) {
     const existing = await userRepository.findStudentInOrg(normalized, orgId);
@@ -323,9 +508,13 @@ export async function createStudent(
     firstName: String(firstName || '').trim(),
     lastName: String(lastName || '').trim(),
     phone: String(phone || '').trim(),
+    grade: String(grade || '').trim(),
+    school: String(school || '').trim(),
     username: finalUsername,
     // Only set email when present (keeps the sparse unique index happy).
     ...(normalized ? { email: normalized } : {}),
+    // Same for the roll number's partial unique index.
+    ...(roll ? { rollNumber: roll } : {}),
     org: orgId,
   });
   await student.setPassword(finalPassword);

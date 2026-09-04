@@ -25,6 +25,17 @@ export function buildStats(user = {}, dashboard) {
     xpLevelSpan: span,
     levelPercent: levelInfo.percent ?? null,
     overallPercent: dashboard?.progress?.overallPercent ?? null,
+    /**
+     * The daily streak, straight from the server.
+     *
+     * Not computed here on purpose. A streak is a question about calendar days
+     * in the pupil's own timezone, the server decides it when the activity
+     * happens, and it pays real XP — so a browser-side count would be both
+     * wrong across a midnight boundary and one edit away from free XP.
+     */
+    streak: dashboard?.streak?.current ?? 0,
+    longestStreak: dashboard?.streak?.longest ?? 0,
+    streakBonusXp: dashboard?.streak?.bonusXp ?? 0,
   }
 }
 

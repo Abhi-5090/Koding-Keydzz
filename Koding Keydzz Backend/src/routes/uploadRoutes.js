@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import * as uploadController from '../controllers/uploadController.js';
 import { protect } from '../middlewares/auth.js';
+import { uploadLimiter } from '../middlewares/rateLimit.js';
 
 // In-memory storage so we can stream the buffer straight to Cloudinary.
 const upload = multer({
@@ -18,6 +19,7 @@ const router = Router();
 router.post(
   '/avatar',
   protect,
+  uploadLimiter,
   upload.single('file'),
   uploadController.uploadAvatar
 );

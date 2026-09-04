@@ -4,10 +4,23 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Mail, Lock } from 'lucide-react';
 import { useLoginMutation } from '../features/auth/authApi';
-import { setCredentials } from '../features/auth/authSlice';
+import { setCredentials, PORTAL_ROLES } from '../features/auth/authSlice';
 import Button from '../components/ui/Button';
+import { formatApiError } from '../utils/apiError';
 
 const homeForRole = (role) => (role === 'superadmin' ? '/superadmin' : '/dashboard');
+
+/*
+ * PORTAL_ROLES is imported from authSlice so this gate and the route guard
+ * can never disagree.
+ *
+ * Faculty were previously rejected here with "This portal is for
+ * administrators only" — the gate was written when the only staff role was
+ * `admin` and was not revisited when teachers were introduced, so every
+ * teacher account was unusable despite being valid server-side. The route
+ * guard had the same omission, which would have bounced them in a redirect
+ * loop even if login had let them through.
+ */
 
 export default function Login() {
   const dispatch = useDispatch();
@@ -24,8 +37,12 @@ export default function Login() {
     try {
       const data = await login({ email, password }).unwrap();
       const user = data.user || data;
-      if (user?.role !== 'admin' && user?.role !== 'superadmin') {
-        setError('Access denied. This portal is for administrators only.');
+      if (!PORTAL_ROLES.includes(user?.role)) {
+        setError(
+          user?.role === 'student'
+            ? 'This is the staff portal. Students sign in on the Koding Keydzz learning app.'
+            : 'This account does not have access to the staff portal.'
+        );
         return;
       }
       dispatch(
@@ -41,7 +58,7 @@ export default function Login() {
         setError('Could not reach the server. Please try again.');
         return;
       }
-      setError(err?.data?.message || 'Invalid email or password.');
+      setError(formatApiError(err, 'Invalid email or password.'));
     }
   };
 
@@ -76,15 +93,25 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* htmlFor + id: these labels were previously siblings of their
+                inputs with no association at all, so a screen reader could not
+                announce either field and clicking a label did not focus its
+                input. Caught by the browser test suite. */}
             <div>
-              <label className="k-label">Email</label>
+              <label className="k-label" htmlFor="login-email">
+                Email
+              </label>
               <div className="relative">
                 <Mail
                   size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/60"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/70"
+                  aria-hidden="true"
                 />
                 <input
+                  id="login-email"
+                  name="email"
                   type="email"
+                  autoComplete="username"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -95,14 +122,20 @@ export default function Login() {
             </div>
 
             <div>
-              <label className="k-label">Password</label>
+              <label className="k-label" htmlFor="login-password">
+                Password
+              </label>
               <div className="relative">
                 <Lock
                   size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/60"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/70"
+                  aria-hidden="true"
                 />
                 <input
+                  id="login-password"
+                  name="password"
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

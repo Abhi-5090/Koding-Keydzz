@@ -58,6 +58,24 @@ export const authApi = baseApi.injectEndpoints({
       transformResponse: unwrap,
       providesTags: ['Auth'],
     }),
+
+    /**
+     * Revoke this device's session on the SERVER.
+     *
+     * Signing out previously only cleared localStorage, so the refresh token
+     * stayed valid for its full 7-day lifetime — which matters on the shared
+     * classroom machines this app runs on. Sending the refresh token revokes
+     * just this device and leaves the student's other devices signed in.
+     */
+    logout: builder.mutation({
+      query: (refreshToken) => ({
+        url: '/auth/logout',
+        method: 'POST',
+        body: { refreshToken },
+      }),
+      transformResponse: unwrap,
+      invalidatesTags: ['Auth'],
+    }),
   }),
   overrideExisting: false,
 })
@@ -67,4 +85,5 @@ export const {
   useRegisterStudentMutation,
   useGetMeQuery,
   useLazyGetMeQuery,
+  useLogoutMutation,
 } = authApi

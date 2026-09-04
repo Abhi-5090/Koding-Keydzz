@@ -9,7 +9,7 @@ import {
   Rabbit, GraduationCap, User,
   Medal, Award,
 } from 'lucide-react'
-import { useGsap, gsap } from '../hooks/useGsap'
+import { useGsapContext } from '../motion/hooks'
 import FloatingShapes from '../components/ui/FloatingShapes'
 import Particles from '../components/ui/Particles'
 import AnimatedIcon from '../components/ui/AnimatedIcon'
@@ -82,7 +82,20 @@ const TESTIMONIALS = [
 const ACHIEVEMENTS = [Footprints, Repeat, Bug, Wand2, Code2, Rocket, Bot, Flame]
 
 export default function Landing() {
-  const scope = useGsap(() => {
+  /**
+   * The landing page's choreography.
+   *
+   * `gsap.from` throughout, never `fromTo`: `from` snapshots the element's
+   * CURRENT (visible) appearance as the end state and animates in from an
+   * offset. So the page is fully readable before GSAP arrives, and if the
+   * chunk never arrives it is simply a static page — where a `fromTo` off
+   * `opacity: 0` would have left a blank screen.
+   *
+   * The whole block is skipped under prefers-reduced-motion (handled inside
+   * useGsapContext), which the previous implementation did not do — a pupil
+   * who had asked for less movement still got the parallax hero.
+   */
+  const scope = useGsapContext(({ gsap }) => {
     // Hero entrance
     gsap.from('.hero-line', { y: 40, opacity: 0, duration: 0.9, stagger: 0.15, ease: 'power3.out' })
 

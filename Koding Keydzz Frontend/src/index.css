@@ -1,16 +1,11 @@
+/* Tokens FIRST: every rule below reads from them, and Tailwind's own
+   utilities resolve against them too. See theme.css for the palette and the
+   contrast reasoning. */
+@import './theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  color-scheme: dark;
-
-  /* Global motion system — strong custom easings (Emil Kowalski).
-     Built-in CSS easings are too weak; these give animations intent. */
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-}
 
 * {
   box-sizing: border-box;
@@ -23,16 +18,22 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #001621;
-  color: #ffffff;
-  font-family: 'Inter', sans-serif;
+  /* Painted from tokens so the page ground follows the theme. An explicit
+     background is mandatory, not cosmetic: a transparent body borrows
+     whatever the host paints behind it, which is how a light-mode page ends
+     up with dark-mode text on it. */
+  background-color: rgb(var(--c-bg));
+  color: rgb(var(--c-text));
+  font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Poppins', system-ui, sans-serif;
   font-weight: 800;
+  /* Long headings break badly at small widths without this. */
+  text-wrap: balance;
 }
 
 #root {
@@ -62,7 +63,13 @@ h1, h2, h3, h4, h5, h6 {
   textarea:focus-visible,
   [tabindex]:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #001621, 0 0 0 4px rgba(255, 96, 47, 0.6);
+    /* Two rings: the inner one separates the halo from whatever is behind it,
+       so the ring stays visible on card, surface AND page ground. Both come
+       from tokens, so light mode gets its own solved 3.83:1 focus colour
+       rather than an ember that vanishes on paper. */
+    box-shadow:
+      0 0 0 2px rgb(var(--c-bg)),
+      0 0 0 4px rgb(var(--c-focus) / 0.85);
     border-radius: 0.5rem;
   }
 
@@ -75,17 +82,25 @@ h1, h2, h3, h4, h5, h6 {
   .tint-scope select:focus-visible,
   .tint-scope textarea:focus-visible,
   .tint-scope [tabindex]:focus-visible {
-    box-shadow: 0 0 0 2px #001621, 0 0 0 4px var(--tint, rgba(255, 96, 47, 0.6));
+    box-shadow:
+      0 0 0 2px rgb(var(--c-bg)),
+      0 0 0 4px var(--tint, rgb(var(--c-focus) / 0.85));
   }
 }
 
 @layer components {
   .golden-glow {
-    box-shadow: 0 0 24px rgba(255, 96, 47, 0.5);
+    /* Glow on dark, drop shadow on light — see --shadow-brand in theme.css. */
+    box-shadow: var(--shadow-brand);
   }
 
   .golden-text {
-    background: linear-gradient(90deg, #FF602F, #FF6A3D, #FF602F);
+    background: linear-gradient(
+      90deg,
+      rgb(var(--c-primary)),
+      rgb(var(--c-accent)),
+      rgb(var(--c-primary))
+    );
     background-size: 200% auto;
     -webkit-background-clip: text;
     background-clip: text;
@@ -94,11 +109,35 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .glass-card {
-    @apply bg-card/80 backdrop-blur-md border border-k-border rounded-2xl;
+    @apply rounded-2xl border border-k-border bg-card/80 shadow-card backdrop-blur-md;
+  }
+
+  /* An enterprise-grade panel: the workhorse container. Distinct from
+     .glass-card in that it is opaque and does not blur — used where content
+     density matters more than atmosphere (tables, forms, stat grids). */
+  .panel {
+    @apply rounded-2xl border border-k-border bg-card shadow-card;
+  }
+
+  /* Loading placeholder that reads as "content is coming", not as an error.
+     The sweep is the only motion, and it stops under reduced-motion. */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-surface;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--c-text) / 0.07),
+      transparent
+    );
+    animation: shimmer 1.6s var(--ease-out) infinite;
   }
 
   .game-text {
-    font-family: 'Fredoka', sans-serif;
+    font-family: 'Fredoka', 'Poppins', system-ui, sans-serif;
   }
 
   /* Crisp press feedback for any pressable element that opts in. */
@@ -120,7 +159,14 @@ h1, h2, h3, h4, h5, h6 {
 
 @layer utilities {
   .text-shadow-glow {
-    text-shadow: 0 0 18px rgba(255, 96, 47, 0.7);
+    /* Scaled by --glow-strength: full on dark, off on the light parchment,
+       where a wide ember halo behind ember text just smudges it. */
+    text-shadow: 0 0 calc(18px * var(--glow-strength, 1)) rgb(var(--c-ember) / 0.7);
+  }
+
+  /* Digits that line up in columns — leaderboards, XP, stat tiles. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
   }
 
   .scrollbar-thin::-webkit-scrollbar {
@@ -128,14 +174,14 @@ h1, h2, h3, h4, h5, h6 {
     height: 8px;
   }
   .scrollbar-thin::-webkit-scrollbar-track {
-    background: #001621;
+    background: rgb(var(--c-bg));
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #FF602F66;
+    background: rgb(var(--c-primary) / 0.4);
     border-radius: 8px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #FF602F;
+    background: rgb(var(--c-primary));
   }
 }
 
@@ -146,8 +192,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 16px rgba(255, 96, 47, 0.35); }
-  50% { box-shadow: 0 0 40px rgba(255, 96, 47, 0.7); }
+  0%, 100% { box-shadow: 0 0 16px rgb(var(--c-ember) / 0.35); }
+  50% { box-shadow: 0 0 40px rgb(var(--c-ember) / 0.7); }
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
 }
 
 @keyframes gradient-shift {
@@ -170,18 +220,18 @@ h1, h2, h3, h4, h5, h6 {
    the steady glow remains. */
 @keyframes session-glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 8px var(--glow-color, rgba(255, 96, 47, 0.4));
-    text-shadow: 0 0 6px var(--glow-color, rgba(255, 96, 47, 0.4));
+    box-shadow: 0 0 8px var(--glow-color, rgb(var(--c-ember) / 0.4));
+    text-shadow: 0 0 6px var(--glow-color, rgb(var(--c-ember) / 0.4));
   }
   50% {
-    box-shadow: 0 0 20px var(--glow-color, rgba(255, 96, 47, 0.85));
-    text-shadow: 0 0 12px var(--glow-color, rgba(255, 96, 47, 0.85));
+    box-shadow: 0 0 20px var(--glow-color, rgb(var(--c-ember) / 0.85));
+    text-shadow: 0 0 12px var(--glow-color, rgb(var(--c-ember) / 0.85));
   }
 }
 
 .session-glow {
-  box-shadow: 0 0 12px var(--glow-color, rgba(255, 96, 47, 0.55));
-  text-shadow: 0 0 8px var(--glow-color, rgba(255, 96, 47, 0.55));
+  box-shadow: 0 0 calc(12px * var(--glow-strength, 1)) var(--glow-color, rgb(var(--c-ember) / 0.55));
+  text-shadow: 0 0 calc(8px * var(--glow-strength, 1)) var(--glow-color, rgb(var(--c-ember) / 0.55));
 }
 
 .session-glow-pulse {
@@ -215,11 +265,70 @@ h1, h2, h3, h4, h5, h6 {
   .animate-spin-slow,
   .animate-wiggle,
   .animate-confetti,
+  .animate-shimmer,
   .session-glow-pulse {
     animation: none !important;
   }
 
+  /* The skeleton sweep is pure decoration; the grey block still communicates
+     "loading" on its own. */
+  .skeleton::after {
+    animation: none !important;
+    opacity: 0;
+  }
+
   .pressable:active {
     transform: none;
+  }
+}
+
+/* ==========================================================================
+   PRINTING A CERTIFICATE
+   ==========================================================================
+   The certificate is the one thing in this product that is meant to leave the
+   screen: a child passes a course and a parent puts the result on the fridge or
+   sends it to a grandparent. So printing has to produce the certificate ALONE —
+   not the certificate wrapped in a navigation sidebar, an XP bar and a print
+   button, which is what a default print of a single-page app gives you.
+
+   `.print-only-sheet` is put on the page wrapper. Everything on the page is
+   hidden, then the sheet is brought back and laid out to fill the paper.
+   Backgrounds are forced on, because browsers strip them by default and a
+   certificate is almost entirely background.
+   ========================================================================== */
+@media print {
+  .print-only-sheet .no-print,
+  body > *:not(#root),
+  #root > *:not(.print-root) {
+    display: none !important;
+  }
+
+  .print-only-sheet .no-print {
+    display: none !important;
+  }
+
+  html,
+  body,
+  #root,
+  .print-root {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .certificate-sheet {
+    width: 100% !important;
+    max-width: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
   }
 }

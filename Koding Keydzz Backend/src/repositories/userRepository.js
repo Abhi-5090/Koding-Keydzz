@@ -1,6 +1,7 @@
 import { BaseRepository } from './BaseRepository.js';
 import { User } from '../models/User.js';
 import { buildLoginFilter, normalizeIdentifier } from '../utils/username.js';
+import { escapeRegex } from '../utils/privacy.js';
 
 class UserRepository extends BaseRepository {
   constructor() {
@@ -21,6 +22,21 @@ class UserRepository extends BaseRepository {
 
   // Resolve a login identifier that may be EITHER an email OR a username
   // (case-insensitive). Used by the /auth/login flow.
+  /**
+   * Record a sign-in without a read-modify-save.
+   *
+   * A login must not fail because the user document changed since it was
+   * loaded — see the note at the call site in authService.
+   */
+  touchLastLogin(id, when = new Date()) {
+    return this.model.updateOne({ _id: id }, { $set: { lastLoginAt: when } });
+  }
+
+  /** Consume the pre-multi-session refresh hash, atomically. */
+  clearLegacyRefreshHash(id) {
+    return this.model.updateOne({ _id: id }, { $set: { refreshTokenHash: null } });
+  }
+
   findByLogin(identifier, withSecrets = false) {
     const query = this.model.findOne(buildLoginFilter(identifier));
     if (withSecrets) query.select('+passwordHash +refreshTokenHash');
@@ -34,11 +50,27 @@ class UserRepository extends BaseRepository {
   }
 
   findByIdWithSecrets(id) {
-    return this.model.findById(id).select('+passwordHash +refreshTokenHash');
+    return this.model
+      .findById(id)
+      .select('+passwordHash +refreshTokenHash +sessions');
   }
 
-  setRefreshTokenHash(id, hash) {
-    return this.model.findByIdAndUpdate(id, { refreshTokenHash: hash }, { new: true });
+  /** Replace the whole session list (used by login, refresh rotation, logout). */
+  setSessions(id, sessions) {
+    return this.model.findByIdAndUpdate(id, { sessions }, { new: true });
+  }
+
+  /**
+   * Revoke EVERY session for a user — the "sign out all devices" primitive.
+   * Called on password reset and on suspension. Also clears the legacy
+   * single-hash field so a pre-migration session can't survive either.
+   */
+  revokeAllSessions(id) {
+    return this.model.findByIdAndUpdate(
+      id,
+      { sessions: [], refreshTokenHash: null },
+      { new: true }
+    );
   }
 
   // Persist the per-account lockout counters (see utils/loginLockout.js).
@@ -61,7 +93,7 @@ class UserRepository extends BaseRepository {
   // Top students by XP. Pass `org` to scope the board to a single organization
   // (school leaderboard); omit it (null) for the global, platform-wide board.
   topByXp(limit = 50, org = null) {
-    const filter = { role: 'student', status: 'active' };
+    const filter = { role: 'student', status: 'active', deletedAt: null };
     if (org) filter.org = org;
     return this.model
       .find(filter)
@@ -76,21 +108,32 @@ class UserRepository extends BaseRepository {
   async xpRank(id, org = null) {
     const user = await this.model.findById(id).select('xp role status org');
     if (!user || user.role !== 'student' || user.status !== 'active') return null;
-    const filter = { role: 'student', status: 'active', xp: { $gt: user.xp } };
+    const filter = {
+      role: 'student',
+      status: 'active',
+      deletedAt: null,
+      xp: { $gt: user.xp },
+    };
     if (org) filter.org = org;
     const higher = await this.model.countDocuments(filter);
     return higher + 1;
   }
 
-  searchStudents({ search = '', skip = 0, limit = 20, org = null } = {}) {
-    const filter = { role: 'student' };
+  searchStudents({ search = '', skip = 0, limit = 20, org = null, studentIds = null } = {}) {
+    // deletedAt: null — soft-deleted students stay out of every listing.
+    const filter = { role: 'student', deletedAt: null };
     if (org) filter.org = org;
+    // Faculty scope — see adminService.listStudents.
+    if (studentIds) filter._id = { $in: studentIds };
     if (search) {
+      // Escaped — see escapeRegex(). An unescaped term reached MongoDB as a
+      // regular expression and 500'd on any name containing regex punctuation.
+      const safe = escapeRegex(search);
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { username: { $regex: search, $options: 'i' } },
-        { school: { $regex: search, $options: 'i' } },
+        { name: { $regex: safe, $options: 'i' } },
+        { email: { $regex: safe, $options: 'i' } },
+        { username: { $regex: safe, $options: 'i' } },
+        { school: { $regex: safe, $options: 'i' } },
       ];
     }
     return this.model
@@ -102,7 +145,9 @@ class UserRepository extends BaseRepository {
 
   // Fetch the full (non-paginated) list of students in an organization.
   findAllStudentsInOrg(org) {
-    return this.model.find({ role: 'student', org }).sort({ createdAt: -1 });
+    return this.model
+      .find({ role: 'student', org, deletedAt: null })
+      .sort({ createdAt: -1 });
   }
 
   // Find a student by email scoped to a single organization.
@@ -111,6 +156,36 @@ class UserRepository extends BaseRepository {
       email: String(email).toLowerCase(),
       org,
       role: 'student',
+      deletedAt: null,
+    });
+  }
+
+  /** A student in this org with this roll number (the school's own id). */
+  findStudentInOrgByRollNumber(rollNumber, org) {
+    return this.model.findOne({
+      rollNumber: String(rollNumber).trim(),
+      org,
+      role: 'student',
+      deletedAt: null,
+    });
+  }
+
+  /**
+   * A student in this org with exactly this first+last name.
+   *
+   * Last-resort duplicate check for a roster import when the row carries
+   * neither an email nor a roll number — which is the common case for young
+   * children, and is why a re-uploaded roster used to duplicate every pupil.
+   * Case-insensitive but NOT a regex (exact match on a normalized value), so
+   * there is no injection or ReDoS surface.
+   */
+  findStudentInOrgByName(firstName, lastName, org) {
+    return this.model.findOne({
+      org,
+      role: 'student',
+      deletedAt: null,
+      firstName: new RegExp(`^${escapeRegex(String(firstName).trim())}$`, 'i'),
+      lastName: new RegExp(`^${escapeRegex(String(lastName || '').trim())}$`, 'i'),
     });
   }
 

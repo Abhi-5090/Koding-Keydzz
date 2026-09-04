@@ -117,17 +117,31 @@ describe('solveHint drives an optimal completion', () => {
 })
 
 describe('authored hanoi levels', () => {
-  it('has 10 levels with the right difficulty ramp', () => {
-    expect(hanoiLevels).toHaveLength(10)
-    expect(hanoiLevels.filter((l) => l.difficulty === 'easy')).toHaveLength(2)
-    expect(hanoiLevels.filter((l) => l.difficulty === 'medium')).toHaveLength(4)
-    expect(hanoiLevels.filter((l) => l.difficulty === 'hard')).toHaveLength(4)
+  /**
+   * The level set is now GENERATED and tiered — every genuinely distinct Hanoi
+   * puzzle, and no more.
+   *
+   * A puzzle here is defined by its disc count (3-10) and its start/finish
+   * pegs (6 ordered pairs), so 48 is the honest ceiling. Padding it out to
+   * match the puzzle games' 170 would mean levels a player could not tell
+   * apart. Exact counts and the tier plan live in levels.test.js.
+   */
+  it('covers every distinct disc-count and peg-pair combination exactly once', () => {
+    const seen = new Set()
+    for (const l of hanoiLevels) {
+      const key = `${l.disks}:${l.from}->${l.to}`
+      expect(seen.has(key), `duplicate puzzle ${key}`).toBe(false)
+      seen.add(key)
+    }
+    // 8 disc counts x 6 ordered peg pairs.
+    expect(seen.size).toBe(48)
+    expect(hanoiLevels).toHaveLength(48)
   })
 
   it('every level has valid fields and unique ids', () => {
     const ids = new Set()
     hanoiLevels.forEach((l, i) => {
-      expect(Number.isInteger(l.disks) && l.disks >= 3 && l.disks <= 7).toBe(true)
+      expect(Number.isInteger(l.disks) && l.disks >= 3 && l.disks <= 10).toBe(true)
       expect([0, 1, 2]).toContain(l.from)
       expect([0, 1, 2]).toContain(l.to)
       expect(l.from).not.toBe(l.to)
@@ -139,20 +153,29 @@ describe('authored hanoi levels', () => {
     })
   })
 
-  it('ramps disk counts easy(3) -> medium(4,5) -> hard(6,7)', () => {
+  it('ramps disc counts easy(3-4) -> medium(5-6) -> hard(7-10)', () => {
+    // Disc count is what actually decides the work, so it drives difficulty.
     for (const l of hanoiLevels) {
-      if (l.difficulty === 'easy') expect(l.disks).toBe(3)
-      if (l.difficulty === 'medium') expect([4, 5]).toContain(l.disks)
-      if (l.difficulty === 'hard') expect([6, 7]).toContain(l.disks)
+      if (l.difficulty === 'easy') expect([3, 4]).toContain(l.disks)
+      if (l.difficulty === 'medium') expect([5, 6]).toContain(l.disks)
+      if (l.difficulty === 'hard') expect([7, 8, 9, 10]).toContain(l.disks)
     }
   })
 
-  it('ramps hints 2 -> 1 -> 0 by level order (cap 2)', () => {
-    // first ~4 levels max hints 2, middle ~3 -> 1, last ~3 -> 0
+  it('ramps hints down by TIER rather than by level id', () => {
+    // Hints used to taper across a fixed 10-level list. With tiers the taper
+    // belongs to the tier, so a newly-unlocked level is not handed the same
+    // crutches as a beginner's first puzzle.
     for (const l of hanoiLevels) {
-      if (l.id <= 4) expect(l.maxHints).toBe(2)
-      else if (l.id <= 7) expect(l.maxHints).toBe(1)
-      else expect(l.maxHints).toBe(0)
+      const expected = l.tier >= 3 ? 0 : l.tier >= 1 ? 1 : 2
+      expect(l.maxHints, `level ${l.id} at tier ${l.tier}`).toBe(expected)
+    }
+  })
+
+  it('states the optimal move count for every level', () => {
+    // Shown to the player as the target, and used by the star grader.
+    for (const l of hanoiLevels) {
+      expect(l.minMoves).toBe(2 ** l.disks - 1)
     }
   })
 })

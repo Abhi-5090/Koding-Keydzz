@@ -96,7 +96,13 @@ export default function HanoiPlayScreen({ level, onExit, onNext, hasNext, comple
       setAlreadyMastered(false)
       setLevelRank(null)
       setAwarding(true)
-      const res = await completeLevel(level, stars, { moves: movesUsed, timeMs })
+      const res = await completeLevel(level, stars, {
+        moves: movesUsed,
+        timeMs,
+        // Hanoi is the one game the server can grade EXACTLY: the optimum is
+        // 2^disks - 1, and it reads `disks` from its own catalogue.
+        performance: { hintsUsed, mistakes: 0 },
+      })
       if (cancelled.current) return
       setLevelRank(Number.isFinite(res?.levelRank) ? res.levelRank : null)
       const awarded = res?.awarded || { xp: 0, coins: 0 }

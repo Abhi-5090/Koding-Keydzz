@@ -11,6 +11,7 @@ import { worldIcon } from '../data/iconMap'
 import PageTransition from '../components/layout/PageTransition'
 import Card from '../components/ui/Card'
 import XPBar from '../components/ui/XPBar'
+import { useCountUp, useGrowBar, useRevealIn } from '../motion/hooks'
 import Button from '../components/ui/Button'
 import GlowBadge from '../components/ui/GlowBadge'
 import Particles from '../components/ui/Particles'
@@ -20,6 +21,7 @@ import { LoadingState, ErrorState, EmptyState } from '../components/ui/QueryStat
 const FIRSTRUN_KEY = 'kk_dismissed_firstrun'
 
 export default function Dashboard() {
+  const panelsRef = useRevealIn({ selector: ':scope > *', y: 22, stagger: 0.07 })
   const { user } = useAuth()
   const { data: catalog } = useGetAvatarItemsQuery()
   const { data: dash, isLoading, isError, refetch } = useGetDashboardQuery()
@@ -117,11 +119,23 @@ export default function Dashboard() {
           <div className="flex gap-4">
             <Stat icon={Map} label="Progress" value={stats.overallPercent != null ? `${stats.overallPercent}%` : '—'} />
             <Stat icon={Coins} label="Coins" value={stats.coins} />
+            {/* Only shown once there is a streak to show. A permanent "0 day
+                streak" is a reproach, not encouragement. */}
+            {stats.streak > 0 ? (
+              <Stat
+                icon={Flame}
+                label={stats.streak === 1 ? 'Day streak' : 'Day streak'}
+                value={stats.streak}
+              />
+            ) : null}
           </div>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* One staggered entrance for the panel row. The stagger is 70ms — long
+          enough to read as a sequence, short enough that the last card is in
+          place before a child could have reached for it. */}
+      <div ref={panelsRef} className="grid gap-6 lg:grid-cols-3">
         {/* Daily challenges */}
         <Card className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
@@ -229,9 +243,7 @@ export default function Dashboard() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="game-text truncate text-sm" style={{ color: w.tint }}>{w.name}</p>
-                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-malt">
-                      <div className="h-full rounded-full bg-turmeric" style={{ width: `${w.percent ?? 0}%` }} />
-                    </div>
+                    <WorldBar percent={w.percent ?? 0} tint={w.tint} />
                   </div>
                   <span className="shrink-0 text-xs text-text-secondary tabular-nums">{w.percent ?? 0}%</span>
                 </div>
@@ -247,14 +259,44 @@ export default function Dashboard() {
   )
 }
 
-function Stat({ icon, label, value }) {
+/**
+ * A world's progress bar.
+ *
+ * Animated with `scaleX` on a full-width fill, not by tweening `width`: a
+ * width animation re-lays out the row every frame, which is visible as judder
+ * on a tablet. The track keeps its `aria` role on the row above, so the bar
+ * itself is decorative.
+ */
+function WorldBar({ percent, tint }) {
+  const ref = useGrowBar(percent / 100)
   return (
-    <div className="rounded-xl border border-k-border bg-surface/60 px-4 py-3 text-center">
+    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface">
+      <div
+        ref={ref}
+        className="h-full w-full origin-left rounded-full"
+        style={{ background: tint || undefined, transform: `scaleX(${(percent || 0) / 100})` }}
+      />
+    </div>
+  )
+}
+
+function Stat({ icon, label, value }) {
+  const numeric = typeof value === 'number'
+  // Only NUMBERS count up. A percentage string or an em-dash placeholder has
+  // nothing to count, and tweening one produces "NaN" on screen.
+  const countRef = useCountUp(numeric ? value : 0, { enabled: numeric })
+
+  return (
+    <div className="rounded-xl border border-k-border bg-surface/60 px-4 py-3 text-center shadow-card">
       <div className="flex justify-center">
         <AnimatedIcon icon={icon} size={24} animation="float" className="text-turmeric" glow />
       </div>
-      <div className="game-text text-lg font-bold text-turmeric">
-        {typeof value === 'number' ? value.toLocaleString() : value}
+      {/* The final figure is rendered as children as well as animated to.
+          A screen reader reads the DOM, not the tween — and if GSAP never
+          loads, the correct number is already on screen. `tnum` stops the
+          digits jittering as they change width mid-count. */}
+      <div ref={numeric ? countRef : null} className="game-text tnum text-lg font-bold text-turmeric">
+        {numeric ? value.toLocaleString() : value}
       </div>
       <div className="text-xs text-text-secondary">{label}</div>
     </div>

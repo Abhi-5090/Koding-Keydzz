@@ -2,11 +2,18 @@ import { orgRepository } from '../repositories/orgRepository.js';
 import { userRepository } from '../repositories/userRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { slugify, generateOrgCode } from '../utils/orgUtils.js';
-import { setStudentSuspension, resetStudentPassword } from './adminService.js';
+import {
+  setStudentSuspension,
+  resetStudentPassword,
+  updateStudent,
+  deleteStudent,
+  getStudentDetail as getStudentDetailScoped,
+} from './adminService.js';
 import {
   bulkCreateStudents,
   createStudent as createStudentInOrg,
 } from './studentBulkService.js';
+import { broadcast } from './notificationService.js';
 import { lastNMonths, fillMonthlySeries, bucketizeXp } from '../utils/analytics.js';
 import { World } from '../models/World.js';
 import { Lesson } from '../models/Lesson.js';
@@ -42,7 +49,10 @@ function adminSafe(user) {
  * Create an organization plus its admin user in a transaction-like flow.
  * If admin creation fails after the org was created, the org is rolled back.
  */
-export async function createOrg({ name, adminName, adminEmail, adminPassword }, createdBy = null) {
+export async function createOrg(
+  { name, adminName, adminEmail, adminPassword, ...contract },
+  createdBy = null
+) {
   const existingOrg = await orgRepository.findByName(name);
   if (existingOrg) {
     throw ApiError.conflict('An organization with this name already exists');
@@ -61,6 +71,19 @@ export async function createOrg({ name, adminName, adminEmail, adminPassword }, 
     status: 'active',
     createdBy: createdBy || undefined,
     studentCount: 0,
+    facultyCount: 0,
+    adminCount: 1,
+    classroomCount: 0,
+    // Optional contract/contact details from the create form.
+    ...(contract.plan ? { plan: contract.plan } : {}),
+    ...(contract.seatLimit !== undefined ? { seatLimit: contract.seatLimit } : {}),
+    ...(contract.contactName ? { contactName: contract.contactName } : {}),
+    ...(contract.contactEmail ? { contactEmail: contract.contactEmail } : {}),
+    ...(contract.contactPhone ? { contactPhone: contract.contactPhone } : {}),
+    ...(contract.city ? { city: contract.city } : {}),
+    ...(contract.country ? { country: contract.country } : {}),
+    ...(contract.timezone ? { timezone: contract.timezone } : {}),
+    ...(contract.notes ? { notes: contract.notes } : {}),
   });
 
   let admin;
@@ -88,15 +111,35 @@ export async function createOrg({ name, adminName, adminEmail, adminPassword }, 
   return { org: serializeOrg(org), admin: adminSafe(admin) };
 }
 
-function serializeOrg(org, { admin, studentCount } = {}) {
+function serializeOrg(org, { admin, studentCount, facultyCount, adminCount, classroomCount } = {}) {
+  const students =
+    typeof studentCount === 'number' ? studentCount : org.studentCount || 0;
   return {
     id: String(org._id),
     name: org.name,
     slug: org.slug,
     code: org.code,
     status: org.status,
-    studentCount:
-      typeof studentCount === 'number' ? studentCount : org.studentCount || 0,
+    studentCount: students,
+    // Member counts for the new tenancy model: an organization has MANY
+    // admins and faculty, not a single admin.
+    facultyCount: typeof facultyCount === 'number' ? facultyCount : org.facultyCount || 0,
+    adminCount: typeof adminCount === 'number' ? adminCount : org.adminCount || 0,
+    classroomCount:
+      typeof classroomCount === 'number' ? classroomCount : org.classroomCount || 0,
+    // Contract details surfaced in the superadmin console.
+    plan: org.plan || 'trial',
+    seatLimit: org.seatLimit || 0,
+    seatsRemaining: org.seatLimit ? Math.max(0, org.seatLimit - students) : null,
+    seatUtilization: org.seatLimit ? Math.round((students / org.seatLimit) * 100) : null,
+    contactName: org.contactName || '',
+    contactEmail: org.contactEmail || '',
+    contactPhone: org.contactPhone || '',
+    city: org.city || '',
+    country: org.country || '',
+    timezone: org.timezone || '',
+    notes: org.notes || '',
+    // Primary contact admin (the org may have others).
     admin: admin || null,
     createdAt: org.createdAt,
   };
@@ -104,19 +147,32 @@ function serializeOrg(org, { admin, studentCount } = {}) {
 
 export async function listOrgs() {
   const orgs = await orgRepository.listAll();
-  const items = await Promise.all(
-    orgs.map(async (org) => {
-      const studentCount = await userRepository.count({
-        role: 'student',
-        org: org._id,
-      });
-      const adminDoc = org.adminUser;
-      const admin = adminDoc
-        ? { name: adminDoc.name, email: adminDoc.email }
-        : null;
-      return serializeOrg(org, { admin, studentCount });
-    })
-  );
+
+  // One grouped query for every org's member counts instead of N queries in a
+  // loop — this list is the superadmin's landing page.
+  const counts = await User.aggregate([
+    { $match: { org: { $ne: null }, deletedAt: null } },
+    { $group: { _id: { org: '$org', role: '$role' }, count: { $sum: 1 } } },
+  ]);
+  const byOrg = new Map();
+  for (const row of counts) {
+    const key = String(row._id.org);
+    if (!byOrg.has(key)) byOrg.set(key, {});
+    byOrg.get(key)[row._id.role] = row.count;
+  }
+
+  const items = orgs.map((org) => {
+    const c = byOrg.get(String(org._id)) || {};
+    const adminDoc = org.adminUser;
+    const admin = adminDoc ? { name: adminDoc.name, email: adminDoc.email } : null;
+    return serializeOrg(org, {
+      admin,
+      studentCount: c.student || 0,
+      facultyCount: c.faculty || 0,
+      adminCount: c.admin || 0,
+    });
+  });
+
   return { items, total: items.length };
 }
 
@@ -124,19 +180,47 @@ export async function getOrg(id) {
   const org = await orgRepository.findById(id);
   if (!org) throw ApiError.notFound('Organization not found');
 
-  const [studentCount, adminUser] = await Promise.all([
-    userRepository.count({ role: 'student', org: org._id }),
-    org.adminUser ? userRepository.findById(org.adminUser) : null,
-  ]);
+  const { Classroom } = await import('../models/Classroom.js');
+  const [studentCount, facultyCount, adminCount, classroomCount, adminUser, admins] =
+    await Promise.all([
+      userRepository.count({ role: 'student', org: org._id, deletedAt: null }),
+      userRepository.count({ role: 'faculty', org: org._id, deletedAt: null }),
+      userRepository.count({ role: 'admin', org: org._id, deletedAt: null }),
+      Classroom.countDocuments({ org: org._id, archivedAt: null }),
+      org.adminUser ? userRepository.findById(org.adminUser) : null,
+      // ALL administrators, not just the primary contact.
+      userRepository.model
+        .find({ role: 'admin', org: org._id, deletedAt: null })
+        .select('name email status lastLoginAt'),
+    ]);
 
   const admin = adminUser ? adminSafe(adminUser) : null;
   return {
-    ...serializeOrg(org, { admin, studentCount }),
-    counts: { students: studentCount, admins: adminUser ? 1 : 0 },
+    ...serializeOrg(org, {
+      admin,
+      studentCount,
+      facultyCount,
+      adminCount,
+      classroomCount,
+    }),
+    counts: {
+      students: studentCount,
+      faculty: facultyCount,
+      admins: adminCount,
+      classrooms: classroomCount,
+    },
+    admins: admins.map((a) => ({
+      id: String(a._id),
+      name: a.name,
+      email: a.email || null,
+      status: a.status,
+      lastLoginAt: a.lastLoginAt || null,
+      isPrimary: String(a._id) === String(org.adminUser || ''),
+    })),
   };
 }
 
-export async function updateOrg(id, { name, status }) {
+export async function updateOrg(id, { name, status, ...rest }) {
   const org = await orgRepository.findById(id);
   if (!org) throw ApiError.notFound('Organization not found');
 
@@ -159,11 +243,29 @@ export async function updateOrg(id, { name, status }) {
     // Suspending an org revokes the sessions of its admin + students so they
     // are forced through login (where the org status is re-checked).
     if (status === 'suspended') {
+      // Clear BOTH the multi-device session list and the legacy single-hash
+      // field, or a signed-in device would survive the suspension.
       await userRepository.model.updateMany(
         { org: org._id },
-        { refreshTokenHash: null }
+        { sessions: [], refreshTokenHash: null }
       );
     }
+  }
+
+  // Contract / contact fields. Only assign what was actually supplied so a
+  // partial update never blanks a field it did not mention.
+  for (const field of [
+    'plan',
+    'seatLimit',
+    'contactName',
+    'contactEmail',
+    'contactPhone',
+    'city',
+    'country',
+    'timezone',
+    'notes',
+  ]) {
+    if (rest[field] !== undefined) org[field] = rest[field];
   }
 
   await org.save();
@@ -204,13 +306,17 @@ export async function deleteOrg(id) {
 }
 
 export async function getStats() {
-  const [totalOrgs, activeOrgs, totalAdmins, totalStudents] = await Promise.all([
-    orgRepository.count(),
-    orgRepository.count({ status: 'active' }),
-    userRepository.count({ role: 'admin' }),
-    userRepository.count({ role: 'student' }),
-  ]);
-  return { totalOrgs, activeOrgs, totalAdmins, totalStudents };
+  // deletedAt: null everywhere — soft-deleted accounts must not inflate a
+  // headline count. Faculty is counted separately now that the role exists.
+  const [totalOrgs, activeOrgs, totalAdmins, totalFaculty, totalStudents] =
+    await Promise.all([
+      orgRepository.count(),
+      orgRepository.count({ status: 'active' }),
+      userRepository.count({ role: 'admin', deletedAt: null }),
+      userRepository.count({ role: 'faculty', deletedAt: null }),
+      userRepository.count({ role: 'student', deletedAt: null }),
+    ]);
+  return { totalOrgs, activeOrgs, totalAdmins, totalFaculty, totalStudents };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -406,6 +512,11 @@ export async function listAllStudents({ search = '', org = null, page = 1, limit
   };
 }
 
+// A single student's profile + progress, any org (superadmin is unscoped).
+export async function getStudentDetail(id) {
+  return getStudentDetailScoped(id, null);
+}
+
 // Global suspend/reset reuse the org-agnostic adminService helpers (org=null).
 export async function suspendStudentGlobal(id, suspend = true) {
   return setStudentSuspension(id, suspend, null);
@@ -413,6 +524,14 @@ export async function suspendStudentGlobal(id, suspend = true) {
 
 export async function resetStudentPasswordGlobal(id, password = null) {
   return resetStudentPassword(id, password, null);
+}
+
+export async function updateStudentGlobal(id, patch = {}) {
+  return updateStudent(id, patch, null);
+}
+
+export async function deleteStudentGlobal(id) {
+  return deleteStudent(id, null);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -444,7 +563,209 @@ export async function createOrgStudent(orgId, payload) {
   return createStudentInOrg(payload, orgId);
 }
 
+/** A specific org's student — 404 if the org is missing or the student isn't in it. */
+export async function getOrgStudentDetail(orgId, studentId) {
+  await requireOrgById(orgId);
+  return getStudentDetailScoped(studentId, orgId);
+}
+
+
+/**
+ * Platform-wide announcement, or one targeted at a single organization.
+ *
+ * This is the ONLY unscoped broadcast in the system and it is deliberately
+ * restricted to superadmin. Org admins use adminService.broadcastNotification,
+ * which is hard-scoped to their own tenant.
+ *
+ * @param {object} args
+ * @param {string} args.title
+ * @param {string} [args.body]
+ * @param {'all'|'students'} [args.scope]
+ * @param {*} [args.org]  When supplied, limits delivery to that organization.
+ */
+export async function broadcastPlatform({ title, body, scope = 'all', org = null }) {
+  const filter = { status: 'active' };
+  if (scope === 'students') filter.role = 'student';
+  if (org) filter.org = org;
+
+  const users = await userRepository.find(filter, { select: '_id' });
+  const userIds = users.map((u) => u._id);
+
+  const result = await broadcast({ type: 'broadcast', title, body, userIds });
+  return { ...result, scope, org: org ? String(org) : null };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Organization assignment — every user belongs to a school.                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * List users who belong to NO organization.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * `User.org` defaults to `null`, and public self-registration
+ * (`POST /auth/register`, gated by ALLOW_STUDENT_SIGNUP) never set it. Any
+ * account created that way is a tenant orphan: no school owns it, so no admin
+ * can see it, it appears on no classroom, and it is scoped out of every
+ * org-filtered query — including the ones that decide what a teacher is shown.
+ * The pupil can still sign in, which is what makes it easy to miss.
+ *
+ * `superadmin` is excluded because being org-less is CORRECT for that role —
+ * it is the platform operator, deliberately above every tenant.
+ */
+export async function listUnassignedUsers({ search = '', page = 1, limit = 25 } = {}) {
+  const filter = {
+    org: null,
+    role: { $ne: 'superadmin' },
+    deletedAt: null,
+  };
+  if (search) {
+    const rx = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    filter.$or = [{ name: rx }, { email: rx }, { username: rx }];
+  }
+
+  const skip = (Math.max(1, page) - 1) * limit;
+  const [docs, total] = await Promise.all([
+    User.find(filter)
+      .select('name firstName lastName email username role grade createdAt lastLoginAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    User.countDocuments(filter),
+  ]);
+
+  return {
+    items: docs.map((u) => ({
+      id: String(u._id),
+      name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+      email: u.email || '',
+      username: u.username || '',
+      role: u.role,
+      grade: u.grade || '',
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt || null,
+    })),
+    total,
+    page: Math.max(1, page),
+    limit,
+    pages: Math.max(1, Math.ceil(total / limit)),
+  };
+}
+
+/**
+ * Put a user into an organization, or move them between organizations.
+ *
+ * THE SIDE EFFECTS THAT MAKE THIS MORE THAN A FIELD WRITE
+ * -------------------------------------------------------
+ * `org` is the tenant boundary, so changing it re-homes everything scoped by
+ * it. Writing the field alone would leave the account visible in two schools
+ * at once:
+ *
+ *  1. CLASSROOMS. Membership lives on the Classroom document, which carries
+ *     its own `org`. A pupil moved to a new school while still listed on their
+ *     old school's class roster would keep appearing in that teacher's lists
+ *     and analytics — a cross-tenant data leak. They are pulled from every
+ *     classroom in the previous org (as student AND as faculty).
+ *  2. ROLL NUMBER. `(org, rollNumber)` is uniquely indexed, so a pupil whose
+ *     roll number is already taken in the destination would fail the write
+ *     with a raw E11000. Detected up front and reported in plain language.
+ *  3. SEAT LIMIT. A school on a seat-limited plan must not be pushed over it
+ *     by a move it did not ask for.
+ *
+ * Member counts need no fixup: they are aggregated live from User (see
+ * `listOrgs`), never incremented by hand.
+ *
+ * @param {string} userId
+ * @param {string} orgId
+ * @returns {Promise<{ id, name, role, from, to, classroomsLeft }>}
+ */
+export async function assignUserOrganization(userId, orgId) {
+  const user = await userRepository.findById(userId);
+  if (!user || user.deletedAt) throw ApiError.notFound('User not found');
+
+  // The platform operator is org-less on purpose; giving it a tenant would
+  // scope its own queries and lock it out of every other school.
+  if (user.role === 'superadmin') {
+    throw ApiError.badRequest(
+      'The superadmin account is not part of any organization and cannot be assigned to one'
+    );
+  }
+
+  const org = await requireOrgById(orgId);
+  if (org.status && org.status !== 'active') {
+    throw ApiError.badRequest(
+      `${org.name} is ${org.status}. Reactivate it before moving people into it.`
+    );
+  }
+
+  const previousOrg = user.org ? String(user.org) : null;
+  if (previousOrg === String(org._id)) {
+    throw ApiError.badRequest(`This user is already in ${org.name}`);
+  }
+
+  // ---- roll number collision in the destination ----
+  if (user.rollNumber) {
+    const clash = await User.findOne({
+      org: org._id,
+      rollNumber: user.rollNumber,
+      deletedAt: null,
+      _id: { $ne: user._id },
+    })
+      .select('name')
+      .lean();
+    if (clash) {
+      throw ApiError.conflict(
+        `Roll number "${user.rollNumber}" is already used by ${clash.name} in ${org.name}. ` +
+          "Clear or change this user's roll number first."
+      );
+    }
+  }
+
+  // ---- seat limit on the destination ----
+  if (user.role === 'student' && org.seatLimit) {
+    const seatsUsed = await User.countDocuments({
+      org: org._id,
+      role: 'student',
+      deletedAt: null,
+    });
+    if (seatsUsed >= org.seatLimit) {
+      throw ApiError.badRequest(
+        `${org.name} has no seats left (${seatsUsed} of ${org.seatLimit} used). ` +
+          'Raise the seat limit before moving another pupil in.'
+      );
+    }
+  }
+
+  // ---- leave the previous school's classrooms ----
+  // Done BEFORE the org write, so a failure here cannot leave the user
+  // re-homed but still on the old roster.
+  let classroomsLeft = 0;
+  if (previousOrg) {
+    const { Classroom } = await import('../models/Classroom.js');
+    const res = await Classroom.updateMany(
+      { org: previousOrg, $or: [{ students: user._id }, { faculty: user._id }] },
+      { $pull: { students: user._id, faculty: user._id } }
+    );
+    classroomsLeft = res.modifiedCount ?? res.nModified ?? 0;
+  }
+
+  user.org = org._id;
+  await user.save();
+
+  return {
+    id: String(user._id),
+    name: user.name,
+    role: user.role,
+    from: previousOrg,
+    to: { id: String(org._id), name: org.name, code: org.code },
+    classroomsLeft,
+  };
+}
+
 export default {
+  broadcastPlatform,
   createOrg,
   listOrgs,
   getOrg,
@@ -454,9 +775,15 @@ export default {
   getStats,
   getAnalytics,
   listAllStudents,
+  getStudentDetail,
   suspendStudentGlobal,
   resetStudentPasswordGlobal,
+  updateStudentGlobal,
+  deleteStudentGlobal,
   listOrgStudents,
   bulkCreateOrgStudents,
   createOrgStudent,
+  getOrgStudentDetail,
+  listUnassignedUsers,
+  assignUserOrganization,
 };

@@ -1,5 +1,6 @@
 import { ApiError } from '../utils/ApiError.js';
 import { env } from '../config/env.js';
+import { captureError } from '../config/monitoring.js';
 
 export const notFound = (req, _res, next) => {
   next(ApiError.notFound(`Route not found: ${req.method} ${req.originalUrl}`));
@@ -51,13 +52,16 @@ export const errorHandler = (err, req, res, _next) => {
     // too, so nothing is lost regardless of what we expose to the client.
     console.error(err);
 
-    // Optional error-tracking hook. When SENTRY_DSN is configured we emit a
-    // structured record here. To wire full APM, install `@sentry/node`,
-    // initialize it in src/server.js, and replace this block with
-    // `Sentry.captureException(err)`. See DEPLOYMENT.md → Monitoring & Backups.
-    if (env.SENTRY_DSN) {
-      console.error('[sentry]', JSON.stringify({ ...record, stack: err.stack }));
-    }
+    // Ship the failure to Sentry when SENTRY_DSN is configured (no-op
+    // otherwise). Request bodies are stripped in monitoring.js — they carry
+    // student names and, on the login route, passwords.
+    captureError(err, {
+      method: req?.method,
+      path: req?.originalUrl,
+      status: statusCode,
+      userId: req?.user?._id ? String(req.user._id) : undefined,
+      org: req?.user?.org ? String(req.user.org) : undefined,
+    });
   }
 
   const isProd = env.NODE_ENV === 'production';

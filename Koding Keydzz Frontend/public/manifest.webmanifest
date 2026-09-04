@@ -1,0 +1,19 @@
+{
+  "name": "Koding Keydzz",
+  "short_name": "Keydzz",
+  "description": "Learn coding through adventure — Python, C, HTML & CSS and AI.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#001621",
+  "theme_color": "#001621",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

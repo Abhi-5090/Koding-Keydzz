@@ -1,21 +1,45 @@
 import { useState } from 'react'
 import Editor from '@monaco-editor/react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Code, Play, Loader2, Terminal, PartyPopper, Zap, Braces } from 'lucide-react'
+import { Code, Play, Loader2, Terminal, PartyPopper, Zap } from 'lucide-react'
 import { runCode, isPythonReady } from '../features/playground/runners'
 import PageTransition from '../components/layout/PageTransition'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import AnimatedIcon from '../components/ui/AnimatedIcon'
 import Confetti from '../components/ui/Confetti'
+import { configureMonaco } from '../lib/monacoLoader'
 
+// Point Monaco at this app's own origin BEFORE the editor mounts.
+// Unconfigured, @monaco-editor/react fetches ~3 MB from jsDelivr at
+// runtime, so a school network that filters CDNs leaves the Playground
+// with no editor. `loader.config` is ignored once loading has started,
+// which is why this runs at module scope rather than in an effect.
+configureMonaco()
+
+/**
+ * Starter code per language.
+ *
+ * Python only for now. JavaScript was removed with the move to a course
+ * ladder — it belonged to no course, so it sat in this picker with no lessons,
+ * quizzes or games behind it. C and HTML arrive with their own courses.
+ */
 const STARTERS = {
   python: `# Python Playground\n# Print a greeting and add some numbers!\n\nname = "Hero"\nprint("Hello, " + name + "!")\nprint("2 + 3 =", 2 + 3)\n`,
-  javascript: `// JavaScript Playground\n// Print a greeting and add some numbers!\n\nconst name = "Hero";\nconsole.log("Hello, " + name + "!");\nconsole.log("2 + 3 =", 2 + 3);\n`,
 }
 
+/** File extension shown on the editor tab, per language. */
+const EXTENSIONS = { python: 'py', c: 'c', html: 'html' }
+
 export default function Playground() {
-  const [language, setLanguage] = useState('python')
+  /**
+   * The language this playground runs.
+   *
+   * A constant rather than state: there is one language, so `setLanguage` was
+   * never called and an unused setter reads as an unfinished feature. It
+   * becomes state again when a pupil can have more than one course unlocked.
+   */
+  const language = 'python'
   const [code, setCode] = useState(STARTERS.python)
   const [output, setOutput] = useState([])
   const [errorOut, setErrorOut] = useState('')
@@ -25,14 +49,6 @@ export default function Playground() {
   const [running, setRunning] = useState(false)
   // First-run only: the Python (Pyodide/WASM) engine downloads from the CDN.
   const [loadingPython, setLoadingPython] = useState(false)
-
-  const switchLang = (lang) => {
-    setLanguage(lang)
-    setCode(STARTERS[lang])
-    setOutput([])
-    setErrorOut('')
-    setRan(false)
-  }
 
   const handleRun = async () => {
     setOutput([])
@@ -83,15 +99,15 @@ export default function Playground() {
           </h1>
           <p className="text-text-secondary">Write real code, hit run, see real output!</p>
         </div>
+        {/* One language, so this is a label rather than a picker — a toggle
+            with a single option is a control that cannot do anything. It
+            becomes a real picker again when the C and HTML courses land and a
+            pupil has more than one unlocked. */}
         <div className="flex items-center gap-2">
-          <LangButton active={language === 'python'} onClick={() => switchLang('python')}>
+          <span className="game-text inline-flex items-center gap-2 rounded-xl border border-k-border bg-surface/70 px-3 py-2 text-sm text-turmeric">
             <AnimatedIcon icon={Code} size={16} animation="hover" />
             Python
-          </LangButton>
-          <LangButton active={language === 'javascript'} onClick={() => switchLang('javascript')}>
-            <AnimatedIcon icon={Braces} size={16} animation="hover" />
-            JavaScript
-          </LangButton>
+          </span>
         </div>
       </div>
 
@@ -99,7 +115,7 @@ export default function Playground() {
         {/* Editor */}
         <Card hover={false} className="overflow-hidden p-0">
           <div className="flex items-center justify-between border-b border-k-border px-4 py-2">
-            <span className="game-text text-sm text-text-secondary">main.{language === 'python' ? 'py' : 'js'}</span>
+            <span className="game-text text-sm text-text-secondary">main.{EXTENSIONS[language] || 'txt'}</span>
             <div className="flex gap-1.5">
               <span className="h-3 w-3 rounded-full bg-error" />
               <span className="h-3 w-3 rounded-full bg-accent" />
@@ -137,8 +153,8 @@ export default function Playground() {
           </div>
           <div className="scrollbar-thin min-h-[380px] flex-1 overflow-auto bg-malt/80 p-4 font-mono text-sm">
             {!ran && !running && (
-              <p className="flex items-center gap-1.5 text-text-secondary/60">
-                <AnimatedIcon icon={Play} size={14} animation="none" className="text-text-secondary/60" />
+              <p className="flex items-center gap-1.5 text-text-secondary/70">
+                <AnimatedIcon icon={Play} size={14} animation="none" className="text-text-secondary/70" />
                 Output will appear here. Press Run.
               </p>
             )}
@@ -159,7 +175,7 @@ export default function Playground() {
                 transition={{ delay: i * 0.05 }}
                 className="text-success"
               >
-                <span className="mr-2 text-text-secondary/50">›</span>
+                <span className="mr-2 text-text-secondary/70">›</span>
                 {line}
               </motion.div>
             ))}
@@ -204,15 +220,3 @@ export default function Playground() {
   )
 }
 
-function LangButton({ active, children, ...props }) {
-  return (
-    <button
-      {...props}
-      className={`game-text inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm transition-[background-color,border-color,color,box-shadow] duration-200 ${
-        active ? 'bg-turmeric text-malt shadow-golden-glow' : 'border border-k-border bg-surface/60 text-text-secondary hover:text-turmeric'
-      }`}
-    >
-      {children}
-    </button>
-  )
-}

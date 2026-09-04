@@ -3,6 +3,7 @@ import { lessonRepository } from '../repositories/lessonRepository.js';
 import { challengeRepository } from '../repositories/challengeRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { computeLevel, XP_REWARDS } from '../utils/xp.js';
+import { recordLearningActivity } from './streakService.js';
 import { createNotification } from './notificationService.js';
 import { checkAndUnlockAchievements } from './achievementService.js';
 
@@ -17,6 +18,16 @@ async function applyGain(user, { xp = 0, coins = 0 }) {
   user.xp += xp;
   user.coins += coins;
   user.totalCoinsEarned += coins;
+
+  /**
+   * Keep the daily streak BEFORE the level is computed.
+   *
+   * The streak bonus is XP, so it has to land before `computeLevel` or a pupil
+   * whose bonus takes them over a threshold would not be told they levelled up
+   * until their next activity. Ordering, not decoration.
+   */
+  const streak = await recordLearningActivity(user);
+
   user.level = computeLevel(user.xp);
   await user.save();
 
@@ -31,7 +42,7 @@ async function applyGain(user, { xp = 0, coins = 0 }) {
   }
 
   await checkAndUnlockAchievements(user);
-  return { user, previousLevel, leveledUp };
+  return { user, previousLevel, leveledUp, streak };
 }
 
 export async function completeLesson(userId, lessonId) {
@@ -57,7 +68,7 @@ export async function completeLesson(userId, lessonId) {
     user.lessonsCompleted += 1;
   }
 
-  const { leveledUp } = await applyGain(user, { xp: xpEarned, coins: coinsEarned });
+  const { leveledUp, streak } = await applyGain(user, { xp: xpEarned, coins: coinsEarned });
 
   return {
     xpEarned,
@@ -66,6 +77,7 @@ export async function completeLesson(userId, lessonId) {
     leveledUp,
     coins: user.coins,
     alreadyCompleted: already,
+    streak,
   };
 }
 

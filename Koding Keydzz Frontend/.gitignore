@@ -26,3 +26,14 @@ dist-ssr
 # Env (keep .env for local demo, ignore secrets)
 .env.local
 .env.*.local
+
+# Self-hosted Python runtime (~13 MB of WebAssembly binaries).
+# Fetched on demand with `npm run fetch:pyodide` rather than committed — git
+# would keep them for the life of the repository. The build FAILS if
+# VITE_PYODIDE_URL points here and they are absent, so a deploy cannot
+# silently fall back to a CDN that a school network blocks.
+public/pyodide/
+
+# Monaco editor, copied from node_modules by `npm run fetch:monaco`.
+# A ~15 MB build artifact, not source — regenerated in CI and on deploy.
+public/monaco/

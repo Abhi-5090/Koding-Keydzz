@@ -5,15 +5,21 @@
  * server-side code execution / RCE surface. The old `POST /playground/run`
  * endpoint is no longer used.
  *
- *   • Python  → Pyodide (CPython compiled to WebAssembly), lazy-loaded from a
- *               CDN on first run and memoized for the tab's lifetime.
- *   • JavaScript → a sandboxed Web Worker (no DOM, no window) with a hard
- *               wall-clock timeout the parent enforces via `worker.terminate()`.
+ *   • Python → Pyodide (CPython compiled to WebAssembly), lazy-loaded on first
+ *     run and memoized for the tab's lifetime.
+ *
+ * JAVASCRIPT WAS REMOVED, along with the sandboxed Web Worker that ran it. The
+ * platform is a course ladder now (Python → C → HTML → AI) and JavaScript
+ * belonged to no course, so it sat in the language picker with no lessons,
+ * quizzes or games behind it.
+ *
+ * C and HTML arrive with their own courses and will not reuse this path: C
+ * needs a compile step, and HTML is rendered in a preview pane rather than
+ * executed.
  *
  * Public API:
  *   runCode({ language, code, stdin }) -> Promise<{ stdout, stderr, output }>
  *   runPython(code, { stdin })         -> Promise<{ stdout, stderr, output }>
- *   runJavaScript(code)                -> Promise<{ stdout, stderr, output }>
  *   loadPythonEngine()                 -> Promise<pyodide>   (warm-up / preload)
  *   isPythonReady()                    -> boolean            (sync, for UX)
  *
@@ -26,11 +32,41 @@
  *  Python — Pyodide (WebAssembly), loaded from CDN and memoized.
  * ------------------------------------------------------------------ */
 
-// Pinned version. NOTE: for offline / production hardening, self-host the
-// Pyodide assets under /public (copy the `full/` dir) and point PYODIDE_CDN at
-// e.g. `/pyodide/v0.26.4/full/` — no code changes needed beyond this constant.
+// Pinned version.
 const PYODIDE_VERSION = '0.26.4'
-const PYODIDE_CDN = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`
+
+/**
+ * Where the Pyodide runtime is loaded from.
+ *
+ * SELF-HOSTING IS STRONGLY RECOMMENDED FOR SCHOOLS. Two independent reasons:
+ *
+ *  1. School networks routinely block public CDNs. When jsdelivr is filtered,
+ *     every Python lesson fails with "couldn't load the Python engine" — in
+ *     exactly the environment this product is sold into.
+ *  2. Pyodide is a ~10 MB download per device. Served from your own origin it
+ *     is cached by the proxy instead of crossing the school's uplink thirty
+ *     times when a class starts.
+ *
+ * To self-host:
+ *   1. Download the Pyodide release and copy its `full/` directory to
+ *        public/pyodide/v0.26.4/full/
+ *   2. Set VITE_PYODIDE_URL=/pyodide/v0.26.4/full/
+ *
+ * The bundled nginx config already serves /pyodide/ with the correct
+ * `application/wasm` type and a long cache. Its CSP also allows the CDN
+ * fallback plus the `blob:` worker the JavaScript runner needs — a
+ * `default-src 'self'` policy silently breaks both runners.
+ *
+ * Must end with a trailing slash.
+ */
+const PYODIDE_CDN = (() => {
+  const configured = import.meta.env?.VITE_PYODIDE_URL
+  if (configured && String(configured).trim()) {
+    const url = String(configured).trim()
+    return url.endsWith('/') ? url : `${url}/`
+  }
+  return `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`
+})()
 
 // Soft budget: Pyodide runs on the main thread and CPython cannot be preempted
 // from JS without SharedArrayBuffer + cross-origin isolation (not available
@@ -162,128 +198,30 @@ export async function runPython(code, { stdin = '' } = {}) {
 }
 
 /* ------------------------------------------------------------------ *
- *  JavaScript — sandboxed Web Worker with a hard timeout.
- * ------------------------------------------------------------------ */
-
-const JS_TIMEOUT_MS = 4000
-
-// Worker body. Runs inside a Worker global scope: no `window`, no `document`,
-// no DOM — so it cannot touch the page. console.* is overridden to stream
-// captured output back to the parent; a top-level try/catch reports errors.
-const JS_WORKER_SOURCE = `
-self.onmessage = function (e) {
-  var code = e.data && e.data.code
-  var out = []
-  var errOut = []
-
-  function fmt(v) {
-    if (typeof v === 'string') return v
-    if (v instanceof Error) return v.stack || (v.name + ': ' + v.message)
-    try {
-      return JSON.stringify(v, function (k, val) {
-        return typeof val === 'bigint' ? val.toString() + 'n'
-          : typeof val === 'function' ? '[Function]'
-          : typeof val === 'undefined' ? '[undefined]'
-          : val
-      }, 2)
-    } catch (_) {
-      return String(v)
-    }
-  }
-  function line(bucket, args) {
-    bucket.push(Array.prototype.map.call(args, fmt).join(' '))
-  }
-
-  console.log = function () { line(out, arguments) }
-  console.info = function () { line(out, arguments) }
-  console.debug = function () { line(out, arguments) }
-  console.warn = function () { line(out, arguments) }
-  console.error = function () { line(errOut, arguments) }
-
-  try {
-    // Indirect eval → runs in global (worker) scope, not this function's scope.
-    (0, eval)(code)
-    self.postMessage({ stdout: out.join('\\n'), stderr: errOut.join('\\n') })
-  } catch (err) {
-    var msg = err instanceof Error ? (err.stack || (err.name + ': ' + err.message)) : String(err)
-    errOut.push(msg)
-    self.postMessage({ stdout: out.join('\\n'), stderr: errOut.join('\\n') })
-  }
-}
-`
-
-/**
- * Run JavaScript source in a sandboxed Worker, terminating it if it exceeds
- * JS_TIMEOUT_MS (guards against infinite loops).
- * @param {string} code
- * @returns {Promise<{ stdout: string, stderr: string, output: string }>}
- */
-export function runJavaScript(code) {
-  return new Promise((resolve) => {
-    let worker
-    let blobUrl
-    try {
-      blobUrl = URL.createObjectURL(
-        new Blob([JS_WORKER_SOURCE], { type: 'application/javascript' })
-      )
-      worker = new Worker(blobUrl)
-    } catch (e) {
-      resolve({
-        stdout: '',
-        stderr: 'Could not start the JavaScript sandbox: ' + (e?.message || e),
-        output: '',
-      })
-      return
-    }
-
-    let settled = false
-    const cleanup = () => {
-      if (worker) worker.terminate()
-      if (blobUrl) URL.revokeObjectURL(blobUrl)
-    }
-    const finish = (result) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      cleanup()
-      resolve({ output: result.stdout, ...result })
-    }
-
-    const timer = setTimeout(() => {
-      finish({
-        stdout: '',
-        stderr:
-          'Your code took too long to finish (over 4s). Check for a loop that never ends.',
-      })
-    }, JS_TIMEOUT_MS)
-
-    worker.onmessage = (e) => {
-      const { stdout = '', stderr = '' } = e.data || {}
-      finish({ stdout, stderr })
-    }
-    worker.onerror = (e) => {
-      finish({ stdout: '', stderr: e?.message || 'JavaScript error.' })
-    }
-
-    worker.postMessage({ code })
-  })
-}
-
-/* ------------------------------------------------------------------ *
  *  Dispatcher
  * ------------------------------------------------------------------ */
 
 /**
  * Run student code entirely client-side.
- * @param {{ language: 'python'|'javascript', code: string, stdin?: string }} args
+ *
+ * Python only. JavaScript was removed with the move to a course ladder — it
+ * belonged to no course, so it appeared in the runner while having no lessons,
+ * quizzes or games behind it. Its sandboxed Web Worker went with it.
+ *
+ * C and HTML arrive with their courses: C needs a compile step, and HTML is
+ * rendered in a preview pane rather than executed. Neither fits this
+ * interpreter-shaped path, so each will get its own rather than a stub here.
+ *
+ * @param {{ language: 'python', code: string, stdin?: string }} args
  * @returns {Promise<{ stdout: string, stderr: string, output: string }>}
  */
 export function runCode({ language, code, stdin = '' }) {
   if (language === 'python') return runPython(code, { stdin })
-  if (language === 'javascript') return runJavaScript(code)
   return Promise.resolve({
     stdout: '',
-    stderr: `Unsupported language: ${language}`,
+    stderr:
+      `${language} cannot be run yet — this playground currently runs Python. ` +
+      'Your course will tell you which language to use.',
     output: '',
   })
 }

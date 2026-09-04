@@ -4,6 +4,7 @@ import levels from '../../data/sudokuLevels'
 import LeveledGamePage from '../../components/games/LeveledGamePage'
 import HowToPlayModal from '../../components/games/HowToPlayModal'
 import SudokuPlayScreen from './sudoku/SudokuPlayScreen'
+import { BOARD_MUTED } from '../../theme/tokens'
 
 const GAME_KEY = 'sudoku'
 const TINT = '#2DD4BF'
@@ -96,7 +97,7 @@ function ExampleMini({ tint }) {
               key={`${r}-${c}`}
               className="flex h-7 w-7 items-center justify-center font-game text-sm font-bold"
               style={{
-                color: r === 0 ? tint : '#9DB8C4',
+                color: r === 0 ? tint : BOARD_MUTED,
                 background: r === 0 ? `${tint}1f` : 'transparent',
                 borderRight: c === 1 ? `2px solid ${tint}88` : `1px solid ${tint}22`,
                 borderBottom: r === 1 ? `2px solid ${tint}88` : `1px solid ${tint}22`,

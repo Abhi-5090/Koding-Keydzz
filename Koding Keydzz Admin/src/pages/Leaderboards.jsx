@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, Zap, Crown, Medal } from 'lucide-react';
 import { useGetLeaderboardQuery } from '../features/admin/adminApi';
@@ -12,12 +11,6 @@ function asList(data) {
   // Backend now returns { scope, entries, me }; keep older shapes working too.
   return data?.entries || data?.leaderboard || [];
 }
-
-const TYPES = [
-  { value: 'global', label: 'Global' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-];
 
 const PODIUM = [
   { place: 1, icon: Crown, ring: 'ring-turmeric', bg: 'from-turmeric/30', order: 'sm:order-2', height: 'sm:h-44', label: 'text-turmeric' },
@@ -67,8 +60,9 @@ function Podium({ top3 }) {
 }
 
 export default function Leaderboards() {
-  const [type, setType] = useState('global');
-  const { data, isError, isLoading, error, refetch } = useGetLeaderboardQuery(type);
+  // The backend serves a single global ranking (no time-boxed boards), so we
+  // show one board rather than duplicating it under Weekly/Monthly labels.
+  const { data, isError, isLoading, error, refetch } = useGetLeaderboardQuery('global');
 
   const rows = asList(data);
   const top3 = rows.slice(0, 3);
@@ -109,25 +103,11 @@ export default function Leaderboards() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Leaderboards" subtitle="Top performing students">
-        <div className="flex rounded-xl border border-k-border bg-malt/40 p-1">
-          {TYPES.map((t) => (
-            <button
-              key={t.value}
-              onClick={() => setType(t.value)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-150 ease-out active:scale-[0.97] ${
-                type === t.value ? 'bg-turmeric text-malt' : 'text-text-secondary hover:text-turmeric'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </PageHeader>
+      <PageHeader title="Leaderboards" subtitle="Top performing students" />
 
       <div className="k-card flex items-center gap-2 px-5 py-3 text-sm text-text-secondary">
         <AnimatedIcon icon={Trophy} size={16} animation="pulse" className="text-turmeric" />
-        Showing the <span className="font-semibold text-text-primary">{type}</span> leaderboard
+        Showing the <span className="font-semibold text-text-primary">global</span> leaderboard, ranked by total XP.
       </div>
 
       <QueryState

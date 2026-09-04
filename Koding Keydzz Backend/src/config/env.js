@@ -18,6 +18,16 @@ const envSchema = z.object({
     .default('development'),
   // Code-execution strategy for the playground (see codeExecutionService).
   CODE_RUNNER: z.enum(['auto', 'local', 'piston']).optional(),
+
+  /**
+   * External task grading (optional).
+   *
+   * Both must be set for it to be usable, AND the question must opt in — see
+   * services/externalValidator.js. Sending a child's examined work to a third
+   * party is a decision, so the safe path is what you get by doing nothing.
+   */
+  TASK_VALIDATOR_URL: z.string().url().optional(),
+  TASK_VALIDATOR_API_KEY: z.string().min(16).optional(),
   // Feature flags (string 'true' to enable; default off). Read at request time
   // in the routes, mirrored here so they're documented and validated at boot.
   ALLOW_STUDENT_SIGNUP: z.enum(['true', 'false']).optional(),
@@ -28,6 +38,20 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
+  /**
+   * Redis, for running MORE THAN ONE API instance.
+   *
+   * Socket.IO keeps its rooms in each process's memory. With two instances and
+   * no shared backplane, a notification emitted on instance A never reaches a
+   * pupil whose socket is held by instance B — the emit simply finds no room
+   * and disappears, with nothing logged. Setting this makes every room emit
+   * cross-instance (see src/sockets/index.js).
+   *
+   * Leave it unset for a single instance; nothing else changes.
+   */
+  REDIS_URL: z.string().optional(),
+  /** Optional label for this instance, used only to make logs readable. */
+  INSTANCE_ID: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -97,6 +121,10 @@ export const env = {
   clientOrigins: data.CLIENT_ORIGINS.split(',')
     .map((o) => o.trim())
     .filter(Boolean),
+
+  // Read through named properties so no call site has to know the raw env keys.
+  taskValidatorUrl: data.TASK_VALIDATOR_URL || '',
+  taskValidatorApiKey: data.TASK_VALIDATOR_API_KEY || '',
 };
 
 export default env;

@@ -6,6 +6,7 @@ import { useBroadcastNotificationMutation } from '../features/admin/adminApi';
 import Button from '../components/ui/Button';
 import FormField from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
+import { formatApiError } from '../utils/apiError';
 
 const TYPES = [
   { value: 'announcement', label: 'Announcement', icon: Megaphone, desc: 'General message to all students' },
@@ -59,7 +60,7 @@ export default function Notifications() {
       setSendError(
         network
           ? 'Could not reach the server. Please try again.'
-          : err?.data?.message || 'Could not send the broadcast. Please try again.'
+          : formatApiError(err, 'Could not send the broadcast. Please try again.')
       );
       return;
     }
@@ -97,7 +98,7 @@ export default function Notifications() {
                 >
                   <t.icon size={20} className={type === t.value ? 'text-turmeric' : 'text-text-secondary'} />
                   <span className="font-heading text-sm font-bold text-text-primary">{t.label}</span>
-                  <span className="text-xs text-text-secondary/60">{t.desc}</span>
+                  <span className="text-xs text-text-secondary/70">{t.desc}</span>
                 </button>
               ))}
             </div>
@@ -179,7 +180,7 @@ export default function Notifications() {
               <AnimatedIcon icon={Bell} size={15} animation="wiggle" className="text-turmeric" /> Recent Broadcasts
             </h3>
             {log.length === 0 ? (
-              <p className="py-4 text-center text-sm text-text-secondary/50">Nothing sent yet.</p>
+              <p className="py-4 text-center text-sm text-text-secondary/70">Nothing sent yet.</p>
             ) : (
               <div className="space-y-3">
                 {log.map((n) => (
@@ -190,7 +191,7 @@ export default function Notifications() {
                         {n.type}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-text-secondary/60">{n.at}</p>
+                    <p className="mt-1 text-xs text-text-secondary/70">{n.at}</p>
                   </div>
                 ))}
               </div>
