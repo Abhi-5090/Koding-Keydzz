@@ -20,6 +20,7 @@ import {
   Zap,
   GraduationCap,
   Award,
+  ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useGetDashboardQuery } from '../../features/student/studentApi'
@@ -38,6 +39,9 @@ const NAV = [
   // explores that course's worlds. Trophy is already imported for
   // Achievements, so GraduationCap keeps the two distinguishable.
   { to: '/courses', label: 'My Journey', icon: GraduationCap },
+  // Directly under the journey: if a teacher has set something, that is what a
+  // pupil should be doing before they wander off to the games.
+  { to: '/assignments', label: 'My Work', icon: ClipboardList },
   { to: '/map', label: 'World Map', icon: Map },
   { to: '/play', label: 'Playground', icon: Code2 },
   { to: '/games', label: 'Mini Games', icon: Gamepad2 },

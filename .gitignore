@@ -54,3 +54,4 @@ mongo_data/
 # production certs come from certbot and must never be committed.
 nginx/certs/
 nginx/certbot-webroot/
+ops/backups/

@@ -50,7 +50,7 @@ const userSchema = new mongoose.Schema(
      */
     role: {
       type: String,
-      enum: ['superadmin', 'admin', 'faculty', 'student'],
+      enum: ['superadmin', 'admin', 'faculty', 'student', 'guardian'],
       default: 'student',
       index: true,
     },
@@ -101,6 +101,51 @@ const userSchema = new mongoose.Schema(
     // Whether an admin created this staff account but they have not signed in
     // yet — drives the "pending invite" state in the admin UI.
     mustChangePassword: { type: Boolean, default: false },
+
+    /**
+     * SELF-SERVICE PASSWORD RESET.
+     *
+     * Only the HASH of the reset token is stored, never the token. A reset
+     * token is a bearer credential for one account — anyone holding it can
+     * take the account over — so a database dump or a stray log must not
+     * contain usable ones. Same reasoning as refresh tokens.
+     *
+     * `passwordResetUsedAt` exists so a used token reads as USED rather than
+     * as absent. Deleting the record on use would make a replayed link
+     * indistinguishable from an expired one, and "this link has already been
+     * used" is the message that stops someone hunting for a fault.
+     */
+    passwordResetTokenHash: { type: String, default: null, select: false },
+    passwordResetExpiresAt: { type: Date, default: null, select: false },
+    passwordResetRequestedAt: { type: Date, default: null, select: false },
+    passwordResetUsedAt: { type: Date, default: null, select: false },
+
+    /**
+     * GUARDIAN LINKS — which children this account may see.
+     *
+     * ONLY MEANINGFUL ON A `guardian`. Empty on everyone else.
+     *
+     * WHY THE SCHOOL CREATES THE LINK, NEVER THE GUARDIAN
+     * ---------------------------------------------------
+     * This is the consent gate, and it is the whole reason parent access is
+     * safe to build. A guardian cannot claim a child, request access, or add a
+     * link by any route — an administrator at the school does it, because the
+     * school is the only party that actually knows who a child's guardian is.
+     * Any self-service version of this is a way to read a stranger's child's
+     * record by knowing their name.
+     *
+     * Stored on the guardian rather than as a `guardians` array on the pupil so
+     * that "what may this session see" is answerable from the signed-in
+     * document alone, with no second query and no chance of the two lists
+     * disagreeing.
+     */
+    guardianOf: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        index: true,
+      },
+    ],
     lastLoginAt: { type: Date, default: null },
     xp: { type: Number, default: 0 },
     level: { type: Number, default: 1 },

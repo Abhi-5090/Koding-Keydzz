@@ -78,7 +78,15 @@ export const superadminStudentsQuerySchema = z.object({
 
 /* ---- Organization staff (admins + faculty) ---- */
 
-export const staffRole = z.enum(['admin', 'faculty']);
+/**
+ * Roles an administrator may create in their own school.
+ *
+ * `guardian` is here because a parent account is provisioned exactly like a
+ * member of staff — by the school, with a temporary password, forced to change
+ * it on first sign-in. What differs is what it can see, and that is decided by
+ * the capability map, not by how it was created.
+ */
+export const staffRole = z.enum(['admin', 'faculty', 'guardian']);
 
 export const createStaffSchema = z.object({
   role: staffRole,
@@ -465,6 +473,49 @@ export const resetPasswordSchema = z.object({
  * applied in authService.changePassword, because the schema does not know who
  * is calling.
  */
+/** Asking for a reset link. Only an address; the answer never varies. */
+export const requestPasswordResetSchema = z.object({
+  email: z.string().email('A valid email address is required'),
+});
+
+/** Finishing a reset. The 8-character floor is re-checked in the service. */
+export const completePasswordResetSchema = z.object({
+  token: z.string().min(20, 'That reset link is not valid').max(200),
+  newPassword: z
+    .string()
+    .min(8, 'New password must be at least 8 characters')
+    .max(128),
+});
+
+/* ---- Assignments ---- */
+
+const assignmentTarget = z.object({
+  kind: z.enum(['lesson', 'quiz', 'world', 'course', 'game']),
+  ref: z.string().min(1, 'What is being assigned is required').max(120),
+  // Only meaningful for `game`; the service rejects it as missing there.
+  level: z.coerce.number().int().min(1).optional(),
+});
+
+export const createAssignmentSchema = z.object({
+  title: z.string().min(2, 'Give the assignment a title').max(160),
+  instructions: z.string().max(2000).optional().default(''),
+  target: assignmentTarget,
+  // `null` is a deliberate value, not an omission: "do this whenever" is a
+  // real thing a teacher wants, and forcing a date makes them invent one.
+  dueAt: z.string().datetime().nullable().optional(),
+});
+
+export const updateAssignmentSchema = z.object({
+  title: z.string().min(2).max(160).optional(),
+  instructions: z.string().max(2000).optional(),
+  dueAt: z.string().datetime().nullable().optional(),
+});
+
+/** Linking a guardian to a pupil. Both ids, both checked against the school. */
+export const guardianLinkSchema = z.object({
+  studentId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'A valid student id is required'),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Your current password is required').max(128),
   newPassword: z
@@ -755,4 +806,9 @@ export default {
   resetPasswordSchema,
   changePasswordSchema,
   classroomAnnounceSchema,
+  requestPasswordResetSchema,
+  completePasswordResetSchema,
+  createAssignmentSchema,
+  updateAssignmentSchema,
+  guardianLinkSchema,
 };

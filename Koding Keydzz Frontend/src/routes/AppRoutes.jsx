@@ -40,6 +40,8 @@ const Leaderboard = lazy(() => import('../pages/Leaderboard'))
 const Shop = lazy(() => import('../pages/Shop'))
 const Profile = lazy(() => import('../pages/Profile'))
 const Certificates = lazy(() => import('../pages/Certificates'))
+const Assignments = lazy(() => import('../pages/Assignments'))
+const Family = lazy(() => import('../pages/Family'))
 const VerifyCertificate = lazy(() => import('../pages/VerifyCertificate'))
 const Avatar = lazy(() => import('../pages/Avatar'))
 
@@ -117,6 +119,24 @@ export default function AppRoutes() {
         }
       />
 
+      {/*
+        THE FAMILY VIEW. Authenticated, but deliberately outside StudentLayout:
+        a parent should not be given a pupil's sidebar, XP bar or avatar. It has
+        its own header and its own sign-out.
+      */}
+      <Route
+        path="/family"
+        element={
+          <ProtectedRoute>
+            <RouteErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
+                <Family />
+              </Suspense>
+            </RouteErrorBoundary>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Protected student area. One Suspense boundary around the layout's
           Outlet covers every lazy child, so the sidebar and topbar stay put
           while the page itself loads. */}
@@ -143,6 +163,9 @@ export default function AppRoutes() {
         <Route path="/play" element={<Playground />} />
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/achievements" element={<Achievements />} />
+        {/* Work a teacher has set. Read-only: completion comes from the
+            pupil's own progress, so there is nothing to submit here. */}
+        <Route path="/assignments" element={<Assignments />} />
         <Route path="/certificates" element={<Certificates />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/shop" element={<Shop />} />

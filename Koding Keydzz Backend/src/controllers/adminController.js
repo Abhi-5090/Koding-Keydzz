@@ -9,6 +9,8 @@ import { studentIdsInScope } from '../services/classroomService.js';
 import * as testResults from '../services/testResultsService.js';
 import * as marking from '../services/markingService.js';
 import * as insights from '../services/teachingInsightsService.js';
+import * as assignments from '../services/assignmentService.js';
+import * as guardianAdmin from '../services/guardianService.js';
 
 /**
  * Resolve the caller's student scope.
@@ -196,6 +198,110 @@ export const announceToClassroom = asyncHandler(async (req, res) => {
   return sendSuccess(res, data, 'Announcement sent to the class');
 });
 
+/* ---- Assignments ---- */
+
+export const createAssignment = asyncHandler(async (req, res) => {
+  const data = await assignments.createAssignment({
+    org: req.orgId,
+    classroomId: req.params.id,
+    classroomScope: req.classroomScope ?? null,
+    createdBy: req.user._id,
+    ...req.body,
+  });
+  await recordAudit(req, {
+    action: 'assignment.create',
+    targetType: 'Assignment',
+    targetId: data.id,
+    meta: { classroom: String(req.params.id), title: data.title },
+  });
+  return sendSuccess(res, data, 'Assignment set', 201);
+});
+
+export const listClassroomAssignments = asyncHandler(async (req, res) => {
+  const data = await assignments.listForClassroom({
+    org: req.orgId,
+    classroomId: req.params.id,
+    classroomScope: req.classroomScope ?? null,
+    includeArchived: req.query.includeArchived === 'true',
+  });
+  return sendSuccess(res, data, 'Assignments');
+});
+
+export const updateAssignment = asyncHandler(async (req, res) => {
+  const data = await assignments.updateAssignment({
+    org: req.orgId,
+    id: req.params.id,
+    classroomScope: req.classroomScope ?? null,
+    patch: req.body,
+  });
+  await recordAudit(req, {
+    action: 'assignment.update',
+    targetType: 'Assignment',
+    targetId: data.id,
+  });
+  return sendSuccess(res, data, 'Assignment updated');
+});
+
+export const archiveAssignment = asyncHandler(async (req, res) => {
+  const data = await assignments.archiveAssignment({
+    org: req.orgId,
+    id: req.params.id,
+    classroomScope: req.classroomScope ?? null,
+    archive: req.body?.archive !== false,
+  });
+  await recordAudit(req, {
+    action: data.archivedAt ? 'assignment.archive' : 'assignment.restore',
+    targetType: 'Assignment',
+    targetId: data.id,
+  });
+  return sendSuccess(res, data, data.archivedAt ? 'Assignment archived' : 'Assignment restored');
+});
+
+/* ---- Guardians ---- */
+
+/**
+ * Link a guardian to a pupil.
+ *
+ * ADMIN ONLY, and this is the consent gate for the whole parent feature: a
+ * guardian can never claim a child, because the school is the only party that
+ * knows who a child's guardian is. Audited, because it grants a person sight
+ * of a named child's record.
+ */
+export const linkGuardian = asyncHandler(async (req, res) => {
+  const data = await guardianAdmin.linkGuardian({
+    org: req.orgId,
+    guardianId: req.params.id,
+    studentId: req.body.studentId,
+  });
+  await recordAudit(req, {
+    action: 'guardian.link',
+    targetType: 'User',
+    targetId: req.params.id,
+    meta: { student: data.student },
+  });
+  return sendSuccess(res, data, 'Guardian linked');
+});
+
+export const unlinkGuardian = asyncHandler(async (req, res) => {
+  const data = await guardianAdmin.unlinkGuardian({
+    org: req.orgId,
+    guardianId: req.params.id,
+    studentId: req.body.studentId,
+  });
+  await recordAudit(req, {
+    action: 'guardian.unlink',
+    targetType: 'User',
+    targetId: req.params.id,
+    meta: { student: String(req.body.studentId) },
+  });
+  return sendSuccess(res, data, 'Guardian unlinked');
+});
+
+export const listGuardians = asyncHandler(async (req, res) => {
+  const data = await guardianAdmin.listGuardians({ org: req.orgId });
+  return sendSuccess(res, data, 'Guardians');
+});
+
 export const getClassReport = asyncHandler(async (req, res) => {
   const data = await reportService.getClassReport({
     org: req.user.org,
@@ -359,6 +465,13 @@ export default {
   exportStudents,
   broadcastNotification,
   announceToClassroom,
+  createAssignment,
+  listClassroomAssignments,
+  updateAssignment,
+  archiveAssignment,
+  linkGuardian,
+  unlinkGuardian,
+  listGuardians,
   getStudentDetail,
   getAuditLog,
   getClassReport,

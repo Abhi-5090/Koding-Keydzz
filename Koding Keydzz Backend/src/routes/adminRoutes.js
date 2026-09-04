@@ -18,6 +18,9 @@ import {
   suspendSchema,
   broadcastSchema,
   classroomAnnounceSchema,
+  createAssignmentSchema,
+  updateAssignmentSchema,
+  guardianLinkSchema,
   createStudentSchema,
   updateStudentSchema,
   courseSchema,
@@ -238,6 +241,66 @@ router.get(
  * student:read capability and the classroom narrowing that scopes a teacher to
  * their own pupils — the same three checks every other student read gets.
  */
+/**
+ * GUARDIANS — parent and carer accounts, and who they may see.
+ *
+ * Gated on `staff:write` (administrators only), NOT on anything a teacher
+ * holds. Linking a guardian grants a person sight of a named child's record,
+ * which is a safeguarding decision and belongs with the school office rather
+ * than with whoever happens to teach that class this term.
+ */
+router.get('/guardians', readStaff, adminController.listGuardians);
+router.post(
+  '/guardians/:id/link',
+  writeStaff,
+  validate({ params: idParam, body: guardianLinkSchema }),
+  adminController.linkGuardian
+);
+router.post(
+  '/guardians/:id/unlink',
+  writeStaff,
+  validate({ params: idParam, body: guardianLinkSchema }),
+  adminController.unlinkGuardian
+);
+
+/**
+ * ASSIGNMENTS — the primitive the product did not have.
+ *
+ * Everything a pupil did was pupil-initiated; there was no way for a teacher to
+ * say "finish this by Friday". Faculty hold `assignment:write` deliberately,
+ * and `withClassroomScope` confines them to classes they actually teach.
+ *
+ * Completion is DERIVED from progress the pupil already recorded, so there is
+ * no submission endpoint here and never will be — see assignmentService.js.
+ */
+const readAssignments = [requireOrg, requireCapability('assignment:read'), withClassroomScope];
+const writeAssignments = [requireOrg, requireCapability('assignment:write'), withClassroomScope];
+
+router.get(
+  '/classrooms/:id/assignments',
+  readAssignments,
+  validate({ params: idParam }),
+  adminController.listClassroomAssignments
+);
+router.post(
+  '/classrooms/:id/assignments',
+  writeAssignments,
+  validate({ params: idParam, body: createAssignmentSchema }),
+  adminController.createAssignment
+);
+router.patch(
+  '/assignments/:id',
+  writeAssignments,
+  validate({ params: idParam, body: updateAssignmentSchema }),
+  adminController.updateAssignment
+);
+router.post(
+  '/assignments/:id/archive',
+  writeAssignments,
+  validate({ params: idParam }),
+  adminController.archiveAssignment
+);
+
 /* ---- Teaching insights ----
  *
  * Same capability and scope as the class report: a teacher sees their own

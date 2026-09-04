@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Mail, Lock } from 'lucide-react';
 import { useLoginMutation } from '../features/auth/authApi';
@@ -158,6 +158,16 @@ export default function Login() {
             <Button type="submit" className="w-full" size="lg" loading={isLoading}>
               Sign In
             </Button>
+
+            {/* Staff can now recover their own account. Before this, a teacher
+                who forgot their password had to find an administrator, and a
+                locked-out superadmin needed shell access to the host. */}
+            <Link
+              to="/forgot-password"
+              className="block w-full rounded-lg py-1 text-center text-sm font-semibold text-text-secondary transition hover:text-turmeric focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-turmeric/40"
+            >
+              Forgot your password?
+            </Link>
           </form>
         </div>
       </motion.div>

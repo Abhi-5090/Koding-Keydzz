@@ -68,6 +68,9 @@ export const baseApi = createApi({
   tagTypes: [
     'Auth',
     'Dashboard',
+    // Work a teacher has set. Read-only for a pupil — completion is derived on
+    // the server from their progress, so there is nothing here to mutate.
+    'Assignments',
     'Worlds',
     'Lessons',
     'Leaderboard',

@@ -12,6 +12,9 @@ import {
   ArrowRight,
   CalendarDays,
   Info,
+  PenLine,
+  Award,
+  Flame,
 } from 'lucide-react';
 import { useGetOrgAnalyticsQuery } from '../features/admin/adminApi';
 import { selectAuth } from '../features/auth/authSlice';
@@ -189,6 +192,131 @@ function AttentionPanel({ students, scope }) {
   );
 }
 
+/**
+ * WHAT NEEDS DOING TODAY.
+ *
+ * Separated from the rest of the dashboard on purpose. Everything below this
+ * describes how the term is going; these three describe whether somebody has to
+ * act, and they read differently:
+ *
+ *   • A MARKING BACKLOG is unfairness with a number on it. An answer the
+ *     machine could not judge is recorded as a withheld mark, not a zero, so
+ *     every item here is a pupil currently scored below the work they did.
+ *     That is why it is the first thing, why it turns red rather than amber,
+ *     and why it links straight to the queue.
+ *   • CERTIFICATES are the outcome the whole ladder exists to produce.
+ *   • STREAKS are the only leading indicator here. Everything else on this page
+ *     tells you what already happened.
+ */
+function OperationalPanel({ op }) {
+  if (!op) return null;
+
+  const backlog = op.markingBacklog || 0;
+  const waitingSince = op.oldestWaiting ? new Date(op.oldestWaiting) : null;
+  const daysWaiting = waitingSince
+    ? Math.floor((Date.now() - waitingSince.getTime()) / 86_400_000)
+    : 0;
+
+  return (
+    <section
+      aria-labelledby="operational-heading"
+      className="rounded-2xl border border-k-border bg-card p-5"
+    >
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <h2
+          id="operational-heading"
+          className="font-heading text-lg font-bold text-text-primary"
+        >
+          Needs attention now
+        </h2>
+        <p className="text-sm text-text-secondary/70">
+          Not a trend — things to act on
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {/* Marking backlog. Its own treatment, because it is the only one of
+            the three that means someone is currently being treated unfairly. */}
+        <div
+          className={`rounded-xl border p-4 ${
+            backlog > 0 ? 'border-error/50 bg-error/5' : 'border-k-border bg-surface/40'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+              Waiting to be marked
+            </p>
+            <span className={backlog > 0 ? 'text-error' : 'text-success'}>
+              <PenLine size={16} aria-hidden="true" />
+            </span>
+          </div>
+          <p className="mt-2 font-heading text-3xl font-bold tabular-nums text-text-primary">
+            {backlog}
+          </p>
+          {backlog > 0 ? (
+            <>
+              <p className="mt-1 text-sm text-text-secondary">
+                {op.markingAttempts} paper{op.markingAttempts === 1 ? '' : 's'} affected
+                {daysWaiting >= 1
+                  ? `, oldest ${daysWaiting} day${daysWaiting === 1 ? '' : 's'} ago`
+                  : ''}
+                . Each is a mark held back, not a zero.
+              </p>
+              <Link
+                to="/marking"
+                className="mt-2 inline-block text-sm font-bold text-turmeric underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-turmeric/40"
+              >
+                Open the marking queue →
+              </Link>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-text-secondary">
+              Nothing withheld. Every answer that needed a human has one.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-k-border bg-surface/40 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+              Certificates earned
+            </p>
+            <span className="text-turmeric">
+              <Award size={16} aria-hidden="true" />
+            </span>
+          </div>
+          <p className="mt-2 font-heading text-3xl font-bold tabular-nums text-text-primary">
+            {op.certificatesIssued || 0}
+          </p>
+          <p className="mt-1 text-sm text-text-secondary">
+            Courses passed and certified. Pupils can print theirs.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-k-border bg-surface/40 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+              On a daily streak
+            </p>
+            <span className="text-turmeric">
+              <Flame size={16} aria-hidden="true" />
+            </span>
+          </div>
+          <p className="mt-2 font-heading text-3xl font-bold tabular-nums text-text-primary">
+            {op.streaks?.onStreak || 0}
+          </p>
+          <p className="mt-1 text-sm text-text-secondary">
+            Two days or more running
+            {op.streaks?.longest
+              ? `. Best so far is ${op.streaks.longest} day${op.streaks.longest === 1 ? '' : 's'}.`
+              : '.'}
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const { CATEGORICAL, STATUS } = useChartTheme();
   /**
@@ -285,6 +413,9 @@ export default function Dashboard() {
                 icon={AlertTriangle}
               />
             </div>
+
+            {/* ---- What needs doing today, above everything descriptive ---- */}
+            <OperationalPanel op={d?.operational} />
 
             {/* ---- The actionable panel, deliberately above the charts ---- */}
             <AttentionPanel students={d?.needingAttention} scope={d?.scope} />

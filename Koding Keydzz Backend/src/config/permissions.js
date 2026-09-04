@@ -51,10 +51,21 @@ export const ROLES = Object.freeze({
   ADMIN: 'admin',
   FACULTY: 'faculty',
   STUDENT: 'student',
+  /**
+   * A parent or carer. Reads ONE OR MORE named children's progress and nothing
+   * else — no class, no other pupil, no curriculum, no staff. Linked to a child
+   * by an administrator, never by themselves.
+   */
+  GUARDIAN: 'guardian',
 });
 
 /** Roles that belong to an organization (everything except the superadmin). */
-export const ORG_ROLES = Object.freeze([ROLES.ADMIN, ROLES.FACULTY, ROLES.STUDENT]);
+export const ORG_ROLES = Object.freeze([
+  ROLES.ADMIN,
+  ROLES.FACULTY,
+  ROLES.STUDENT,
+  ROLES.GUARDIAN,
+]);
 
 /** Roles that are staff (can see other people's data, subject to scoping). */
 export const STAFF_ROLES = Object.freeze([ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.FACULTY]);
@@ -119,12 +130,35 @@ export const CAPABILITIES = Object.freeze({
   'report:org': [ROLES.SUPERADMIN, ROLES.ADMIN],
   'report:class': [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.FACULTY],
 
+  /**
+   * ASSIGNMENTS — setting work with a deadline.
+   *
+   * Faculty hold the write capability, and that is the whole point: a teacher
+   * setting homework for their own class is the thing this exists for. The
+   * classroom scope confines them to classes they teach, exactly as it does
+   * for rosters and reports — so `assignment:write` means "may set work", not
+   * "may set work for anyone".
+   */
+  'assignment:read': [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.FACULTY, ROLES.STUDENT],
+  'assignment:write': [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.FACULTY],
+
   /* ---- Announcements within one organization ---- */
   'announce:org': [ROLES.ADMIN],
   'announce:class': [ROLES.ADMIN, ROLES.FACULTY],
 
   /* ---- Organization audit trail ---- */
   'audit:org': [ROLES.ADMIN],
+
+  /**
+   * GUARDIAN — reading a linked child's progress.
+   *
+   * One capability, one verb, and nothing else on the whole list. A guardian
+   * holds no `student:read` (that would be the whole school), no
+   * `classroom:read` (that would be other people's children) and no write
+   * capability of any kind. The set of children is resolved from their own
+   * `guardianOf` links, so there is no id for them to tamper with.
+   */
+  'child:read': [ROLES.GUARDIAN],
 
   /* ---- Learner surfaces ---- */
   'learn:play': [ROLES.STUDENT],

@@ -7,6 +7,21 @@ export const studentApi = baseApi.injectEndpoints({
       transformResponse: unwrap,
       providesTags: ['Dashboard'],
     }),
+
+    /**
+     * WORK MY TEACHER HAS SET ME.
+     *
+     * There is nothing to hand in and no "done" button to press: the server
+     * works out what I have finished from my own progress — the lessons I have
+     * completed, the quizzes I have passed, the levels I have beaten. So this
+     * is read-only, and it re-reads whenever that progress changes, which is
+     * why it shares the Dashboard tag rather than owning one.
+     */
+    getMyAssignments: builder.query({
+      query: () => '/student/assignments',
+      transformResponse: unwrap,
+      providesTags: ['Assignments', 'Dashboard'],
+    }),
     getWorlds: builder.query({
       query: () => '/worlds',
       transformResponse: unwrap,
@@ -51,6 +66,7 @@ export const studentApi = baseApi.injectEndpoints({
 })
 
 export const {
+  useGetMyAssignmentsQuery,
   useGetDashboardQuery,
   useGetWorldsQuery,
   useGetLessonsQuery,

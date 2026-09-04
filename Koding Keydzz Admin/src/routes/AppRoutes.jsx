@@ -29,7 +29,12 @@ const OrgDetail = lazy(() => import('../pages/superadmin/OrgDetail'));
 const AllStudents = lazy(() => import('../pages/superadmin/AllStudents'));
 const QuestionBank = lazy(() => import('../pages/superadmin/QuestionBank'));
 const ChangePassword = lazy(() => import('../pages/ChangePassword'));
+const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('../pages/ResetPassword'));
 const TestResults = lazy(() => import('../pages/TestResults'));
+const MarkingQueue = lazy(() => import('../pages/MarkingQueue'));
+const Insights = lazy(() => import('../pages/Insights'));
+const Assignments = lazy(() => import('../pages/Assignments'));
 // Tenancy model: staff (admins + faculty) and classes.
 const Staff = lazy(() => import('../pages/Staff'));
 const Classrooms = lazy(() => import('../pages/Classrooms'));
@@ -73,6 +78,29 @@ export default function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
 
+      {/* PUBLIC password recovery. Must be reachable without signing in — the
+          whole point is that somebody who cannot sign in can recover. */}
+      <Route
+        path="/forgot-password"
+        element={
+          <RouteErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <ForgotPassword />
+            </Suspense>
+          </RouteErrorBoundary>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <RouteErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <ResetPassword />
+            </Suspense>
+          </RouteErrorBoundary>
+        }
+      />
+
       <Route
         path="/change-password"
         element={
@@ -108,6 +136,35 @@ export default function AppRoutes() {
             the same read of the same pupils — the server narrows a teacher to
             their own classes. Read only; there is no edit route to guard. */}
         <Route path="/test-results" element={<TestResults />} />
+        {/* Teaching insights: the same read of the same pupils as the class
+            report, so `report:class` and the shared capability gate above
+            already cover it. */}
+        <Route path="/insights" element={<Insights />} />
+        {/* Setting work. `assignment:read` covers the page; the write controls
+            inside it need `assignment:write`, which the API enforces. */}
+        <Route path="/assignments" element={<Assignments />} />
+      </Route>
+
+      {/*
+        THE MARKING QUEUE gets its own guard.
+
+        It is the ONE surface in the product that shows staff a mark scheme, so
+        it is gated on `final_test:mark` rather than on the student-read
+        capability the rest of the school surfaces share. Faculty hold it
+        deliberately — they are the people who know the pupil and the work.
+      */}
+      <Route
+        element={
+          <ProtectedRoute capability="final_test:mark">
+            <RouteErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
+                <AdminLayout />
+              </Suspense>
+            </RouteErrorBoundary>
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/marking" element={<MarkingQueue />} />
       </Route>
 
       {/* Administrator-only school management. */}

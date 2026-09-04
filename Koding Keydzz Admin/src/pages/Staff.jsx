@@ -13,6 +13,7 @@ import {
   Mail,
   Info,
   Printer,
+  Users,
 } from 'lucide-react';
 import {
   useGetStaffQuery,
@@ -52,7 +53,11 @@ import { formatApiError } from '../utils/apiError';
  *   • destructive actions confirm, and explain what will happen.
  */
 
-const ROLE_LABEL = { admin: 'Administrator', faculty: 'Teacher' };
+const ROLE_LABEL = {
+  admin: 'Administrator',
+  faculty: 'Teacher',
+  guardian: 'Parent / carer',
+};
 
 /** One-time credential panel. Shown after creating or resetting an account. */
 function CredentialHandover({ staff, password, onDone }) {
@@ -220,6 +225,13 @@ function StaffForm({ initial, onSubmit, onCancel, saving, error }) {
               title: 'Administrator',
               blurb:
                 'Full access to this school: add pupils and staff, create classes, import rosters, see every report.',
+            },
+            {
+              value: 'guardian',
+              icon: Users,
+              title: 'Parent / carer',
+              blurb:
+                'Reads the progress of the children YOU link them to, and nothing else — no class lists, no other pupils, no controls. You create the link; they cannot.',
             },
           ].map((opt) => {
             const active = form.role === opt.value;

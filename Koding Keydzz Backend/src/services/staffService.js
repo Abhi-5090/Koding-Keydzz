@@ -2,6 +2,12 @@ import { userRepository } from '../repositories/userRepository.js';
 import { orgRepository } from '../repositories/orgRepository.js';
 import { Organization } from '../models/Organization.js';
 import { Classroom } from '../models/Classroom.js';
+import {
+  sendMail,
+  mailEnabled,
+  staffWelcomeMessage,
+  config as mailConfig,
+} from './mailService.js';
 import { ApiError } from '../utils/ApiError.js';
 import { escapeRegex } from '../utils/privacy.js';
 import { generatePassword } from './adminService.js';
@@ -22,7 +28,27 @@ import { ROLES } from '../config/permissions.js';
  * valid for the superadmin, which is enforced by the routes.
  */
 
-const STAFF_ROLES = [ROLES.ADMIN, ROLES.FACULTY];
+/**
+ * ROLES AN ADMINISTRATOR MANAGES FROM THE STAFF PAGE.
+ *
+ * NOT the same list as `STAFF_ROLES` in config/permissions.js, and the
+ * difference matters:
+ *
+ *   • permissions.STAFF_ROLES = who may see OTHER PEOPLE'S data
+ *     (superadmin, admin, faculty). A guardian is emphatically not in it.
+ *   • this list = whose ACCOUNT an administrator provisions and maintains here
+ *     (admin, faculty, guardian).
+ *
+ * A parent account is created exactly like a member of staff — by the school,
+ * with a temporary password, forced to change it on first sign-in — and needs
+ * to appear on this roster so the office can find it, reset it and link it to
+ * a child. What it can SEE is decided by the capability map, not by the fact
+ * that this page created it.
+ *
+ * Conflating the two lists is how a guardian would end up holding staff
+ * capabilities, so they are deliberately separate names in separate files.
+ */
+const MANAGEABLE_ROLES = [ROLES.ADMIN, ROLES.FACULTY, ROLES.GUARDIAN];
 
 /** Fields safe to return for a staff member. */
 function toStaffJSON(user, extra = {}) {
@@ -53,7 +79,7 @@ function toStaffJSON(user, extra = {}) {
 export async function listStaff({ org, role = null, search = '', page = 1, limit = 25 } = {}) {
   if (!org) throw ApiError.badRequest('An organization is required');
 
-  const filter = { org, deletedAt: null, role: role ? role : { $in: STAFF_ROLES } };
+  const filter = { org, deletedAt: null, role: role ? role : { $in: MANAGEABLE_ROLES } };
   if (search) {
     const safe = escapeRegex(search);
     filter.$or = [
@@ -111,8 +137,8 @@ export async function listStaff({ org, role = null, search = '', page = 1, limit
  */
 export async function createStaff({ org, role, name, email, phone = '', title = '', subjects = [], password = null }) {
   if (!org) throw ApiError.badRequest('An organization is required');
-  if (!STAFF_ROLES.includes(role)) {
-    throw ApiError.badRequest(`Role must be one of: ${STAFF_ROLES.join(', ')}`);
+  if (!MANAGEABLE_ROLES.includes(role)) {
+    throw ApiError.badRequest(`Role must be one of: ${MANAGEABLE_ROLES.join(', ')}`);
   }
 
   const organization = await orgRepository.findById(org);
@@ -141,7 +167,37 @@ export async function createStaff({ org, role, name, email, phone = '', title = 
 
   await Organization.recountMembers(org);
 
-  return { staff: toStaffJSON(user), password: finalPassword };
+  /**
+   * Email the credentials WHEN THAT IS POSSIBLE, and always return them too.
+   *
+   * There was no mail infrastructure at all, so a temporary password reached a
+   * new teacher only by being read off a screen. Now it can be emailed — but
+   * the password is still returned to the caller, and the admin UI still shows
+   * it once with a printable slip, because:
+   *
+   *   • mail is off by default (MAIL_TRANSPORT=none), and the product has to
+   *     keep working exactly as before in that case;
+   *   • school mail is unreliable enough that an administrator standing next
+   *     to the new teacher should not have to wait on a mail queue;
+   *   • `sendMail` never throws, so a mail outage cannot fail the account
+   *     creation that has already succeeded.
+   *
+   * `emailed` is reported so the UI can say which happened rather than guess.
+   */
+  let emailed = false;
+  if (mailEnabled()) {
+    const cfg = mailConfig();
+    const message = staffWelcomeMessage({
+      name: user.name,
+      email: user.email,
+      tempPassword: finalPassword,
+      signInUrl: cfg.appUrl ? `${cfg.appUrl}/login` : 'your school portal',
+    });
+    const result = await sendMail({ to: user.email, ...message });
+    emailed = result.sent;
+  }
+
+  return { staff: toStaffJSON(user), password: finalPassword, emailed };
 }
 
 /** Fetch one staff member, scoped to the organization. */
@@ -150,7 +206,7 @@ export async function getStaff({ org, id }) {
     _id: id,
     org,
     deletedAt: null,
-    role: { $in: STAFF_ROLES },
+    role: { $in: MANAGEABLE_ROLES },
   });
   if (!user) throw ApiError.notFound('Staff member not found');
 
@@ -180,7 +236,7 @@ export async function updateStaff({ org, id, patch = {} }) {
     _id: id,
     org,
     deletedAt: null,
-    role: { $in: STAFF_ROLES },
+    role: { $in: MANAGEABLE_ROLES },
   });
   if (!user) throw ApiError.notFound('Staff member not found');
 
@@ -196,7 +252,7 @@ export async function updateStaff({ org, id, patch = {} }) {
   }
 
   if (patch.role !== undefined && patch.role !== user.role) {
-    if (!STAFF_ROLES.includes(patch.role)) {
+    if (!MANAGEABLE_ROLES.includes(patch.role)) {
       throw ApiError.badRequest('Staff role must be admin or faculty');
     }
     // Demoting the last remaining admin would lock the school out of its own
@@ -239,7 +295,7 @@ export async function setStaffSuspension({ org, id, suspend = true }) {
     _id: id,
     org,
     deletedAt: null,
-    role: { $in: STAFF_ROLES },
+    role: { $in: MANAGEABLE_ROLES },
   });
   if (!user) throw ApiError.notFound('Staff member not found');
 
@@ -271,7 +327,7 @@ export async function resetStaffPassword({ org, id, password = null }) {
     _id: id,
     org,
     deletedAt: null,
-    role: { $in: STAFF_ROLES },
+    role: { $in: MANAGEABLE_ROLES },
   });
   if (!user) throw ApiError.notFound('Staff member not found');
 
@@ -293,7 +349,7 @@ export async function deleteStaff({ org, id }) {
     _id: id,
     org,
     deletedAt: null,
-    role: { $in: STAFF_ROLES },
+    role: { $in: MANAGEABLE_ROLES },
   });
   if (!user) throw ApiError.notFound('Staff member not found');
 

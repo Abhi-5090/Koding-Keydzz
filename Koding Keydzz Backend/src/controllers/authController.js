@@ -1,6 +1,7 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSuccess } from '../utils/ApiResponse.js';
 import * as authService from '../services/authService.js';
+import * as passwordReset from '../services/passwordResetService.js';
 
 export const registerStudent = asyncHandler(async (req, res) => {
   const result = await authService.registerStudent(req.body);
@@ -49,4 +50,43 @@ export const changePassword = asyncHandler(async (req, res) => {
   return sendSuccess(res, result, 'Password changed');
 });
 
-export default { registerStudent, login, refresh, logout, me, changePassword };
+/* ---- Self-service password reset ---- */
+
+/**
+ * Ask for a reset link.
+ *
+ * ALWAYS 200 with the same body. Whether the address exists, belongs to a
+ * pupil, is suspended, or mail is switched off entirely, the caller learns
+ * nothing — a reset form that distinguishes these is a free tool for finding
+ * out which of a school's staff addresses are real.
+ */
+export const requestPasswordReset = asyncHandler(async (req, res) => {
+  const data = await passwordReset.request({ email: req.body.email });
+  return sendSuccess(res, { requested: true }, data.message);
+});
+
+/** Is this link usable? Lets the screen explain itself before anything is typed. */
+export const inspectPasswordReset = asyncHandler(async (req, res) => {
+  const data = await passwordReset.inspect({ token: req.query.token });
+  return sendSuccess(res, data, data.valid ? 'Link is valid' : 'Link cannot be used');
+});
+
+export const completePasswordReset = asyncHandler(async (req, res) => {
+  const data = await passwordReset.complete({
+    token: req.body.token,
+    newPassword: req.body.newPassword,
+  });
+  return sendSuccess(res, data, 'Password reset. Please sign in with your new password.');
+});
+
+export default {
+  registerStudent,
+  login,
+  refresh,
+  logout,
+  me,
+  changePassword,
+  requestPasswordReset,
+  inspectPasswordReset,
+  completePasswordReset,
+};

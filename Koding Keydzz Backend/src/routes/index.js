@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRoutes from './authRoutes.js';
+import guardianRoutes from './guardianRoutes.js';
 import studentRoutes from './studentRoutes.js';
 import courseRoutes from './courseRoutes.js';
 import finalTestRoutes from './finalTestRoutes.js';
@@ -75,8 +76,46 @@ router.get('/ready', async (_req, res) => {
 
 /**
  * METRICS. `?format=prometheus` for a scraper, JSON by default for a human.
+ *
+ * OPTIONALLY TOKEN-GUARDED, and it should be guarded in production.
+ * ----------------------------------------------------------------
+ * This endpoint was completely open, and it publishes request volume, error
+ * rate, uptime and which language runtimes are installed. None of that is
+ * catastrophic on its own, but it is free reconnaissance and there is no reason
+ * for it to be world-readable.
+ *
+ * Two keys, the same pattern used for code execution and external grading:
+ * set `METRICS_TOKEN` and a matching `Authorization: Bearer` (or `?token=`) is
+ * required. Leave it unset and the endpoint stays open, so an existing scraper
+ * configuration keeps working until someone chooses to lock it down. A
+ * deployment that sets the variable gets enforcement; one that does not is
+ * warned about it in DEPLOYMENT.md.
+ *
+ * `?token=` is accepted because several scrapers cannot set a header, and the
+ * comparison is length-safe rather than a plain `===` so it does not leak the
+ * token's length through timing.
  */
+function metricsTokenOk(req) {
+  const expected = process.env.METRICS_TOKEN;
+  if (!expected) return true; // not configured — open, as before
+
+  const header = String(req.headers.authorization || '');
+  const bearer = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  const supplied = bearer || String(req.query.token || '');
+
+  if (supplied.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i += 1) {
+    diff |= supplied.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 router.get('/metrics', async (req, res) => {
+  if (!metricsTokenOk(req)) {
+    return res.status(401).json({ success: false, message: 'Metrics token required' });
+  }
+
   const mongoose = (await import('mongoose')).default;
   const { snapshot, prometheusText } = await import('../middlewares/metrics.js');
   const { availableRunners } = await import('../services/codeExecutionService.js');
@@ -99,6 +138,8 @@ router.get('/metrics', async (req, res) => {
 
 router.use('/auth', authRoutes);
 router.use('/student', studentRoutes);
+// Parent and carer access. Read-only, and scoped to linked children only.
+router.use('/guardian', guardianRoutes);
 // The course ladder: Python -> C -> HTML -> AI, gated by each final test.
 router.use('/courses', courseRoutes);
 // The final test that gates each course. Student-only.

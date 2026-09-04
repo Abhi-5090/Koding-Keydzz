@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useGetPlatformAnalyticsQuery } from '../../features/superadmin/superadminApi';
 import PageHeader from '../../components/ui/PageHeader';
+import SystemHealthPanel from '../../components/charts/SystemHealthPanel';
 import QueryState from '../../components/ui/QueryState';
 import {
   ChartPanel,
@@ -143,6 +144,66 @@ export default function SuperAdminDashboard() {
               icon={Activity}
             />
           </div>
+
+          {/* ---- Is the platform working at all? Above every trend, because a
+                   missing runtime means exams are silently unmarkable. ---- */}
+          <SystemHealthPanel />
+
+          {/* ---- Platform-wide operations: the marking backlog is the one
+                   number here that means somebody is being scored unfairly. ---- */}
+          {d?.operational ? (
+            <section
+              aria-labelledby="platform-ops-heading"
+              className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+            >
+              <h2 id="platform-ops-heading" className="sr-only">
+                Platform operations
+              </h2>
+              <div
+                className={`rounded-2xl border p-5 ${
+                  d.operational.markingBacklog > 0
+                    ? 'border-error/50 bg-error/5'
+                    : 'border-k-border bg-card'
+                }`}
+              >
+                <p className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+                  Answers awaiting marking
+                </p>
+                <p className="mt-2 font-heading text-3xl font-bold tabular-nums text-text-primary">
+                  {d.operational.markingBacklog}
+                </p>
+                <p className="mt-1 text-sm text-text-secondary">
+                  Across every school. Each one is a withheld mark, so this is unfairness
+                  with a number on it.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-k-border bg-card p-5">
+                <p className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+                  Certificates issued
+                </p>
+                <p className="mt-2 font-heading text-3xl font-bold tabular-nums text-text-primary">
+                  {d.operational.certificatesIssued}
+                </p>
+                <p className="mt-1 text-sm text-text-secondary">
+                  Courses passed and certified platform-wide.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-k-border bg-card p-5">
+                <p className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+                  Pupils on a streak
+                </p>
+                <p className="mt-2 font-heading text-3xl font-bold tabular-nums text-text-primary">
+                  {d.operational.streaks?.onStreak ?? 0}
+                </p>
+                <p className="mt-1 text-sm text-text-secondary">
+                  Two or more days running — the only leading retention signal here.
+                  {d.operational.streaks?.longest
+                    ? ` Longest is ${d.operational.streaks.longest} days.`
+                    : ''}
+                </p>
+              </div>
+            </section>
+          ) : null}
 
           {/* ---- At-risk schools: the actionable list ---- */}
           {d?.tenants?.atRisk?.length > 0 && (

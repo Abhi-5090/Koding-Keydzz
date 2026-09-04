@@ -7,6 +7,8 @@ import { Quiz } from '../models/Quiz.js';
 import { World } from '../models/World.js';
 import { Lesson } from '../models/Lesson.js';
 import { Purchase } from '../models/Purchase.js';
+import { TestAttempt } from '../models/TestAttempt.js';
+import { Certificate } from '../models/Certificate.js';
 import { ApiError } from '../utils/ApiError.js';
 import {
   lastNDays,
@@ -63,6 +65,87 @@ function studentFilter(org, studentIds = null) {
   if (org) f.org = org;
   if (studentIds) f._id = { $in: studentIds };
   return f;
+}
+
+/**
+ * OPERATIONAL FIGURES — the numbers that imply an ACTION, not a trend.
+ *
+ * The rest of this file measures how a school is doing. These three measure
+ * whether anyone needs to do something today, which is a different question and
+ * belongs in its own block so a dashboard can treat it differently:
+ *
+ *   • markingBacklog — answers a machine could not judge, waiting for a human.
+ *     Every one of them is a pupil sitting below their real score, because an
+ *     unmarkable answer is recorded as a WITHHELD mark rather than a zero. This
+ *     number is unfairness measured in units of children, and it now has a
+ *     screen to clear it on.
+ *   • certificatesIssued — the positive outcome the whole ladder exists for.
+ *   • streaks — how many pupils are on a run of consecutive days. The only
+ *     leading indicator of retention this product has; the rest of the
+ *     engagement block is lagging.
+ *
+ * Scoped the same way as everything else: a null `studentIds` means the whole
+ * organization, an array means a faculty member's own classes.
+ */
+async function operationalFigures({ org = null, studentIds = null } = {}) {
+  const pupilFilter = studentFilter(org, studentIds);
+
+  const attemptFilter = { status: 'submitted', awaitingReview: true };
+  if (org) attemptFilter.org = org;
+  if (studentIds) attemptFilter.user = { $in: studentIds };
+
+  const certFilter = { revokedAt: null };
+  if (org) certFilter.org = org;
+  if (studentIds) certFilter.user = { $in: studentIds };
+
+  const [awaitingAttempts, certificatesIssued, pupilsWithStreak, streakRows] =
+    await Promise.all([
+      TestAttempt.find(attemptFilter).select('answers submittedAt').lean(),
+      Certificate.countDocuments(certFilter),
+      User.countDocuments({ ...pupilFilter, 'streak.current': { $gte: 2 } }),
+      User.find({ ...pupilFilter, 'streak.current': { $gte: 1 } })
+        .select('streak.current streak.longest')
+        .lean(),
+    ]);
+
+  /**
+   * Counted per ANSWER, not per attempt.
+   *
+   * One paper can carry several unmarkable answers and each needs a separate
+   * judgement, so "3 attempts waiting" would understate the work by however
+   * many answers each one holds. The marking queue lists answers, and this
+   * number has to agree with it or the dashboard is lying about the size of
+   * the job.
+   */
+  let markingBacklog = 0;
+  let oldestWaiting = null;
+  for (const attempt of awaitingAttempts) {
+    for (const answer of attempt.answers || []) {
+      if (answer.needsReview) markingBacklog += 1;
+    }
+    if (attempt.submittedAt && (!oldestWaiting || attempt.submittedAt < oldestWaiting)) {
+      oldestWaiting = attempt.submittedAt;
+    }
+  }
+
+  const currents = streakRows.map((u) => u.streak?.current || 0).filter((n) => n > 0);
+  const longest = streakRows.reduce((max, u) => Math.max(max, u.streak?.longest || 0), 0);
+
+  return {
+    markingBacklog,
+    markingAttempts: awaitingAttempts.length,
+    oldestWaiting,
+    certificatesIssued,
+    streaks: {
+      // "On a streak" means two days or more — one day is a visit, not a habit.
+      onStreak: pupilsWithStreak,
+      active: currents.length,
+      longest,
+      avgCurrent: currents.length
+        ? Math.round((currents.reduce((a, b) => a + b, 0) / currents.length) * 10) / 10
+        : 0,
+    },
+  };
 }
 
 /* ========================================================================== */
@@ -296,6 +379,9 @@ export async function getPlatformAnalytics({ days = 30 } = {}) {
       lessons: lessonCount,
       quizzes: quizCount,
     },
+
+    // Platform-wide: no org filter, so this is every school at once.
+    operational: await operationalFigures({}),
   };
 }
 
@@ -598,6 +684,9 @@ export async function getOrgAnalytics({ org, studentIds = null, days = 30 } = {}
     },
 
     worldMastery,
+    // What needs doing today, as opposed to how the term is going.
+    operational: await operationalFigures({ org, studentIds }),
+
     quizDifficulty: quizDifficulty.slice(0, 12),
     needingAttention: needingAttention.slice(0, 20),
     topStudents,

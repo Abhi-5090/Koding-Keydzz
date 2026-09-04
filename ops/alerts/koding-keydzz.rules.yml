@@ -1,0 +1,116 @@
+# Prometheus alerting rules for Koding Keydzz.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# The application already published everything below on
+# `GET /api/v1/metrics?format=prometheus`, and nothing was watching it. A gauge
+# nobody reads is not observability; it is a gauge.
+#
+# The first rule is the one that actually matters and the reason the metric was
+# added in the first place. If a language runtime is missing, coding answers in
+# a final test cannot be judged: they are flagged `needsReview` and a whole
+# cohort's papers land silently in the marking queue. The exam appears to work.
+# Pupils sit it, submit it, and get a score that is missing marks. Nobody finds
+# out until a teacher notices the queue, or a parent asks why.
+#
+# LOAD IT
+#   rule_files:
+#     - /etc/prometheus/rules/koding-keydzz.rules.yml
+#
+# SCRAPE IT
+#   scrape_configs:
+#     - job_name: koding-keydzz
+#       metrics_path: /api/v1/metrics
+#       params:
+#         format: [prometheus]
+#       # Set METRICS_TOKEN on the app and match it here.
+#       authorization:
+#         credentials: <METRICS_TOKEN>
+#       static_configs:
+#         - targets: ['api.internal:5000']
+
+groups:
+  - name: koding-keydzz-exams
+    rules:
+      # ---------------------------------------------------------------------
+      # THE ALERT THAT MATTERS MOST.
+      # ---------------------------------------------------------------------
+      - alert: KodingKeydzzCodeRunnerMissing
+        expr: kk_code_runner_available == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No {{ $labels.language }} runtime — exams cannot be marked"
+          description: >-
+            The {{ $labels.language }} runtime has been unavailable for 5
+            minutes. Coding answers in a final test cannot be judged, so they
+            are flagged for human review instead of being marked. Pupils can
+            still SIT the exam and will receive a score that is missing marks,
+            and the only visible symptom is a growing marking queue. Install or
+            restore the runtime, then check /admin/marking for papers that
+            piled up while it was gone.
+          runbook: >-
+            1. GET /api/v1/ready — it returns 503 when a runtime is missing.
+            2. Confirm the interpreter/compiler is on PATH in the API container.
+            3. After restoring it, work the marking queue: the affected answers
+               are withheld marks, not zeros, so they can still be awarded.
+
+  - name: koding-keydzz-availability
+    rules:
+      - alert: KodingKeydzzDatabaseDown
+        expr: kk_db_connected == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API cannot reach MongoDB"
+          description: >-
+            The process is alive but has no database connection, so every
+            request that touches data is failing. /api/v1/ready is returning
+            503; an orchestrator should already be refusing traffic.
+
+      - alert: KodingKeydzzErrorRateHigh
+        expr: kk_request_error_rate > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Over 5% of requests are failing"
+          description: >-
+            Error rate has been above 5% for ten minutes. Ten minutes rather
+            than one because a single failing client, or one bad deploy that
+            rolls back on its own, is not worth waking anyone for.
+
+      - alert: KodingKeydzzErrorRateCritical
+        expr: kk_request_error_rate > 0.25
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A quarter of all requests are failing"
+          description: >-
+            This is an outage, not a blip. Two minutes, because at this rate
+            waiting ten is ten minutes of a school day lost.
+
+      - alert: KodingKeydzzLatencyHigh
+        expr: kk_request_avg_ms > 1500
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Average response time above 1.5s"
+          description: >-
+            Sustained slowness. On the school tablets this product is mostly
+            used on, this is the difference between a lesson and a lost period.
+
+      - alert: KodingKeydzzRestartLoop
+        expr: kk_uptime_seconds < 120
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API keeps restarting"
+          description: >-
+            Uptime has stayed under two minutes for ten minutes, which means the
+            process is crashing and being restarted rather than running.

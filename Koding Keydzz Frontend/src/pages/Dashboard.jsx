@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Map, Coins, Zap, Flame, Settings, Sparkles, Target, Code, HelpCircle, Trophy, Award, ArrowRight, X } from 'lucide-react'
 import { useGetDashboardQuery } from '../features/student/studentApi'
+import { AssignmentsPanel } from './Assignments'
 import { useGetAvatarItemsQuery } from '../features/avatar/avatarApi'
 import { useAuth } from '../hooks/useAuth'
 import { buildStats, resolveAvatarIcon } from '../features/student/dashboardModel'
@@ -124,13 +125,17 @@ export default function Dashboard() {
             {stats.streak > 0 ? (
               <Stat
                 icon={Flame}
-                label={stats.streak === 1 ? 'Day streak' : 'Day streak'}
+                label={stats.streak === 1 ? 'Day streak' : 'Days running'}
                 value={stats.streak}
               />
             ) : null}
           </div>
         </div>
       </div>
+
+      {/* Homework, immediately under the hero and only when something is owed.
+          A pupil who has been set work should see it before the games. */}
+      <AssignmentsPanel />
 
       {/* One staggered entrance for the panel row. The stagger is 70ms — long
           enough to read as a sequence, short enough that the last card is in

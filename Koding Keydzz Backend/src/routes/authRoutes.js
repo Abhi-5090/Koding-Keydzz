@@ -8,6 +8,8 @@ import {
   loginSchema,
   refreshSchema,
   changePasswordSchema,
+  requestPasswordResetSchema,
+  completePasswordResetSchema,
 } from '../utils/validators.js';
 
 const router = Router();
@@ -48,6 +50,22 @@ router.post(
   protect,
   validate({ body: changePasswordSchema }),
   authController.changePassword
+);
+
+/* ---- Self-service password reset. PUBLIC by necessity: the whole point is
+ * that somebody who cannot sign in can recover. `authLimiter` (applied to this
+ * whole router above) is what stops it being abused, together with a per-account
+ * cooldown in the service. ---- */
+router.post(
+  '/password-reset/request',
+  validate({ body: requestPasswordResetSchema }),
+  authController.requestPasswordReset
+);
+router.get('/password-reset/inspect', authController.inspectPasswordReset);
+router.post(
+  '/password-reset/complete',
+  validate({ body: completePasswordResetSchema }),
+  authController.completePasswordReset
 );
 
 export default router;

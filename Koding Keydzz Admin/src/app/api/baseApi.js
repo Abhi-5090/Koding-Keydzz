@@ -84,6 +84,15 @@ export const baseApi = createApi({
     'Classrooms',
     'Audit',
     'Reports',
+    // Answers the machine could not mark, awaiting a human. Marking one
+    // recomputes the attempt's score, so it invalidates TestResults too.
+    'ReviewQueue',
+    // Teaching insights: hardest questions, stalling quizzes, ladder stalls.
+    'Insights',
+    // Work set for a class. Invalidated by setting, editing or archiving —
+    // completion itself is derived on the server from pupil progress, so it is
+    // never patched locally.
+    'Assignments',
   ],
   endpoints: () => ({}),
 });

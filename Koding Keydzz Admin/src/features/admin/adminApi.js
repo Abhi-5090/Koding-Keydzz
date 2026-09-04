@@ -16,6 +16,131 @@ export const adminApi = baseApi.injectEndpoints({
       providesTags: (res, err, arg) => [{ type: 'TestResults', id: arg?.slug }],
     }),
 
+    /* ====================================================================
+     * THE MARKING QUEUE — answers the machine could not mark.
+     *
+     * Task answers with no machine-checkable rule, and coding answers the
+     * runner could not judge, are flagged `needsReview`. That is a WITHHELD
+     * mark, never a zero — so until a human awards it the pupil is scored
+     * below their real mark with no remedy. The service and the endpoints
+     * existed; there was no screen, which is what made the withheld mark
+     * permanent in practice.
+     *
+     * This is the ONLY surface in the product that shows staff a mark scheme,
+     * which is why it is gated on `final_test:mark` rather than on plain
+     * student read.
+     * ==================================================================== */
+    getReviewQueue: builder.query({
+      query: (params) => ({ url: '/admin/review-queue', params }),
+      transformResponse: unwrap,
+      providesTags: ['ReviewQueue'],
+    }),
+
+    markTestAnswer: builder.mutation({
+      query: ({ attemptId, ...body }) => ({
+        url: `/admin/review-queue/${attemptId}`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: unwrap,
+      /**
+       * Marking recomputes the whole attempt from the PAPER, so a released
+       * mark can change a pass/fail and unlock the next course. Both the queue
+       * and the results table have to be refetched rather than patched
+       * locally — the server is the only thing that knows the new total.
+       */
+      invalidatesTags: ['ReviewQueue', 'TestResults', 'Analytics', 'Reports'],
+    }),
+
+    /* ====================================================================
+     * TEACHING INSIGHTS.
+     *
+     * Scoped exactly like the class report: a teacher sees their own classes,
+     * an administrator the whole school. Read-only — nothing here changes a
+     * mark or a pupil.
+     * ==================================================================== */
+    getHardestQuestions: builder.query({
+      query: (params) => ({ url: '/admin/insights/questions', params }),
+      transformResponse: unwrap,
+      providesTags: ['Insights'],
+    }),
+    getHardestQuizzes: builder.query({
+      query: (params) => ({ url: '/admin/insights/quizzes', params }),
+      transformResponse: unwrap,
+      providesTags: ['Insights'],
+    }),
+    getStallPoints: builder.query({
+      query: (params) => ({ url: '/admin/insights/stalls', params }),
+      transformResponse: unwrap,
+      providesTags: ['Insights'],
+    }),
+
+    /**
+     * SYSTEM HEALTH — the metrics endpoint, read by a human.
+     *
+     * The application published these all along and nothing looked at them.
+     * Prometheus rules now exist (ops/alerts/), but not every deployment runs
+     * Prometheus, and a platform owner should be able to see whether exams can
+     * be marked without setting up a monitoring stack first.
+     *
+     * `kk_code_runner_available` is the one that matters: with a runtime
+     * missing, coding answers cannot be judged and quietly pile into the
+     * marking queue while the exam still appears to work.
+     *
+     * Polled rather than cached — a health reading five minutes stale is
+     * worse than none, because it is believed.
+     */
+    getSystemHealth: builder.query({
+      query: () => '/metrics',
+      transformResponse: unwrap,
+      keepUnusedDataFor: 15,
+    }),
+
+    /* ====================================================================
+     * ASSIGNMENTS — the primitive the product did not have.
+     *
+     * Completion is DERIVED on the server from progress the pupil already
+     * recorded, so there is nothing to mark done from here and no submission
+     * endpoint to call. Every mutation refetches rather than patching the
+     * cache: the completion figures are computed, not stored, and only the
+     * server can recompute them.
+     * ==================================================================== */
+    getClassroomAssignments: builder.query({
+      query: ({ classroomId, includeArchived }) => ({
+        url: `/admin/classrooms/${classroomId}/assignments`,
+        params: includeArchived ? { includeArchived: 'true' } : undefined,
+      }),
+      transformResponse: unwrap,
+      providesTags: (r, e, arg) => [{ type: 'Assignments', id: arg?.classroomId }],
+    }),
+    createAssignment: builder.mutation({
+      query: ({ classroomId, ...body }) => ({
+        url: `/admin/classrooms/${classroomId}/assignments`,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: unwrap,
+      invalidatesTags: (r, e, arg) => [{ type: 'Assignments', id: arg?.classroomId }],
+    }),
+    updateAssignment: builder.mutation({
+      query: ({ id, classroomId, ...body }) => ({
+        url: `/admin/assignments/${id}`,
+        method: 'PATCH',
+        body,
+      }),
+      transformResponse: unwrap,
+      invalidatesTags: (r, e, arg) => [{ type: 'Assignments', id: arg?.classroomId }],
+    }),
+    archiveAssignment: builder.mutation({
+      query: ({ id, archive = true }) => ({
+        url: `/admin/assignments/${id}/archive`,
+        method: 'POST',
+        body: { archive },
+      }),
+      transformResponse: unwrap,
+      invalidatesTags: (r, e, arg) => [{ type: 'Assignments', id: arg?.classroomId }],
+    }),
+
     // ---- Stats ----
     getStats: builder.query({
       query: () => '/admin/stats',
@@ -529,6 +654,17 @@ export async function exportStudentsCsv() {
 }
 
 export const {
+  useGetSystemHealthQuery,
+  useGetClassroomAssignmentsQuery,
+  useCreateAssignmentMutation,
+  useUpdateAssignmentMutation,
+  useArchiveAssignmentMutation,
+  // Marking queue + teaching insights.
+  useGetReviewQueueQuery,
+  useMarkTestAnswerMutation,
+  useGetHardestQuestionsQuery,
+  useGetHardestQuizzesQuery,
+  useGetStallPointsQuery,
   useGetTestResultsQuery,
   useGetStatsQuery,
   useGetOrgAnalyticsQuery,

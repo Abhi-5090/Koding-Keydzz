@@ -11,12 +11,14 @@
     "test": "vitest run",
     "generate:catalog": "node scripts/generate-game-catalog.mjs",
     "verify:catalog": "node scripts/verify-game-catalog.mjs",
-    "migrate": "node scripts/migrate-quiz-attempts.mjs && node scripts/migrate-sessions.mjs",
+    "migrate": "node scripts/migrate.mjs",
     "recover:superadmin": "node scripts/recover-superadmin.mjs",
     "test:unit": "vitest run --dir tests --exclude 'tests/integration/**'",
     "test:integration": "vitest run tests/integration",
     "users:unassigned": "node scripts/find-unassigned-users.mjs",
-    "seed:courses": "node scripts/seed-courses.mjs"
+    "seed:courses": "node scripts/seed-courses.mjs",
+    "migrate:dry": "node scripts/migrate.mjs --dry",
+    "migrate:list": "node scripts/migrate.mjs --list"
   },
   "keywords": [
     "education",
@@ -41,6 +43,7 @@
     "mongoose": "^8.6.0",
     "morgan": "^1.10.0",
     "multer": "^2.2.0",
+    "nodemailer": "^10.0.0",
     "redis": "^4.7.1",
     "socket.io": "^4.7.5",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",

@@ -24,6 +24,9 @@ import {
   ScrollText,
   FileQuestion,
   ClipboardCheck,
+  PenLine,
+  Lightbulb,
+  ClipboardList,
 } from 'lucide-react';
 import AnimatedIcon from '../ui/AnimatedIcon';
 import {
@@ -68,6 +71,12 @@ const NAV_GROUPS = [
       { to: '/students', label: 'Students', icon: Users, cap: 'student:read', orgOnly: true },
       { to: '/classrooms', label: 'Classes', icon: School, cap: 'classroom:read', orgOnly: true },
       { to: '/test-results', label: 'Final test results', icon: ClipboardCheck, cap: 'student:read', orgOnly: true },
+      // The marking queue sits beside the results it changes. `final_test:mark`
+      // rather than `student:read`: this is the only screen that shows a mark
+      // scheme.
+      { to: '/marking', label: 'Marking queue', icon: PenLine, cap: 'final_test:mark', orgOnly: true },
+      { to: '/assignments', label: 'Assignments', icon: ClipboardList, cap: 'assignment:read', orgOnly: true },
+      { to: '/insights', label: 'Teaching insights', icon: Lightbulb, cap: 'report:class', orgOnly: true },
       { to: '/staff', label: 'Teachers & admins', icon: GraduationCap, cap: 'staff:read', orgOnly: true },
       { to: '/organization', label: 'School details', icon: Building2, cap: 'audit:org', orgOnly: true },
       { to: '/notifications', label: 'Announcements', icon: Bell, cap: 'announce:class', orgOnly: true },
