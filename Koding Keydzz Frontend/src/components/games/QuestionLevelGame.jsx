@@ -287,6 +287,12 @@ export default function QuestionLevelGame({
                 <motion.button
                   key={i}
                   type="button"
+                  /* A stable hook for the interaction audit. The answer
+                     options are otherwise only distinguishable from the
+                     topbar and toolbar by their Tailwind classes, and a test
+                     that keys on styling breaks the next time the styling
+                     changes. */
+                  data-testid="answer-option"
                   disabled={locked}
                   whileTap={!locked ? { scale: 0.97 } : undefined}
                   onClick={() => choose(i)}

@@ -14,6 +14,7 @@ import {
   useGetWorldsQuery,
   useGetQuizzesQuery,
   useGetCoursesQuery,
+  useGetWorldLessonsQuery,
 } from '../features/admin/adminApi';
 import PageHeader from '../components/ui/PageHeader';
 import QueryState from '../components/ui/QueryState';
@@ -109,16 +110,27 @@ function AssignmentForm({ classroomId, onDone, onCancel }) {
     [courses.data]
   );
 
-  /** Lessons across every world, so a lesson can be picked directly. */
+  /**
+   * LESSONS ARE PICKED IN TWO STEPS: a world, then a lesson inside it.
+   *
+   * The first version of this form built one flat list by reading `w.lessons`
+   * off each world. `GET /admin/worlds` does not return nested lessons — they
+   * come from `/worlds/:id/lessons` — so the list was always empty, and since
+   * "A lesson" is the form's default kind, the "which one" picker was empty
+   * every time the dialog opened. The form looked broken on arrival.
+   *
+   * Flattening every world's lessons into one list would also mean one request
+   * per world just to open a dialog. Choosing the world first is both correct
+   * and cheaper, and it is how a teacher thinks about it anyway.
+   */
+  const [lessonWorldId, setLessonWorldId] = useState('');
+  const worldLessons = useGetWorldLessonsQuery(lessonWorldId, { skip: !lessonWorldId });
+
   const lessonOptions = useMemo(() => {
-    const out = [];
-    for (const w of worldList) {
-      for (const l of w.lessons || []) {
-        out.push({ id: l.id || l._id, label: `${w.name} — ${l.title}` });
-      }
-    }
-    return out;
-  }, [worldList]);
+    const raw = worldLessons.data;
+    const list = Array.isArray(raw) ? raw : raw?.lessons || raw?.items || [];
+    return list.map((l) => ({ id: l.id || l._id, label: l.title }));
+  }, [worldLessons.data]);
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
@@ -183,7 +195,10 @@ function AssignmentForm({ classroomId, onDone, onCancel }) {
           <select
             id="a-kind"
             value={form.kind}
-            onChange={(e) => set({ kind: e.target.value, ref: '', level: '' })}
+            onChange={(e) => {
+              set({ kind: e.target.value, ref: '', level: '' });
+              setLessonWorldId('');
+            }}
             className="w-full rounded-lg border border-k-border bg-surface px-3 py-2 text-text-primary focus:border-turmeric focus:outline-none focus:ring-2 focus:ring-turmeric/40"
           >
             {TARGET_KINDS.map((k) => (
@@ -198,11 +213,13 @@ function AssignmentForm({ classroomId, onDone, onCancel }) {
           <label htmlFor="a-ref" className="mb-1.5 block text-sm font-semibold text-text-primary">
             Which one
           </label>
+          {/* A lesson cannot be chosen before its world is. */}
           <select
             id="a-ref"
             value={form.ref}
             onChange={(e) => set({ ref: e.target.value })}
             required
+            disabled={form.kind === 'lesson' && !lessonWorldId}
             className="w-full rounded-lg border border-k-border bg-surface px-3 py-2 text-text-primary focus:border-turmeric focus:outline-none focus:ring-2 focus:ring-turmeric/40"
           >
             <option value="">Choose…</option>
@@ -214,6 +231,40 @@ function AssignmentForm({ classroomId, onDone, onCancel }) {
           </select>
         </div>
       </div>
+
+      {form.kind === 'lesson' ? (
+        <div>
+          <label
+            htmlFor="a-lesson-world"
+            className="mb-1.5 block text-sm font-semibold text-text-primary"
+          >
+            Which world is the lesson in?
+          </label>
+          <select
+            id="a-lesson-world"
+            value={lessonWorldId}
+            onChange={(e) => {
+              setLessonWorldId(e.target.value);
+              // The old lesson belongs to the old world; clearing it stops a
+              // stale id being submitted against a different world.
+              set({ ref: '' });
+            }}
+            className="w-full rounded-lg border border-k-border bg-surface px-3 py-2 text-text-primary focus:border-turmeric focus:outline-none focus:ring-2 focus:ring-turmeric/40"
+          >
+            <option value="">Choose a world…</option>
+            {worldList.map((w) => (
+              <option key={w.id || w._id} value={w.id || w._id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          {lessonWorldId && !worldLessons.isLoading && lessonOptions.length === 0 ? (
+            <p className="mt-1.5 text-xs text-text-secondary">
+              That world has no lessons yet — pick another, or set a different kind of work.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {form.kind === 'game' ? (
         <div>

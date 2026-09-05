@@ -653,6 +653,32 @@ export async function exportStudentsCsv() {
   downloadBlob(blob, filename);
 }
 
+/**
+ * Download the class report CSV.
+ *
+ * The server has exposed `GET /admin/reports/class/export` — permission-gated
+ * and scoped to the caller's own pupils — since the reporting work landed, but
+ * nothing in this app ever called it. Staff could read results on screen and
+ * had no way to take them into a meeting, a spreadsheet or a parents' evening,
+ * which is most of what a report is for.
+ *
+ * Scope is deliberately NOT sent from here. A teacher's export must cover
+ * their classes and an administrator's the whole school, and that decision
+ * belongs to the server, which already makes it for the on-screen table.
+ */
+export async function exportClassReportCsv(grade) {
+  const token = getAccessToken();
+  const qs = grade ? `?grade=${encodeURIComponent(grade)}` : '';
+  const res = await fetch(`${API_URL}/admin/reports/class/export${qs}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    throw new Error('Export failed');
+  }
+  const blob = await res.blob();
+  downloadBlob(blob, `class_report_${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
 export const {
   useGetSystemHealthQuery,
   useGetClassroomAssignmentsQuery,

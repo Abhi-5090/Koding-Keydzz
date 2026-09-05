@@ -9,8 +9,9 @@ import {
   Eye,
   Search,
 } from 'lucide-react';
-import { useGetTestResultsQuery } from '../features/admin/adminApi';
+import { useGetTestResultsQuery, exportClassReportCsv } from '../features/admin/adminApi';
 import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
 import StatCard from '../components/ui/StatCard';
 import DataTable from '../components/ui/DataTable';
 import QueryState from '../components/ui/QueryState';
@@ -111,6 +112,23 @@ function AttemptsCell({ row, maxAttempts }) {
 export default function TestResults() {
   const [slug, setSlug] = useState(DEFAULT_COURSE_SLUG);
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError('');
+    try {
+      await exportClassReportCsv();
+    } catch {
+      // A download is a plain fetch, so it never passes through the RTK Query
+      // middleware that raises a toast for everything else. Without this the
+      // button would fail in complete silence.
+      setExportError('Could not export the results. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const query = useGetTestResultsQuery({ slug, search, limit: 100 });
 
@@ -188,7 +206,16 @@ export default function TestResults() {
         <span className="inline-flex items-center gap-1.5 rounded-full border border-k-border bg-malt/50 px-3 py-1.5 text-xs font-semibold text-text-secondary">
           <Eye size={13} /> View only
         </span>
+        <Button variant="secondary" onClick={handleExport} disabled={exporting}>
+          {exporting ? 'Preparing…' : 'Export results (CSV)'}
+        </Button>
       </PageHeader>
+
+      {exportError ? (
+        <p role="alert" className="text-sm font-semibold text-danger">
+          {exportError}
+        </p>
+      ) : null}
 
       {/* ---- course tabs ---- */}
       <div

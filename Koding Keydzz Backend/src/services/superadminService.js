@@ -33,10 +33,28 @@ async function deriveUniqueSlugAndCode(name) {
     throw ApiError.conflict('An organization with this name already exists');
   }
   let code = generateOrgCode(name);
-  // Retry a handful of times in the unlikely event of a code collision.
-  for (let i = 0; i < 10 && (await orgRepository.findByCode(code)); i += 1) {
-    code = generateOrgCode(name);
+  /**
+   * Each retry must actually try something DIFFERENT.
+   *
+   * This loop used to re-call `generateOrgCode(name)` with no variation. That
+   * call is deterministic for any name of six or more alphanumerics, so all
+   * ten attempts returned the identical colliding code and the duplicate went
+   * to the database — which rejected it with a raw "Duplicate value for code".
+   * A school could not onboard its second campus, and the message gave no clue
+   * why. Widening the random tail on each pass makes the retry real.
+   */
+  for (let i = 0; i < 12 && (await orgRepository.findByCode(code)); i += 1) {
+    code = generateOrgCode(name, 6, { randomChars: Math.min(2 + i, 5) });
   }
+
+  if (await orgRepository.findByCode(code)) {
+    // Astronomically unlikely, but better a sentence the reader can act on
+    // than a database error surfacing in the UI.
+    throw ApiError.conflict(
+      'Could not allocate a unique code for this organization. Please try a slightly different name.'
+    );
+  }
+
   return { slug, code };
 }
 
