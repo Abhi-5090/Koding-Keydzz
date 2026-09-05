@@ -259,13 +259,63 @@ userSchema.index(
 // scan on every row of a large upload.
 userSchema.index({ org: 1, role: 1, firstName: 1, lastName: 1 });
 
+/**
+ * BCRYPT COST FACTOR.
+ *
+ * Raised from 10 to 12. Each step doubles the work: an offline attacker
+ * cracking a stolen hash dump does a quarter as many guesses per second at 12
+ * as at 10, and the honest cost is one login going from roughly 100ms to
+ * 400ms — which nobody notices, because it happens once per sign-in and not
+ * once per request.
+ *
+ * Tunable because hardware moves and this number should be raised again in a
+ * few years. It is read at call time so raising it takes effect on the next
+ * sign-in without a restart-ordering dance.
+ *
+ * A cost BELOW 10 is refused outright. The variable exists so it can be raised
+ * later or lowered in a test suite that hashes thousands of fixtures; it does
+ * not exist so a deployment can quietly weaken every password in the database.
+ */
+const DEFAULT_BCRYPT_COST = 12;
+const MIN_BCRYPT_COST = 10;
+
+export function bcryptCost() {
+  const raw = Number(process.env.BCRYPT_COST);
+  if (!Number.isFinite(raw)) return DEFAULT_BCRYPT_COST;
+  return Math.max(MIN_BCRYPT_COST, Math.min(15, Math.floor(raw)));
+}
+
 userSchema.methods.setPassword = async function setPassword(plain) {
-  this.passwordHash = await bcrypt.hash(plain, 10);
+  this.passwordHash = await bcrypt.hash(plain, bcryptCost());
 };
 
 userSchema.methods.comparePassword = async function comparePassword(plain) {
   if (!this.passwordHash) return false;
   return bcrypt.compare(plain, this.passwordHash);
+};
+
+/**
+ * Was this hash made with a weaker cost than we now require?
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * Raising the cost factor protects nobody who already has an account — their
+ * hash keeps whatever cost it was written with, for ever. Every existing
+ * password would stay at cost 10 unless something rewrites it, and asking an
+ * entire school to change their passwords is not a plan.
+ *
+ * The only moment the plaintext is available to rehash with is a SUCCESSFUL
+ * LOGIN, so that is where the upgrade happens (see authService). This method is
+ * the test for whether it is needed.
+ *
+ * bcrypt hashes carry their cost in the string: `$2b$12$...`. Reading it back
+ * is exact rather than a guess.
+ */
+userSchema.methods.needsRehash = function needsRehash() {
+  if (!this.passwordHash) return false;
+  const match = /^\$2[aby]?\$(\d{2})\$/.exec(this.passwordHash);
+  if (!match) return true; // unrecognised format — rewrite it
+  return Number(match[1]) < bcryptCost();
 };
 
 /**

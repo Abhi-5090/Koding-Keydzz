@@ -139,3 +139,41 @@ describe('it never returns an empty or unhelpful string', () => {
     expect(formatApiError(err)).toBe('Deeper message');
   });
 });
+
+describe('never leaking server internals', () => {
+  it('REFUSES to show a 5xx message, whatever it contains', () => {
+    /**
+     * The bug this locks down: step 2 of the formatter returned `data.message`
+     * for any status, so a 500 raised by an unexpected exception printed
+     * whatever threw into the UI — a driver string, a file path, a stack
+     * fragment. Useless to an administrator and free reconnaissance to anyone
+     * else looking at the screen.
+     */
+    const leaky = [
+      'ECONNREFUSED at Object.<anonymous> (/srv/app/src/db.js:14:7)',
+      'E11000 duplicate key error collection: Koding_Keydzz.users index: email_1',
+      'MongooseServerSelectionError: connect ETIMEDOUT 10.0.0.4:27017',
+    ];
+    for (const message of leaky) {
+      const shown = formatApiError({ status: 500, data: { message } });
+      expect(shown).toBe('The server had a problem. Please try again in a moment.');
+      expect(shown).not.toMatch(/ECONNREFUSED|E11000|Mongoose|\/srv\/|27017/);
+    }
+  });
+
+  it('still shows a deliberate 4xx message, which is the useful half', () => {
+    // The distinction the fix rests on: 4xx messages are written for the user.
+    expect(
+      formatApiError({ status: 409, data: { message: 'This school has no seats left' } })
+    ).toBe('This school has no seats left');
+  });
+
+  it('does not leak a 5xx message hidden in field details either', () => {
+    expect(
+      formatApiError({
+        status: 503,
+        data: { details: [{ path: 'db', message: 'connect ETIMEDOUT 10.0.0.4:27017' }] },
+      })
+    ).not.toMatch(/ETIMEDOUT|27017/);
+  });
+});

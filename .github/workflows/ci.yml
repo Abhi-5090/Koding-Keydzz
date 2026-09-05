@@ -154,6 +154,65 @@ jobs:
           retention-days: 7
 
   # ---- Deployment config sanity ----
+  # ---- Secrets: keep the repository clean, rather than checking once ----
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: a secret committed and then removed is still a leaked
+      # secret, and only shows up if the whole history is available.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: No .env files tracked
+        run: |
+          # The single highest-value check. `.env` holds the production
+          # database credential; it is gitignored, and this asserts that
+          # nobody has ever force-added one.
+          if git log --all --diff-filter=A --name-only --pretty=format: \
+              | sort -u | grep -qE '(^|/)\.env$'; then
+            echo "::error::a .env file was committed at some point in history"
+            exit 1
+          fi
+          if git ls-files | grep -qE '(^|/)\.env$'; then
+            echo "::error::a .env file is currently tracked"
+            exit 1
+          fi
+          echo "No .env file is tracked, and none ever was."
+
+      - name: No credentials in tracked files
+        run: |
+          # Patterns chosen to be high-signal: each one is a credential FORMAT,
+          # not a keyword, so the false-positive rate is near zero and the
+          # check can be a hard failure rather than a warning nobody reads.
+          #
+          # Placeholder forms are excluded deliberately — DEPLOYMENT.md
+          # documents the connection-string shape with USER:PASS, which is
+          # exactly what a reader needs and is not a secret.
+          PATTERN='mongodb\+srv://[^ "'"'"']*:[^ "'"'"'@]+@|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|-----BEGIN (RSA |EC )?PRIVATE KEY'
+          if git grep -nIE "$PATTERN" -- . \
+              | grep -viE 'USER:PASS|example|placeholder|your_|changeme|<[a-z]' ; then
+            echo "::error::a credential-shaped string is committed — see the matches above"
+            exit 1
+          fi
+          echo "No credential-shaped strings in tracked files."
+
+      - name: No secrets reachable from the browser bundle
+        run: |
+          # Vite inlines every VITE_-prefixed variable into the JavaScript it
+          # ships, so a secret given a VITE_ name is published to every user.
+          # This asserts that the only VITE_ variables in use are the public
+          # URLs they are meant to be.
+          FOUND=$(grep -rhoE 'VITE_[A-Z0-9_]+' \
+            "Koding Keydzz Frontend/src" "Koding Keydzz Admin/src" | sort -u)
+          echo "$FOUND"
+          if echo "$FOUND" | grep -qiE 'SECRET|KEY|TOKEN|PASSWORD|CREDENTIAL|PRIVATE'; then
+            echo "::error::a VITE_ variable is named like a secret — it would ship to the browser"
+            exit 1
+          fi
+          echo "Every VITE_ variable is a public URL."
+
   config:
     name: Deployment config
     runs-on: ubuntu-latest

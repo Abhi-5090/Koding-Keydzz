@@ -4,6 +4,7 @@ import registerServiceWorker from './registerServiceWorker'
 import { Provider } from 'react-redux'
 import { store } from './app/store'
 import App from './App'
+import { ToastProvider } from './components/ui/toast/ToastProvider'
 import './index.css'
 
 /**
@@ -19,7 +20,11 @@ registerServiceWorker()
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <Provider store={store}>
-      <App />
+      {/* Inside the store provider so the error middleware's dispatcher exists
+          before the first request can fail. */}
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </Provider>
   </React.StrictMode>
 )

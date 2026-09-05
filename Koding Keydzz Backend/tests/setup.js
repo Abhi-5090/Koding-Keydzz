@@ -22,6 +22,24 @@ process.env.JWT_REFRESH_SECRET =
 process.env.NODE_ENV = 'test';
 
 /**
+ * HASH AT THE FLOOR IN TESTS, NOT AT THE PRODUCTION COST.
+ *
+ * Production uses bcrypt cost 12. Each step doubles the work, so the suite —
+ * which creates hundreds of fixture users and signs in constantly — pays four
+ * times the hashing cost of the old value. Measured: one integration file went
+ * from ~25s to 96s, almost all of it bcrypt.
+ *
+ * 10 is the FLOOR the model enforces, so this cannot be used to test something
+ * weaker than the product has ever shipped, and it is the value every existing
+ * hash in the database was written with anyway.
+ *
+ * `passwordHashUpgrade.test.js` overrides this back to 12 for its own
+ * assertions, because the thing it tests IS the cost — so the security
+ * property stays covered while the other 850 tests stay fast.
+ */
+process.env.BCRYPT_COST = process.env.BCRYPT_COST || '10';
+
+/**
  * NEVER let the test suite execute code over the network.
  *
  * `runCode` defaults to CODE_RUNNER='auto', which tries a local interpreter

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as authController from '../controllers/authController.js';
 import { protect } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
-import { authLimiter } from '../middlewares/rateLimit.js';
+import { authLimiter, passwordResetLimiter } from '../middlewares/rateLimit.js';
 import {
   registerStudentSchema,
   loginSchema,
@@ -58,6 +58,11 @@ router.post(
  * cooldown in the service. ---- */
 router.post(
   '/password-reset/request',
+  // Much tighter than the sign-in limiter: this endpoint sends mail to an
+  // address the caller chooses, so it is a mail-bomb vector as well as an auth
+  // one. The per-account cooldown in the service is not enough on its own —
+  // it cannot see a caller walking a list of a thousand addresses.
+  passwordResetLimiter,
   validate({ body: requestPasswordResetSchema }),
   authController.requestPasswordReset
 );

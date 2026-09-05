@@ -60,6 +60,23 @@ const label = (path) => {
 export function formatApiError(err, fallback = 'Something went wrong. Please try again.') {
   const data = err?.data ?? err?.error?.data ?? null;
 
+  /**
+   * 0. A 5xx MESSAGE IS NEVER SHOWN, whatever it says.
+   *
+   * An information-disclosure boundary, and it has to come FIRST — step 2
+   * below returns `data.message` for any status, so a 500 raised by an
+   * unexpected exception printed whatever threw straight into the UI. In this
+   * codebase's error middleware that can be a driver string, a file path or a
+   * stack fragment: `ECONNREFUSED at Object.<anonymous>` is useless to a
+   * school administrator and free reconnaissance to anyone else.
+   *
+   * A 4xx message is the opposite — deliberate, written for the user, and the
+   * most useful thing in the response ("This school has no seats left").
+   */
+  if (typeof err?.status === 'number' && err.status >= 500) {
+    return 'The server had a problem. Please try again in a moment.';
+  }
+
   // 1. Field-level detail — the useful part, and the part that was being lost.
   const details = Array.isArray(data?.details) ? data.details : null;
   if (details?.length) {
@@ -91,9 +108,6 @@ export function formatApiError(err, fallback = 'Something went wrong. Please try
   if (err?.status === 403) return 'You do not have permission to do that.';
   if (err?.status === 413) return 'That file is too large.';
   if (err?.status === 429) return 'Too many attempts. Please wait a moment and try again.';
-  if (typeof err?.status === 'number' && err.status >= 500) {
-    return 'The server had a problem. Please try again in a moment.';
-  }
 
   return fallback;
 }

@@ -33,6 +33,19 @@ class UserRepository extends BaseRepository {
   }
 
   /** Consume the pre-multi-session refresh hash, atomically. */
+  /**
+   * Write a new password hash and nothing else.
+   *
+   * A targeted `$set` rather than `save()`, for exactly the reason the login
+   * timestamp is: `save()` builds its update from the document as loaded, so a
+   * concurrent write to the same user makes it match nothing and raise
+   * `DocumentNotFoundError` — turning a successful login into a 500. This
+   * cannot conflict with anything.
+   */
+  setPasswordHash(id, passwordHash) {
+    return this.model.updateOne({ _id: id }, { $set: { passwordHash } });
+  }
+
   clearLegacyRefreshHash(id) {
     return this.model.updateOne({ _id: id }, { $set: { refreshTokenHash: null } });
   }

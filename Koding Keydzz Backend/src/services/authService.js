@@ -199,6 +199,33 @@ export async function login({ identifier, email, password, userAgent = '' }) {
     await userRepository.setLockState(user._id, 0, null);
   }
 
+  /**
+   * TRANSPARENTLY UPGRADE A WEAK HASH.
+   *
+   * Raising the bcrypt cost factor protects nobody who already has an account:
+   * their hash keeps the cost it was written with for ever. Every existing
+   * password in the database would stay at the old cost unless something
+   * rewrote it, and asking a whole school to change their passwords is not a
+   * plan anyone would carry out.
+   *
+   * This is the ONLY moment the plaintext exists to rehash with, so it happens
+   * here — after the password has been verified, so nothing is written on a
+   * failed attempt.
+   *
+   * Wrapped so it can NEVER fail the login. The user typed the right password;
+   * refusing them because a housekeeping write failed would be a self-inflicted
+   * outage, and the upgrade will simply be retried on their next sign-in.
+   */
+  if (typeof user.needsRehash === 'function' && user.needsRehash()) {
+    try {
+      await user.setPassword(password);
+      await userRepository.setPasswordHash(user._id, user.passwordHash);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[auth] could not upgrade password hash for ${user._id}: ${err.message}`);
+    }
+  }
+
   // Org-scoped users (admin/student) cannot log in while their org is suspended.
   if (user.org) {
     const org = await orgRepository.findById(user.org);

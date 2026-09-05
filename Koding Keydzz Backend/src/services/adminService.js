@@ -293,17 +293,41 @@ export async function deleteStudent(id, org = null) {
 
   const orgId = user.org;
 
-  user.deletedAt = new Date();
-  user.status = 'suspended';
   // Preserve the identifiers for the audit trail, then free them so the pupil
   // can be re-enrolled without a unique-index clash.
   const freed = { username: user.username || '', email: user.email || '' };
-  user.username = undefined;
-  user.email = undefined;
-  user.rollNumber = undefined;
-  user.sessions = [];
-  user.refreshTokenHash = null;
-  await user.save();
+
+  /**
+   * ATOMIC, not a read-modify-save.
+   *
+   * `user.save()` builds its update from the document as it was LOADED, so it
+   * matches nothing — and raises `DocumentNotFoundError` — if anything touched
+   * that user in between. The delete then 500s and the pupil is still on the
+   * roster, which is the worst possible outcome for a destructive operation:
+   * the caller is told it failed, and it half did.
+   *
+   * That window is small and real: a concurrent sign-in updates
+   * `lastLoginAt`, a reward credits XP, a session rotates. This is the third
+   * place in this codebase to hit it (see authService.login and the test
+   * harness's makeOrg), and the fix is the same each time — a targeted `$set`
+   * cannot conflict with a concurrent write to other fields.
+   *
+   * `$unset` rather than `undefined`: assigning `undefined` through Mongoose
+   * is a no-op on an update, so the identifiers would never actually be freed
+   * and re-enrolling the same pupil would hit the unique index.
+   */
+  await userRepository.model.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        deletedAt: new Date(),
+        status: 'suspended',
+        sessions: [],
+        refreshTokenHash: null,
+      },
+      $unset: { username: '', email: '', rollNumber: '' },
+    }
+  );
 
   if (orgId) await orgRepository.incStudentCount(orgId, -1);
   return { id: String(user._id), softDeleted: true, freed };

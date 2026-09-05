@@ -73,6 +73,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{js,jsx}'],
+    // jest-dom matchers, so component tests assert what a child would SEE.
+    setupFiles: ['./src/testSetup.js'],
   },
   server: {
     port: 5175,

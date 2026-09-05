@@ -12,6 +12,7 @@ import {
   withClassroomScope,
 } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
+import { accountCreationLimiter } from '../middlewares/rateLimit.js';
 import {
   idParam,
   studentsQuerySchema,
@@ -129,6 +130,7 @@ router.get(
 router.post(
   '/staff',
   writeStaff,
+  accountCreationLimiter,
   validate({ body: createStaffSchema }),
   staffController.createStaff
 );
@@ -402,6 +404,10 @@ router.post(
 router.post(
   '/students',
   writeStudents,
+  // Per-ADMIN, not per-IP: an admin and their whole school share one address.
+  // Counts requests rather than pupils, so the bulk roster import above (one
+  // request for a whole class) is unaffected.
+  accountCreationLimiter,
   validate({ body: createStudentSchema }),
   adminController.createStudent
 );
