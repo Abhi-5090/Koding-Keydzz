@@ -16,6 +16,7 @@ import {
   Flag,
   Check,
   ArrowLeft,
+  Lock,
   ArrowRight,
   Trophy,
   GripVertical,
@@ -98,12 +99,36 @@ export default function Quiz() {
 
 /* ----------------------------- Card grid ----------------------------- */
 
+/**
+ * THE ARENA, FILED THE WAY THE COURSE IS.
+ *
+ * It used to be one flat grid of every quiz on the platform — sixty-five cards
+ * in creation order, mixing Python loops with C pointers and prompt writing.
+ * A pupil three lessons in was shown quizzes for languages they had not begun,
+ * with nothing to say which belonged to the lesson they had just finished.
+ *
+ * Now it is two steps, mirroring the map: choose a realm, then a section
+ * inside it. The lock is the same one the map uses — a section opens when its
+ * world does — because a quiz on loops is not a fair thing to set before the
+ * loops lesson has been read.
+ *
+ * None of that lock is computed here. The server returns each course and
+ * section already carrying `unlocked` and the sentence that explains it, so
+ * this file cannot come to a different answer than the endpoint that serves
+ * the questions.
+ */
 function QuizArena({ onPick }) {
   const query = useGetQuizzesQuery()
-  const quizzes = useMemo(
-    () => (Array.isArray(query.data) ? query.data : []),
+  const [openCourse, setOpenCourse] = useState(null)
+
+  // The grouped shape for a pupil; a bare array for anyone else.
+  const courses = useMemo(() => query.data?.courses || [], [query.data])
+  const flat = useMemo(
+    () => (Array.isArray(query.data) ? query.data : query.data?.items || []),
     [query.data]
   )
+
+  const current = courses.find((c) => c.slug === openCourse) || null
 
   if (query.isLoading) {
     return <PageTransition><LoadingState message="Loading the Quiz Arena…" /></PageTransition>
@@ -112,81 +137,243 @@ function QuizArena({ onPick }) {
     return <PageTransition><ErrorState onRetry={query.refetch} /></PageTransition>
   }
 
+  const Header = ({ subtitle }) => (
+    <div className="mb-6">
+      <h1 className="font-heading text-3xl font-extrabold inline-flex items-center gap-2">
+        <AnimatedIcon icon={Brain} size={30} className="text-turmeric" animation="float" glow />
+        Quiz Arena
+      </h1>
+      <p className="text-text-secondary">{subtitle}</p>
+    </div>
+  )
+
+  /* ---- Step 2: the sections of one realm ---- */
+  if (current) {
+    return (
+      <PageTransition>
+        <button
+          type="button"
+          onClick={() => setOpenCourse(null)}
+          className="mb-4 inline-flex items-center gap-1.5 rounded-xl border border-k-border bg-surface/60 px-3 py-2 text-sm text-text-secondary transition-colors can-hover:hover:text-turmeric"
+        >
+          <ArrowLeft size={16} /> All realms
+        </button>
+
+        <Header subtitle={`${current.title} — one set of questions per section.`} />
+
+        {current.sections.length === 0 ? (
+          <EmptyState
+            icon={HelpCircle}
+            title="No quizzes here yet"
+            message="Questions for this realm are still being written — check back soon!"
+          />
+        ) : (
+          <div className="flex flex-col gap-6">
+            {current.sections.map((section) => (
+              <section key={section.id}>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <h2 className="game-text text-lg font-bold text-text-primary">{section.name}</h2>
+                  <span className="game-text inline-flex items-center gap-1 rounded-full bg-surface/70 px-2.5 py-1 text-xs text-text-secondary">
+                    {section.quizzes.length} quiz{section.quizzes.length === 1 ? '' : 'zes'}
+                  </span>
+                  {!section.unlocked && (
+                    <span className="game-text inline-flex items-center gap-1 rounded-full border border-k-border px-2.5 py-1 text-xs font-semibold text-text-secondary">
+                      <Lock size={11} /> Locked
+                    </span>
+                  )}
+                </div>
+
+                {!section.unlocked && (
+                  /* The server's sentence, naming the world that opens this. */
+                  <p className="mb-3 text-sm text-text-secondary">
+                    {section.lockedReason || 'Finish the world this section belongs to first.'}
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {section.quizzes.map((quiz, i) => (
+                    <QuizCard key={quiz.id || i} quiz={quiz} index={i} onPick={onPick} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </PageTransition>
+    )
+  }
+
+  /* ---- Step 1: the four realms ---- */
+  if (courses.length === 0) {
+    /**
+     * No grouping came back — a member of staff, or a pupil on a platform with
+     * no published courses. Falling back to the flat grid keeps the arena
+     * usable rather than showing an empty screen that is not true.
+     */
+    return (
+      <PageTransition>
+        <Header subtitle="Pick a quiz, answer the questions, and earn XP for your account!" />
+        {flat.length === 0 ? (
+          <EmptyState
+            icon={HelpCircle}
+            title="No quizzes yet"
+            message="Quizzes are on their way — check back soon to test your skills!"
+            action={<Link to="/dashboard"><Button variant="secondary"><span className="inline-flex items-center gap-2"><Home size={18} /> Back to Dashboard</span></Button></Link>}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {flat.map((quiz, i) => (
+              <QuizCard key={idOf(quiz) || i} quiz={quiz} index={i} onPick={onPick} />
+            ))}
+          </div>
+        )}
+      </PageTransition>
+    )
+  }
+
   return (
     <PageTransition>
-      <div className="mb-6">
-        <h1 className="font-heading text-3xl font-extrabold inline-flex items-center gap-2">
-          <AnimatedIcon icon={Brain} size={30} className="text-turmeric" animation="float" glow />
-          Quiz Arena
-        </h1>
-        <p className="text-text-secondary">
-          Pick a quiz, answer the questions, and earn XP for your account!
-        </p>
-      </div>
+      <Header subtitle="Four realms of questions. Open the one you have reached." />
 
-      {quizzes.length === 0 ? (
-        <EmptyState
-          icon={HelpCircle}
-          title="No quizzes yet"
-          message="Quizzes are on their way — check back soon to test your skills!"
-          action={<Link to="/dashboard"><Button variant="secondary"><span className="inline-flex items-center gap-2"><Home size={18} /> Back to Dashboard</span></Button></Link>}
-        />
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {quizzes.map((quiz, i) => {
-            const id = idOf(quiz)
-            const completed = !!(quiz.completed || quiz.attempted || quiz.passed)
-            const best =
-              quiz.bestScore ?? quiz.best ?? (quiz.passed ? quiz.score : null)
-            // world/lesson come back as objects from the API — render their string fields only.
-            const topic =
-              quiz.world?.name ||
-              quiz.lesson?.title ||
-              (typeof quiz.world === 'string' ? quiz.world : null) ||
-              (typeof quiz.lesson === 'string' ? quiz.lesson : null) ||
-              quiz.topic ||
-              null
-            const TypeIcon = TYPE_META[quiz.type]?.icon || HelpCircle
-            return (
-              <motion.button
-                key={id || i}
-                type="button"
-                onClick={() => onPick(id)}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: Math.min(i, 12) * 0.04, ease: EASE_OUT }}
-                whileHover={{ y: -6 }}
-                whileTap={{ scale: 0.97 }}
-                className="group relative flex flex-col rounded-2xl border-2 border-k-border bg-card p-5 text-left transition-[border-color,box-shadow] duration-200 can-hover:hover:border-turmeric can-hover:hover:shadow-golden-glow"
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {courses.map((course, i) => {
+          const tint = course.tint || '#FF602F'
+          return (
+            <motion.button
+              key={course.id}
+              type="button"
+              disabled={!course.unlocked}
+              onClick={() => course.unlocked && setOpenCourse(course.slug)}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: i * 0.05, ease: EASE_OUT }}
+              whileHover={course.unlocked ? { y: -6 } : undefined}
+              whileTap={course.unlocked ? { scale: 0.97 } : undefined}
+              aria-label={
+                course.unlocked
+                  ? `Open ${course.title} quizzes`
+                  : `${course.title} quizzes — locked. ${course.lockedReason || ''}`
+              }
+              className={`group relative flex flex-col rounded-2xl border-2 p-5 text-left transition-[border-color,box-shadow] duration-200 ${
+                course.unlocked
+                  ? 'border-k-border bg-card can-hover:hover:shadow-golden-glow'
+                  : 'cursor-not-allowed border-k-border/40 bg-malt/60 opacity-70'
+              }`}
+              style={course.unlocked ? { borderColor: `${tint}59` } : undefined}
+            >
+              <div
+                className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl"
+                style={
+                  course.unlocked
+                    ? { background: `${tint}22`, color: tint }
+                    : undefined
+                }
               >
-                {completed && (
-                  <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-success/50 bg-success/10 px-2 py-0.5 text-[10px] font-bold uppercase text-success game-text">
-                    <Trophy size={11} /> {best != null ? `Best ${best}` : 'Done'}
-                  </span>
-                )}
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-turmeric/15 text-turmeric transition-transform duration-200 can-hover:group-hover:scale-110">
-                  <TypeIcon size={22} />
-                </div>
-                <h3 className="game-text mb-1 pr-12 text-lg font-bold text-text-primary">
-                  {quiz.title || 'Untitled Quiz'}
-                </h3>
-                {topic && (
-                  <p className="mb-3 text-xs text-text-secondary">{topic}</p>
-                )}
-                <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
+                {course.unlocked ? <Brain size={22} /> : <Lock size={20} className="text-text-secondary" />}
+              </div>
+
+              <h3
+                className="game-text mb-1 text-lg font-bold"
+                style={{ color: course.unlocked ? tint : undefined }}
+              >
+                {course.title}
+              </h3>
+
+              <p className="text-xs leading-snug text-text-secondary">
+                {course.unlocked
+                  ? course.tagline || `${course.sections.length} sections`
+                  : course.lockedReason || 'Finish the realm before this one to unlock it.'}
+              </p>
+
+              {course.unlocked && (
+                <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
                   <span className="game-text inline-flex items-center gap-1 rounded-full bg-surface/70 px-2.5 py-1 text-xs text-text-secondary">
-                    <HelpCircle size={13} /> {quiz.questionCount ?? quiz.questions?.length ?? '?'} Q
+                    {course.sections.length} sections
                   </span>
                   <span className="game-text inline-flex items-center gap-1 rounded-full bg-turmeric/15 px-2.5 py-1 text-xs text-turmeric">
-                    <Zap size={13} /> +{quiz.xpReward ?? 50} XP
+                    <HelpCircle size={13} /> {course.quizCount} quizzes
                   </span>
                 </div>
-              </motion.button>
-            )
-          })}
-        </div>
-      )}
+              )}
+            </motion.button>
+          )
+        })}
+      </div>
     </PageTransition>
+  )
+}
+
+/** One quiz card. Locked cards stay visible so a pupil can see what is coming. */
+function QuizCard({ quiz, index, onPick }) {
+  const id = idOf(quiz)
+  const completed = !!(quiz.completed || quiz.attempted || quiz.passed)
+  const best = quiz.bestScore ?? quiz.best ?? (quiz.passed ? quiz.score : null)
+  const unlocked = quiz.unlocked !== false
+  const topic =
+    quiz.world?.name ||
+    quiz.lesson?.title ||
+    (typeof quiz.world === 'string' ? quiz.world : null) ||
+    (typeof quiz.lesson === 'string' ? quiz.lesson : null) ||
+    quiz.topic ||
+    null
+  const TypeIcon = TYPE_META[quiz.type]?.icon || HelpCircle
+
+  return (
+    <motion.button
+      type="button"
+      disabled={!unlocked}
+      onClick={() => unlocked && onPick(id)}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay: Math.min(index, 12) * 0.04, ease: EASE_OUT }}
+      whileHover={unlocked ? { y: -6 } : undefined}
+      whileTap={unlocked ? { scale: 0.97 } : undefined}
+      aria-label={
+        unlocked
+          ? `Start ${quiz.title || 'quiz'}`
+          : `${quiz.title || 'Quiz'} — locked. ${quiz.lockedReason || ''}`
+      }
+      className={`group relative flex flex-col rounded-2xl border-2 p-5 text-left transition-[border-color,box-shadow] duration-200 ${
+        unlocked
+          ? 'border-k-border bg-card can-hover:hover:border-turmeric can-hover:hover:shadow-golden-glow'
+          : 'cursor-not-allowed border-k-border/40 bg-malt/60 opacity-70'
+      }`}
+    >
+      {completed && unlocked && (
+        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-success/50 bg-success/10 px-2 py-0.5 text-[10px] font-bold uppercase text-success game-text">
+          <Trophy size={11} /> {best != null ? `Best ${best}` : 'Done'}
+        </span>
+      )}
+      {!unlocked && (
+        <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-k-border px-2 py-0.5 text-[10px] font-bold uppercase text-text-secondary game-text">
+          <Lock size={11} /> Locked
+        </span>
+      )}
+
+      <div
+        className={`mb-3 flex h-11 w-11 items-center justify-center rounded-xl ${
+          unlocked
+            ? 'bg-turmeric/15 text-turmeric transition-transform duration-200 can-hover:group-hover:scale-110'
+            : 'text-text-secondary'
+        }`}
+      >
+        {unlocked ? <TypeIcon size={22} /> : <Lock size={20} />}
+      </div>
+
+      <h3 className="game-text mb-1 pr-12 text-lg font-bold text-text-primary">
+        {quiz.title || 'Untitled Quiz'}
+      </h3>
+      {topic && <p className="mb-3 text-xs text-text-secondary">{topic}</p>}
+
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
+        <span className="game-text inline-flex items-center gap-1 rounded-full bg-surface/70 px-2.5 py-1 text-xs text-text-secondary">
+          <HelpCircle size={13} /> {quiz.questionCount ?? quiz.questions?.length ?? '?'} Q
+        </span>
+        <span className="game-text inline-flex items-center gap-1 rounded-full bg-turmeric/15 px-2.5 py-1 text-xs text-turmeric">
+          <Zap size={13} /> +{quiz.xpReward ?? 50} XP
+        </span>
+      </div>
+    </motion.button>
   )
 }
 

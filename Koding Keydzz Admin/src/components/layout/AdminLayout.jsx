@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   LayoutDashboard,
   Users,
@@ -27,6 +27,7 @@ import {
   PenLine,
   Lightbulb,
   ClipboardList,
+  ChevronRight,
 } from 'lucide-react';
 import AnimatedIcon from '../ui/AnimatedIcon';
 import {
@@ -146,7 +147,123 @@ function visibleGroups(capabilities, hasOrg) {
    * treat each other as the same object and fly across the screen between
    * them. One id per mount keeps each indicator's animation to its own list.
    */
+/**
+ * ONE COLLAPSIBLE GROUP OF NAVIGATION LINKS.
+ *
+ * The header is a real <button> with `aria-expanded` and `aria-controls`, not
+ * a styled heading: it toggles something, so it has to be reachable by keyboard
+ * and announced as a control. A screen reader user otherwise meets a list that
+ * has silently lost most of its links.
+ *
+ * The ungrouped items at the top (the dashboard) carry no label and are never
+ * collapsible — the one destination everybody needs should not be behind a
+ * disclosure.
+ *
+ * The height animation is on a wrapper with `overflow-hidden` rather than on
+ * the list itself, so the links inside are not squashed mid-transition; and
+ * `prefers-reduced-motion` drops the travel while keeping the state change,
+ * because the open/closed state is information, not decoration.
+ */
+function SidebarGroup({ group, open, onToggle, reduceMotion, children }) {
+  if (!group.label) {
+    return <div className="mb-4">{children}</div>;
+  }
+
+  const panelId = `sidebar-group-${group.label.replace(/\s+/g, '-').toLowerCase()}`;
+
+  return (
+    <div className="mb-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex w-full items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left text-[0.8rem] font-bold uppercase tracking-[0.1em] text-text-secondary/90 transition-colors duration-200 hover:bg-surface/60 hover:text-text-primary"
+      >
+        <span className="truncate">{group.label}</span>
+        <motion.span
+          aria-hidden
+          animate={{ rotate: open ? 90 : 0 }}
+          transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }}
+          className="shrink-0"
+        >
+          <ChevronRight size={16} />
+        </motion.span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id={panelId}
+            key="panel"
+            initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="pt-1">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function SidebarContent({ instance = 'desktop', groups, portalLabel, reduceMotion, onNavigate, onLogout }) {
+  const { pathname } = useLocation();
+
+  /**
+   * WHICH GROUP IS OPEN — one at a time.
+   *
+   * The sidebar carries twenty-odd destinations across four groups. Listing
+   * them all at once meant scrolling to reach the last of them on a laptop,
+   * and it gave every item the same weight: "Activity log" sat as prominently
+   * as "Students". Collapsing to one open group turns the list into a shape
+   * you can scan.
+   *
+   * The group holding the CURRENT page decides which one is open, so a
+   * navigation never leaves you looking at a sidebar that has closed around
+   * the page you are on. It is derived from the route rather than remembered,
+   * which also means a deep link opens the right group on first paint.
+   */
+  const groupKey = (group, index) => group.label || `top-${index}`;
+
+  /**
+   * The group to open, given the current page.
+   *
+   * The fallback to the FIRST LABELLED group is not cosmetic: the dashboard
+   * sits outside every labelled group, so "open the group holding this page"
+   * left the whole sidebar collapsed on the landing screen — one link and
+   * three shut headings. "My school" (or "Platform", for a platform owner)
+   * opens instead, which is where the work is.
+   */
+  const activeIndex = groups.findIndex(
+    (g) =>
+      g.label &&
+      g.items.some((item) =>
+        item.end ? pathname === item.to : pathname.startsWith(item.to)
+      )
+  );
+  const firstLabelled = groups.findIndex((g) => g.label);
+  const resolvedIndex = activeIndex !== -1 ? activeIndex : firstLabelled;
+  const activeGroupKey =
+    resolvedIndex === -1 ? null : groupKey(groups[resolvedIndex], resolvedIndex);
+
+  const [openGroup, setOpenGroup] = useState(activeGroupKey);
+
+  // Follow the route: opening a page in a collapsed group opens that group.
+  useEffect(() => {
+    if (activeGroupKey) setOpenGroup(activeGroupKey);
+  }, [activeGroupKey]);
+
+  /**
+   * Clicking the open group closes it; clicking another opens that one and
+   * closes the previous — the single-open behaviour, which is the whole point
+   * of collapsing in the first place.
+   */
+  const toggleGroup = (key) => setOpenGroup((current) => (current === key ? null : key));
+
   return (
     <>
       <div className="flex items-center gap-3 px-6 py-6">
@@ -163,12 +280,13 @@ function SidebarContent({ instance = 'desktop', groups, portalLabel, reduceMotio
 
       <nav className="flex-1 overflow-y-auto px-3 pb-3" aria-label="Main navigation">
         {groups.map((group, gi) => (
-          <div key={group.label || `top-${gi}`} className="mb-5">
-            {group.label && (
-              <h2 className="px-4 pb-2 pt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-secondary/80">
-                {group.label}
-              </h2>
-            )}
+          <SidebarGroup
+            key={group.label || `top-${gi}`}
+            group={group}
+            open={openGroup === (group.label || `top-${gi}`)}
+            onToggle={() => toggleGroup(group.label || `top-${gi}`)}
+            reduceMotion={reduceMotion}
+          >
             <div className="space-y-1.5">
               {group.items.map((item) => (
                 <NavLink
@@ -235,7 +353,7 @@ function SidebarContent({ instance = 'desktop', groups, portalLabel, reduceMotio
                 </NavLink>
               ))}
             </div>
-          </div>
+          </SidebarGroup>
         ))}
       </nav>
 

@@ -2,6 +2,7 @@ import { userRepository } from '../repositories/userRepository.js';
 import { lessonRepository } from '../repositories/lessonRepository.js';
 import { challengeRepository } from '../repositories/challengeRepository.js';
 import { ApiError } from '../utils/ApiError.js';
+import { assertLessonOpen } from './progressionService.js';
 import { computeLevel, XP_REWARDS } from '../utils/xp.js';
 import { recordLearningActivity } from './streakService.js';
 import { createNotification } from './notificationService.js';
@@ -48,6 +49,25 @@ async function applyGain(user, { xp = 0, coins = 0 }) {
 export async function completeLesson(userId, lessonId) {
   const user = await userRepository.findById(userId);
   if (!user) throw ApiError.notFound('User not found');
+
+  /**
+   * THE SEQUENCE IS ENFORCED HERE, NOT ONLY ON SCREEN.
+   *
+   * The world page greys out a locked topic, but lesson ids come from the map
+   * and this endpoint takes one in the URL. Without this check a pupil could
+   * post a completion for the last lesson of a world, then the one before it,
+   * and unlock the next world without having read anything — the map only
+   * counts completions, it does not ask how they were arrived at.
+   *
+   * `assertLessonOpen` allows re-completing a lesson already finished, so
+   * revisiting a lesson is never met with an error; it awards nothing the
+   * second time either way.
+   */
+  const gate = await assertLessonOpen(user, lessonId);
+  if (!gate.ok) {
+    if (gate.status === 404) throw ApiError.notFound(gate.message);
+    throw ApiError.forbidden(gate.message);
+  }
 
   const lesson = await lessonRepository.findById(lessonId);
   if (!lesson) throw ApiError.notFound('Lesson not found');

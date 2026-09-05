@@ -74,9 +74,18 @@ async function signIn(page, { email, password }) {
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);
   await page.getByRole('button', { name: /sign in|log in/i }).click();
-  // Landing on a dashboard is the signal that auth + routing + the first lazy
-  // chunk all worked.
-  await expect(page).toHaveURL(/\/(dashboard|superadmin)/, { timeout: 20_000 });
+  /**
+   * Landing on a dashboard is the signal that auth + routing + the first lazy
+   * chunk all worked — OR on the change-password screen, which is where an
+   * account whose password was set by somebody else is correctly sent.
+   *
+   * `mustChangePassword` is enforced in `protect`, so a staff account that has
+   * just been reset is refused every other route until it sets its own
+   * password. Asserting only on the dashboard made that correct behaviour look
+   * like a broken sign-in. Callers that need the dashboard specifically go on
+   * to complete the change and assert on what follows.
+   */
+  await expect(page).toHaveURL(/\/(dashboard|superadmin|change-password)/, { timeout: 20_000 });
 }
 
 test.describe('admin sign-in', () => {
@@ -86,8 +95,15 @@ test.describe('admin sign-in', () => {
     await page.getByLabel(/password/i).fill('definitely-not-the-password');
     await page.getByRole('button', { name: /sign in|log in/i }).click();
 
-    // The user must SEE the failure — not be left on a silent form.
-    await expect(page.getByText(/invalid credentials|incorrect|failed/i)).toBeVisible();
+    /**
+     * The user must SEE the failure — not be left on a silent form.
+     *
+     * The wording is the server's ("Invalid email or password."), and it is
+     * deliberately vague about WHICH was wrong so the form cannot be used to
+     * discover which addresses have accounts. The assertion matches that
+     * rather than an older phrasing.
+     */
+    await expect(page.getByText(/invalid email or password|invalid credentials|incorrect/i)).toBeVisible();
     await expect(page).toHaveURL(/\/login/);
   });
 
@@ -205,8 +221,11 @@ test.describe('staff management', () => {
     // panel is the ONLY place the password is shown. Scope to the dialog —
     // the address also lands in the table behind it.
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText(/write this down now/i)).toBeVisible({ timeout: 15_000 });
-    await expect(dialog.getByText(email)).toBeVisible();
+    await expect(dialog.getByText(/hand this over now/i)).toBeVisible({ timeout: 15_000 });
+    // The address appears twice inside the dialog — in the panel and again on
+    // the printable handover slip — so this asks whether it is shown at all,
+    // not how many times.
+    await expect(dialog.getByText(email).first()).toBeVisible();
     await expect(dialog.getByRole('button', { name: /copy sign-in details/i })).toBeVisible();
 
     await dialog.getByRole('button', { name: /^done$/i }).click();

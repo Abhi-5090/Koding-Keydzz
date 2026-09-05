@@ -19,6 +19,9 @@ import {
   Waypoints,
   Hash,
   LayoutGrid,
+  Cpu,
+  LayoutTemplate,
+  Sparkles,
 } from 'lucide-react'
 
 // Per-world icons keyed by backend slug.
@@ -31,6 +34,23 @@ export const WORLD_ICONS = {
 }
 
 export const worldIcon = (slug) => WORLD_ICONS[slug] || MapIcon
+
+/**
+ * Per-COURSE icons, keyed by the course slug (python | c | html | ai).
+ *
+ * Separate from WORLD_ICONS on purpose: a course and a world are different
+ * things on the map, and only Python's five worlds have their own icons — the
+ * other fifteen fall back to the map pin, which would make every realm look
+ * identical if the two maps were merged.
+ */
+export const COURSE_ICONS = {
+  python: Code,
+  c: Cpu,
+  html: LayoutTemplate,
+  ai: Sparkles,
+}
+
+export const courseIcon = (slug) => COURSE_ICONS[slug] || MapIcon
 
 // Per-game icons keyed by game slug.
 export const GAME_ICONS = {

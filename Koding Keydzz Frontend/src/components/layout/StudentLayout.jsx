@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useDispatch } from 'react-redux'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   LayoutDashboard,
   Map as MapIcon,
@@ -21,6 +21,7 @@ import {
   GraduationCap,
   Award,
   ClipboardList,
+  ChevronRight,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useGetDashboardQuery } from '../../features/student/studentApi'
@@ -33,34 +34,163 @@ import CoinCounter from '../ui/CoinCounter'
 import AnimatedIcon from '../ui/AnimatedIcon'
 import NotificationsBell from './NotificationsBell'
 
-const NAV = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  // Above the map on purpose: a pupil picks a language track first, then
-  // explores that course's worlds. Trophy is already imported for
-  // Achievements, so GraduationCap keeps the two distinguishable.
-  { to: '/courses', label: 'My Journey', icon: GraduationCap },
-  // Directly under the journey: if a teacher has set something, that is what a
-  // pupil should be doing before they wander off to the games.
-  { to: '/assignments', label: 'My Work', icon: ClipboardList },
-  { to: '/map', label: 'World Map', icon: MapIcon },
-  { to: '/play', label: 'Playground', icon: Code2 },
-  { to: '/games', label: 'Mini Games', icon: Gamepad2 },
-  { to: '/quiz', label: 'Quiz Arena', icon: Brain },
-  { to: '/avatar', label: 'Avatar', icon: Drama },
-  { to: '/achievements', label: 'Achievements', icon: Trophy },
-  // Certificates sit next to Achievements deliberately: both answer "what have
-  // I actually earned", and a certificate is the one a child shows someone.
-  { to: '/certificates', label: 'Certificates', icon: Award },
-  { to: '/leaderboard', label: 'Leaderboard', icon: BarChart3 },
-  { to: '/shop', label: 'Shop', icon: ShoppingBag },
-  { to: '/profile', label: 'Profile', icon: UserCircle },
+/**
+ * NAVIGATION, IN FOUR NAMED GROUPS.
+ *
+ * Thirteen destinations in one flat column asked a child to read the whole
+ * list every time, and gave "Profile" the same weight as "My Journey". Worse,
+ * on a laptop the last few sat below the fold, so the shop and the leaderboard
+ * were effectively hidden behind a scroll a child had no reason to try.
+ *
+ * The groups are named for what a child is trying to DO, not for how the app
+ * is built: you are learning, playing, collecting, or looking after your
+ * account. Dashboard stays outside them — the one place everybody starts
+ * should never be behind a disclosure.
+ */
+const NAV_GROUPS = [
+  {
+    label: null, // ungrouped, pinned to the top
+    items: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
+  },
+  {
+    label: 'Learn',
+    items: [
+      // First in the group on purpose: a pupil picks a language track, then
+      // explores that course's worlds.
+      { to: '/courses', label: 'My Journey', icon: GraduationCap },
+      // Directly under it: if a teacher has set something, that is what a
+      // pupil should be doing before they wander off to the games.
+      { to: '/assignments', label: 'My Work', icon: ClipboardList },
+      { to: '/map', label: 'World Map', icon: MapIcon },
+      { to: '/play', label: 'Playground', icon: Code2 },
+    ],
+  },
+  {
+    label: 'Play',
+    items: [
+      { to: '/games', label: 'Mini Games', icon: Gamepad2 },
+      { to: '/quiz', label: 'Quiz Arena', icon: Brain },
+      { to: '/leaderboard', label: 'Leaderboard', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'Rewards',
+    items: [
+      { to: '/achievements', label: 'Achievements', icon: Trophy },
+      // Next to Achievements deliberately: both answer "what have I actually
+      // earned", and a certificate is the one a child shows someone.
+      { to: '/certificates', label: 'Certificates', icon: Award },
+      { to: '/shop', label: 'Shop', icon: ShoppingBag },
+      { to: '/avatar', label: 'Avatar', icon: Drama },
+    ],
+  },
+  {
+    label: 'My account',
+    items: [{ to: '/profile', label: 'Profile', icon: UserCircle }],
+  },
 ]
+
+/**
+ * ONE COLLAPSIBLE GROUP.
+ *
+ * The header is a real <button> carrying `aria-expanded` and `aria-controls`,
+ * because it toggles something: a styled heading would leave a keyboard or
+ * screen-reader user facing a list that had quietly lost most of its links.
+ *
+ * `prefers-reduced-motion` drops the travel but keeps the state change — open
+ * and closed is information, not decoration.
+ */
+function NavGroup({ group, open, onToggle, reduceMotion, children }) {
+  if (!group.label) return <div className="mb-2">{children}</div>
+
+  const panelId = `student-nav-${group.label.replace(/\s+/g, '-').toLowerCase()}`
+
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="game-text flex w-full items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left text-xs font-bold uppercase tracking-[0.1em] text-text-secondary transition-colors duration-200 hover:bg-surface hover:text-turmeric"
+      >
+        <span className="truncate">{group.label}</span>
+        <motion.span
+          aria-hidden
+          animate={{ rotate: open ? 90 : 0 }}
+          transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }}
+          className="shrink-0"
+        >
+          <ChevronRight size={16} />
+        </motion.span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id={panelId}
+            key="panel"
+            initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-1 pt-1">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
 
 export default function StudentLayout() {
   const { user, token, logout } = useAuth()
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const reduceMotion = useReducedMotion()
+  const { pathname } = useLocation()
+
+  /**
+   * WHICH GROUP IS OPEN — one at a time.
+   *
+   * Derived from the CURRENT ROUTE rather than remembered, for two reasons: a
+   * deep link opens the right group on first paint, and navigating can never
+   * leave a child staring at a sidebar that has closed around the page they
+   * are on.
+   */
+  const groupKey = (group, index) => group.label || `top-${index}`
+
+  /**
+   * The group to open, given where the pupil is.
+   *
+   * Falling back to the FIRST LABELLED group matters more than it looks. The
+   * dashboard is not inside any labelled group, so "open the group containing
+   * the current page" left every one of them shut on the screen a child lands
+   * on — a sidebar showing one link and four closed headings, which is worse
+   * than the long list it replaced. Learn is open by default instead, because
+   * that is where a pupil is going next.
+   */
+  const activeGroupKey = (() => {
+    const index = NAV_GROUPS.findIndex((g) =>
+      g.label && g.items.some((item) => pathname.startsWith(item.to))
+    )
+    if (index !== -1) return groupKey(NAV_GROUPS[index], index)
+    const firstLabelled = NAV_GROUPS.findIndex((g) => g.label)
+    return firstLabelled === -1 ? null : groupKey(NAV_GROUPS[firstLabelled], firstLabelled)
+  })()
+
+  const [openGroup, setOpenGroup] = useState(activeGroupKey)
+
+  useEffect(() => {
+    if (activeGroupKey) setOpenGroup(activeGroupKey)
+  }, [activeGroupKey])
+
+  // Clicking the open group closes it; clicking another swaps to it. That
+  // single-open behaviour is the whole reason for collapsing in the first
+  // place — two open groups is just the old long list again.
+  const toggleGroup = (key) => setOpenGroup((current) => (current === key ? null : key))
 
   /**
    * Escape closes the mobile drawer.
@@ -128,40 +258,50 @@ export default function StudentLayout() {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 scrollbar-thin overflow-y-auto">
-        {NAV.map((item, i) => (
-          <motion.div
-            key={item.to}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, delay: i * 0.04, ease: [0.23, 1, 0.32, 1] }}
+      <nav className="flex-1 px-3 scrollbar-thin overflow-y-auto" aria-label="Main navigation">
+        {NAV_GROUPS.map((group, gi) => (
+          <NavGroup
+            key={group.label || `top-${gi}`}
+            group={group}
+            open={openGroup === (group.label || `top-${gi}`)}
+            onToggle={() => toggleGroup(group.label || `top-${gi}`)}
+            reduceMotion={reduceMotion}
           >
-          <NavLink
-            to={item.to}
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) =>
-              `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition-[background-color,color,box-shadow] duration-200 ${
-                isActive
-                  ? 'bg-turmeric text-malt font-bold shadow-golden-glow'
-                  : 'text-text-secondary hover:bg-surface hover:text-turmeric'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span className="transition-transform duration-200 can-hover:group-hover:scale-125">
-                  <AnimatedIcon
-                    icon={item.icon}
-                    size={20}
-                    animation={isActive ? 'pulse' : 'none'}
-                    glow={isActive}
-                  />
-                </span>
-                <span className="game-text">{item.label}</span>
-              </>
-            )}
-          </NavLink>
-          </motion.div>
+            {group.items.map((item, i) => (
+              <motion.div
+                key={item.to}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: i * 0.04, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <NavLink
+                  to={item.to}
+                  onClick={() => setMobileOpen(false)}
+                  className={({ isActive }) =>
+                    `group flex items-center gap-3 rounded-xl px-4 py-3 text-[0.95rem] transition-[background-color,color,box-shadow] duration-200 ${
+                      isActive
+                        ? 'bg-turmeric text-malt font-bold shadow-golden-glow'
+                        : 'text-text-secondary hover:bg-surface hover:text-turmeric'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span className="transition-transform duration-200 can-hover:group-hover:scale-125">
+                        <AnimatedIcon
+                          icon={item.icon}
+                          size={20}
+                          animation={isActive ? 'pulse' : 'none'}
+                          glow={isActive}
+                        />
+                      </span>
+                      <span className="game-text">{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              </motion.div>
+            ))}
+          </NavGroup>
         ))}
       </nav>
 

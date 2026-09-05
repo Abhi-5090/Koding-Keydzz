@@ -33,6 +33,7 @@ const Dashboard = lazy(() => import('../pages/Dashboard'))
 const Courses = lazy(() => import('../pages/Courses'))
 const FinalTest = lazy(() => import('../pages/FinalTest'))
 const WorldMap = lazy(() => import('../pages/WorldMap'))
+const CourseMap = lazy(() => import('../pages/CourseMap'))
 const WorldDetail = lazy(() => import('../pages/WorldDetail'))
 const Quiz = lazy(() => import('../pages/Quiz'))
 const Achievements = lazy(() => import('../pages/Achievements'))
@@ -159,6 +160,8 @@ export default function AppRoutes() {
             to, so the slug is unambiguous and a bookmark still makes sense. */}
         <Route path="/courses/:slug/final-test" element={<FinalTest />} />
         <Route path="/map" element={<WorldMap />} />
+        {/* One realm's worlds. `/map` is the four realms; this is inside one. */}
+        <Route path="/map/:courseSlug" element={<CourseMap />} />
         <Route path="/world/:slug" element={<WorldDetail />} />
         <Route path="/play" element={<Playground />} />
         <Route path="/quiz" element={<Quiz />} />

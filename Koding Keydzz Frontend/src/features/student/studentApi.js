@@ -22,8 +22,22 @@ export const studentApi = baseApi.injectEndpoints({
       transformResponse: unwrap,
       providesTags: ['Assignments', 'Dashboard'],
     }),
+    /**
+     * This pupil's worlds, optionally for a NAMED course.
+     *
+     * The map shows all four courses and drills into whichever one the pupil
+     * opens, so it asks about a course that may not be the one they are
+     * furthest through. Passing no slug keeps the old behaviour — the course
+     * they are currently on — which is what the dashboard wants.
+     *
+     * Each world comes back already carrying `unlocked`, `lockedReason`,
+     * `lessonCount`, `completedLessons` and `percent`. None of that is
+     * recomputed here: a second implementation of the unlock rule in the
+     * client would eventually disagree with the one that gates the content.
+     */
     getWorlds: builder.query({
-      query: () => '/worlds',
+      query: (courseSlug) =>
+        courseSlug ? `/worlds?course=${encodeURIComponent(courseSlug)}` : '/worlds',
       transformResponse: unwrap,
       providesTags: ['Worlds'],
     }),

@@ -195,12 +195,43 @@ export function countQuestionTypes(questions = []) {
  * List quizzes for the student app to discover a real quiz id. Each item:
  * { id, title, type, questionCount, xpReward, world:{id,name,slug}, lesson:{id,title}, typeCounts }.
  */
-export async function listQuizzes() {
+/**
+ * THE QUIZ ARENA, ORGANISED THE WAY THE COURSE IS.
+ *
+ * WHAT WAS WRONG
+ * --------------
+ * This returned every quiz on the platform as one flat list — sixty-five
+ * cards, in creation order, from four different languages. A pupil three
+ * lessons into Python was shown quizzes on C pointers and prompt engineering
+ * with nothing to say which was which, and no way to find the one that
+ * belonged to the lesson they had just finished.
+ *
+ * It was also a hole in the ladder. Everything else — realms, worlds, topics —
+ * opens only when the thing before it is finished, and the arena ignored all
+ * of it: every quiz in every course was playable on day one.
+ *
+ * WHAT IT DOES NOW
+ * ----------------
+ * Each quiz is placed in its world, and each world in its course, and both
+ * carry the SAME lock the map uses: a quiz is open when its world is open.
+ * That is deliberately not a new rule — a second rule would be another thing
+ * to disagree with `progressionService`, which is the only place the ladder is
+ * decided.
+ *
+ * Grouping is returned rather than assembled in the client. The client would
+ * need the course ladder, every world's order and every world's completion to
+ * do it, which is three extra round trips to render one screen.
+ */
+export async function listQuizzes(user = null) {
   const quizzes = await quizRepository.listWithLessonWorld();
-  return quizzes.map((quiz) => {
+
+  const shape = (quiz) => {
     const obj = quiz.toObject ? quiz.toObject() : quiz;
     const lesson = obj.lesson && typeof obj.lesson === 'object' ? obj.lesson : null;
-    const world = lesson && lesson.world && typeof lesson.world === 'object' ? lesson.world : null;
+    // A quiz reaches its world either directly or through its lesson.
+    const world =
+      (obj.world && typeof obj.world === 'object' ? obj.world : null) ||
+      (lesson && lesson.world && typeof lesson.world === 'object' ? lesson.world : null);
     return {
       id: String(obj._id),
       title: obj.title,
@@ -210,10 +241,134 @@ export async function listQuizzes() {
       typeCounts: countQuestionTypes(obj.questions || []),
       lesson: lesson ? { id: String(lesson._id), title: lesson.title } : null,
       world: world
-        ? { id: String(world._id), name: world.name, slug: world.slug }
+        ? {
+            id: String(world._id),
+            name: world.name,
+            slug: world.slug,
+            order: world.order ?? 0,
+            course: world.course ? String(world.course) : null,
+          }
         : null,
     };
+  };
+
+  const items = quizzes.map(shape);
+
+  // Staff and internal callers get the flat list, as before.
+  if (!user) return items;
+
+  const [{ listCoursesForUser }, { decorateWorlds }] = await Promise.all([
+    import('./courseService.js'),
+    import('./progressionService.js'),
+  ]);
+  const { worldRepository } = await import('../repositories/worldRepository.js');
+
+  const ladder = await listCoursesForUser(user);
+  const courses = ladder.items || [];
+
+  /**
+   * World lock state, per course, from the one place that decides it.
+   *
+   * Worlds are fetched per course rather than all at once because the ladder
+   * is per course: "the previous world" means the previous world IN THIS
+   * COURSE, and a single ordered list of all twenty would make the first world
+   * of C depend on the last world of Python.
+   */
+  const worldState = new Map();
+  for (const course of courses) {
+    const worlds = await worldRepository.findByCourse(course.id);
+    const decorated = await decorateWorlds(worlds, user);
+    for (const world of decorated) {
+      worldState.set(String(world._id), {
+        unlocked: course.unlocked && world.unlocked,
+        complete: world.complete,
+        lockedReason: !course.unlocked
+          ? course.lockedReason
+          : world.lockedReason,
+        courseSlug: course.slug,
+      });
+    }
+  }
+
+  const decorateQuiz = (quiz) => {
+    const state = quiz.world ? worldState.get(quiz.world.id) : null;
+    // A quiz with no world belongs to no section of the ladder, so there is
+    // nothing to gate it on — it stays open rather than becoming unreachable.
+    if (!state) return { ...quiz, courseSlug: null, unlocked: true, lockedReason: null };
+    return {
+      ...quiz,
+      courseSlug: state.courseSlug,
+      unlocked: state.unlocked,
+      lockedReason: state.unlocked ? null : state.lockedReason,
+    };
+  };
+
+  const decorated = items.map(decorateQuiz);
+
+  /**
+   * Grouped as courses -> sections (worlds) -> quizzes, and also returned flat
+   * so existing callers that just want a list keep working.
+   */
+  const groups = courses.map((course) => {
+    const mine = decorated.filter((q) => q.courseSlug === course.slug);
+    const sections = [];
+    const byWorld = new Map();
+    for (const quiz of mine) {
+      const key = quiz.world?.id;
+      if (!key) continue;
+      if (!byWorld.has(key)) {
+        const state = worldState.get(key);
+        byWorld.set(key, {
+          id: key,
+          name: quiz.world.name,
+          slug: quiz.world.slug,
+          order: quiz.world.order,
+          unlocked: state?.unlocked ?? false,
+          lockedReason: state?.unlocked ? null : state?.lockedReason || null,
+          quizzes: [],
+        });
+        sections.push(byWorld.get(key));
+      }
+      byWorld.get(key).quizzes.push(quiz);
+    }
+    sections.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    return {
+      id: course.id,
+      slug: course.slug,
+      title: course.title,
+      tagline: course.tagline,
+      tint: course.tint,
+      order: course.order,
+      unlocked: course.unlocked,
+      lockedReason: course.lockedReason,
+      quizCount: mine.length,
+      sections,
+    };
   });
+
+  return { items: decorated, courses: groups };
+}
+
+/**
+ * May this pupil open this quiz?
+ *
+ * Called on the read path for a single quiz and before a submission. The
+ * arena's sections carry the lock, but ids travel to the browser, so without
+ * this the grouping is a filing cabinet rather than a gate.
+ *
+ * The rule is not restated here — it asks `listQuizzes` for the same decorated
+ * list the arena is drawn from, so the screen and the gate cannot disagree.
+ */
+export async function assertQuizOpen(user, quizId) {
+  const { items } = await listQuizzes(user);
+  const quiz = (items || []).find((q) => q.id === String(quizId));
+  // Unknown ids fall through to the normal not-found path below.
+  if (!quiz) return;
+  if (!quiz.unlocked) {
+    throw ApiError.forbidden(
+      quiz.lockedReason || 'Finish the world this quiz belongs to first.'
+    );
+  }
 }
 
 /**
@@ -344,6 +499,7 @@ export default {
   getQuizForClient,
   countQuestionTypes,
   listQuizzes,
+  assertQuizOpen,
   submitQuiz,
   getAttemptHistory,
   MAX_FEEDBACK_ATTEMPTS,

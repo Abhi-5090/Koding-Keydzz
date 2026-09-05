@@ -25,6 +25,7 @@ import PageTransition from '../components/layout/PageTransition'
 import Button from '../components/ui/Button'
 import AnimatedIcon from '../components/ui/AnimatedIcon'
 import TopicLessonModal from '../components/lessons/TopicLessonModal'
+import { BOARD_MUTED, BOARD_SURFACE } from '../theme/tokens'
 import { LoadingState, ErrorState, EmptyState } from '../components/ui/QueryState'
 
 const EASE_OUT = [0.23, 1, 0.32, 1]
@@ -94,8 +95,6 @@ export default function WorldDetail() {
   // Completed sessions for THIS world, as a Set of NORMALISED topic keys.
   // Seeded from the API (dashboard.completedLessonIds); flips live on finish.
   const [completed, setCompleted] = useState(() => new Set())
-
-  const playerLevel = dash?.level ?? 1
 
   const world = useMemo(
     () => (rawWorlds || []).find((w) => w.slug === slug) || null,
@@ -192,12 +191,52 @@ export default function WorldDetail() {
 
   const theme = worldTheme(world.slug)
   const Icon = worldIcon(world.slug)
-  const requiredLevel = world.requiredLevel ?? 1
-  const locked = playerLevel < requiredLevel
+  /**
+   * THE WORLD'S LOCK COMES FROM THE SERVER.
+   *
+   * It used to be `playerLevel < world.requiredLevel` — an XP gate, computed
+   * here. That let a pupil who had ground levels out of mini-games walk into
+   * Algorithm Desert without having written a line in Coding Forest, and it
+   * was a second copy of a rule the API also holds, free to disagree with it.
+   *
+   * The rule is now one sentence, decided in one place: finish the world
+   * before this one. `unlocked` and `lockedReason` arrive with the world.
+   */
+  const locked = world.unlocked === false
   const learnList = buildLearnList(world.slug, world.topics)
 
   // Live "X / N sessions completed" for this world's mastery topics.
   const completedCount = learnList.filter((it) => completed.has(normalizeTopic(it.topic))).length
+
+  /**
+   * TOPICS OPEN ONE AT A TIME.
+   *
+   * Every topic in a world used to open the moment the world did, so a child
+   * could read "Stored Values" before "Variables" — which is not a freer
+   * lesson, it is a worse one, because the second explanation assumes the
+   * first. The lessons arrive carrying `unlocked` and the name of what blocks
+   * them, decided by the same server that refuses an out-of-order completion.
+   *
+   * A topic with no lesson authored behind it stays open: an authoring gap
+   * must not read to a child as a locked door.
+   */
+  const topicState = (topic) => {
+    const lesson = lessonMap.get(normalizeTopic(topic))
+    if (!lesson) return { unlocked: true, lockedReason: null }
+    return {
+      unlocked: lesson.unlocked !== false,
+      lockedReason: lesson.lockedReason || 'Finish the topic before this one first.',
+    }
+  }
+
+  /**
+   * The next world is reachable only once THIS one is finished.
+   *
+   * `complete` is the server's count of lessons done against lessons
+   * authored, not a percentage rounded here — a world at 99% is not finished.
+   */
+  const worldComplete = world.complete === true
+  const advanceReason = `Finish all ${learnList.length} sessions in ${world.name} to continue.`
 
   // Next world in the coding journey, by `order` from GET /worlds. When this is
   // the last world, there is no next → the button falls back to the World Map.
@@ -259,7 +298,7 @@ export default function WorldDetail() {
           {locked && (
             <div className="mt-6 flex items-center gap-2 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm text-error">
               <AnimatedIcon icon={Lock} size={16} animation="none" className="text-error" />
-              Reach Level {requiredLevel} to unlock this realm
+              {world.lockedReason || 'Finish the world before this one to unlock this realm'}
             </div>
           )}
         </div>
@@ -276,9 +315,10 @@ export default function WorldDetail() {
             <AnimatedIcon icon={Lock} size={56} animation={reduce ? 'none' : 'float'} className="text-text-secondary" glow glowColor={`${theme.tint}b3`} />
           </div>
           <h2 className="game-text mb-2 text-xl font-bold" style={{ color: theme.tint }}>This realm is still locked</h2>
+          {/* The reason is the server's sentence, naming the actual world that
+              blocks this one — not an XP number that no longer gates anything. */}
           <p className="mb-6 text-sm text-text-secondary">
-            Keep coding to reach <span className="font-bold" style={{ color: theme.tint }}>Level {requiredLevel}</span> and the gates of{' '}
-            {world.name} will open. You are at Level {playerLevel} — almost there!
+            {world.lockedReason || `Finish the world before ${world.name} and its gates will open.`}
           </p>
           <Button tint={theme.tint} onClick={() => navigate('/map')} className="flex w-full items-center justify-center gap-2">
             <AnimatedIcon icon={ArrowLeft} size={16} animation="hover" />
@@ -317,39 +357,71 @@ export default function WorldDetail() {
                 {learnList.map((item, i) => {
                   const layoutId = `topic-${world.slug}-${normalizeTopic(item.topic)}`
                   const isDone = completed.has(normalizeTopic(item.topic))
+                  const { unlocked: topicOpen, lockedReason } = topicState(item.topic)
                   return (
                     <motion.button
                       type="button"
                       key={item.topic}
-                      layoutId={layoutId}
-                      onClick={() => setActiveTopic(item.topic)}
+                      // A locked card must not animate into the lesson it
+                      // cannot open: sharing the layoutId would fly it to the
+                      // centre and then show nothing.
+                      layoutId={topicOpen ? layoutId : undefined}
+                      onClick={() => topicOpen && setActiveTopic(item.topic)}
+                      disabled={!topicOpen}
+                      aria-label={
+                        topicOpen
+                          ? `${item.topic} — ${isDone ? 'completed' : 'start this lesson'}`
+                          : `${item.topic} — locked. ${lockedReason}`
+                      }
                       initial={{ opacity: 0, y: 14 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, ease: EASE_OUT, delay: i * 0.05 }}
-                      whileHover={reduce ? undefined : { y: -6, boxShadow: `0 0 26px ${theme.tint}66` }}
-                      whileTap={{ scale: 0.98 }}
-                      className="group relative overflow-hidden rounded-2xl border border-k-border bg-card p-5 text-left transition-shadow duration-200"
-                      style={{ borderColor: `${theme.tint}40` }}
+                      whileHover={reduce || !topicOpen ? undefined : { y: -6, boxShadow: `0 0 26px ${theme.tint}66` }}
+                      whileTap={topicOpen ? { scale: 0.98 } : undefined}
+                      className={`group relative overflow-hidden rounded-2xl border border-k-border p-5 text-left transition-shadow duration-200 ${
+                        topicOpen ? 'bg-card' : 'cursor-not-allowed bg-malt/60 opacity-70'
+                      }`}
+                      style={{ borderColor: topicOpen ? `${theme.tint}40` : undefined }}
                     >
                       <div className="mb-3 flex items-center justify-between">
                         <div
                           className="flex h-11 w-11 items-center justify-center rounded-xl"
-                          style={{ background: theme.panelTint, color: theme.tint }}
+                          style={
+                            topicOpen
+                              ? { background: theme.panelTint, color: theme.tint }
+                              : { background: BOARD_SURFACE }
+                          }
                         >
-                          <Sparkles size={20} />
+                          {topicOpen ? (
+                            <Sparkles size={20} />
+                          ) : (
+                            <Lock size={18} className="text-text-secondary" />
+                          )}
                         </div>
-                        <span
-                          className="game-text inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold opacity-80 transition-opacity duration-200 can-hover:group-hover:opacity-100"
-                          style={{ background: `${theme.tint}22`, color: theme.tint }}
-                        >
-                          <BookOpen size={13} />
-                          Learn
-                        </span>
+                        {topicOpen ? (
+                          <span
+                            className="game-text inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold opacity-80 transition-opacity duration-200 can-hover:group-hover:opacity-100"
+                            style={{ background: `${theme.tint}22`, color: theme.tint }}
+                          >
+                            <BookOpen size={13} />
+                            Learn
+                          </span>
+                        ) : (
+                          <span className="game-text inline-flex items-center gap-1 rounded-full border border-k-border px-2.5 py-1 text-xs font-bold text-text-secondary">
+                            <Lock size={12} />
+                            Locked
+                          </span>
+                        )}
                       </div>
-                      <h3 className="game-text text-lg font-bold capitalize" style={{ color: theme.tint }}>
+                      <h3
+                        className="game-text text-lg font-bold capitalize"
+                        style={{ color: topicOpen ? theme.tint : BOARD_MUTED }}
+                      >
                         {item.topic}
                       </h3>
-                      <p className="mt-1 text-sm text-text-secondary">{item.desc}</p>
+                      <p className="mt-1 text-sm text-text-secondary">
+                        {topicOpen ? item.desc : lockedReason}
+                      </p>
 
                       {/* STATUS TAG — flips to a glowing "Session Completed" pill
                           the moment the lesson is finished (live, no reload). */}
@@ -361,6 +433,11 @@ export default function WorldDetail() {
                           >
                             <CheckCircle2 size={13} className="shrink-0" />
                             <span className="truncate">Session Completed</span>
+                          </span>
+                        ) : !topicOpen ? (
+                          <span className="game-text inline-flex max-w-full items-center gap-1.5 rounded-full border border-k-border px-3 py-1 text-xs font-semibold text-text-secondary">
+                            <Lock size={11} className="shrink-0" />
+                            <span className="truncate">Locked</span>
                           </span>
                         ) : (
                           <span className="game-text inline-flex max-w-full items-center gap-1.5 rounded-full border border-k-border px-3 py-1 text-xs font-semibold text-text-secondary">
@@ -438,13 +515,37 @@ export default function WorldDetail() {
             {/* ADVANCE — jump to the next world by `order`, or back to the map
                 when this is the final realm. Rightmost, tint-filled, distinct. */}
             {nextWorld ? (
+              /**
+               * "Continue to the next world" is the one control on this page
+               * that must NOT be a suggestion.
+               *
+               * It used to navigate unconditionally, so a child could arrive
+               * at Coding Forest, read nothing, press Continue and be in Loop
+               * Mountain — which made every lesson optional and the ladder
+               * decorative. Disabled (not hidden) so they can see where they
+               * are going and read, in a sentence, what opens it.
+               */
               <Button
                 tint={theme.tint}
-                onClick={() => navigate(`/world/${nextWorld.slug}`)}
-                className="flex min-w-0 flex-1 items-center justify-center gap-2 sm:ml-auto sm:flex-none"
+                disabled={!worldComplete}
+                onClick={() => worldComplete && navigate(`/world/${nextWorld.slug}`)}
+                title={worldComplete ? undefined : advanceReason}
+                aria-label={
+                  worldComplete
+                    ? `Continue to ${nextWorld.name}`
+                    : `Continue to ${nextWorld.name} — locked. ${advanceReason}`
+                }
+                className={`flex min-w-0 flex-1 items-center justify-center gap-2 sm:ml-auto sm:flex-none ${
+                  worldComplete ? '' : 'cursor-not-allowed opacity-60'
+                }`}
               >
+                <AnimatedIcon
+                  icon={worldComplete ? ArrowRight : Lock}
+                  size={18}
+                  animation={worldComplete ? 'hover' : 'none'}
+                  className="shrink-0"
+                />
                 <span className="truncate">Continue to {nextWorld.name}</span>
-                <AnimatedIcon icon={ArrowRight} size={18} animation="hover" className="shrink-0" />
               </Button>
             ) : (
               <Button

@@ -12,10 +12,24 @@ class QuizRepository extends BaseRepository {
 
   // Quizzes with their lesson (and the lesson's world) populated, newest first.
   listWithLessonWorld() {
-    return this.model
-      .find({})
-      .sort({ createdAt: -1 })
-      .populate({ path: 'lesson', select: 'title world', populate: { path: 'world', select: 'name slug' } });
+    return (
+      this.model
+        .find({})
+        .sort({ createdAt: -1 })
+        .populate({
+          path: 'lesson',
+          select: 'title world order',
+          populate: { path: 'world', select: 'name slug order course' },
+        })
+        /**
+         * The quiz's OWN world ref, as well as the one reached through its
+         * lesson. A quiz pinned straight to a world carries no lesson, and
+         * reading the world only through `lesson.world` dropped those from
+         * every grouping — they appeared in the arena with no section, which
+         * is exactly the "everything in one pile" the categories fix.
+         */
+        .populate({ path: 'world', select: 'name slug order course' })
+    );
   }
 
   // Admin listing: also populate the quiz's direct world ref (a stand-alone quiz

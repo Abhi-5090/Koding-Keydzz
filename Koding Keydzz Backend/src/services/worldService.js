@@ -1,6 +1,7 @@
 import { worldRepository } from '../repositories/worldRepository.js';
 import { lessonRepository } from '../repositories/lessonRepository.js';
 import { ApiError } from '../utils/ApiError.js';
+import { decorateWorlds, decorateLessons } from './progressionService.js';
 
 /**
  * The worlds a pupil may see.
@@ -13,16 +14,38 @@ import { ApiError } from '../utils/ApiError.js';
  * `user` is optional so staff and internal callers (achievements, analytics)
  * can still ask for the whole set; only the student surface passes one.
  */
-export async function listWorlds(user = null) {
+export async function listWorlds(user = null, courseSlug = null) {
   if (!user) return worldRepository.findAllOrdered();
 
   // Imported here rather than at module scope: courseService imports the World
   // model, and a top-level import in both directions is a cycle.
   const { resolveCurrentCourse } = await import('./courseService.js');
   try {
-    const course = await resolveCurrentCourse(user);
-    return worldRepository.findByCourse(course.id);
-  } catch {
+    /**
+     * `courseSlug` lets the map ask for a NAMED course rather than only the
+     * pupil's current one.
+     *
+     * The map now shows all four courses and lets a pupil open the ones they
+     * have unlocked, so "which worlds are in Python?" is a question the client
+     * legitimately asks about a course that is not the one they are furthest
+     * through. `resolveCurrentCourse` still refuses a course they have not
+     * unlocked, so this widens what can be asked for, not what can be reached.
+     */
+    const course = await resolveCurrentCourse(user, courseSlug);
+    const worlds = await worldRepository.findByCourse(course.id);
+    return decorateWorlds(worlds, user);
+  } catch (err) {
+    /**
+     * A LOCKED course is a real answer and must reach the caller as one — the
+     * map asks about courses the pupil has not unlocked, and "403, here is
+     * why" is what it renders.
+     *
+     * Only 403, though. "No course is published at all" is a different
+     * situation with a different right answer: an empty map. Re-throwing that
+     * too turned a fresh platform, and any moment when content is being
+     * re-authored, into a 404 on the pupil's home screen.
+     */
+    if (err instanceof ApiError && err.statusCode === 403) throw err;
     // No published course yet (a fresh platform, or content still being
     // authored). An empty map is the honest answer — better than falling back
     // to every world, which would silently undo the scoping.
@@ -54,7 +77,14 @@ export async function listLessonsForWorld(worldId, user = null) {
     }
   }
 
-  return lessonRepository.findByWorld(worldId);
+  const lessons = await lessonRepository.findByWorld(worldId);
+
+  /**
+   * Staff and internal callers get the raw list; a pupil gets it with the
+   * sequence applied, so the client never has to work out for itself which
+   * topic is next — and cannot get that answer wrong in the pupil's favour.
+   */
+  return user ? decorateLessons(lessons, user) : lessons;
 }
 
 export default { listWorlds, listLessonsForWorld };
