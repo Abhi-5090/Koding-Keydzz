@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Map, Coins, Zap, Flame, Settings, Sparkles, Target, Code, HelpCircle, Trophy, Award, ArrowRight, X } from 'lucide-react'
+import { Map as MapIcon, Coins, Zap, Flame, Settings, Sparkles, Target, Code, HelpCircle, Trophy, Award, ArrowRight, X } from 'lucide-react'
 import { useGetDashboardQuery } from '../features/student/studentApi'
 import { AssignmentsPanel } from './Assignments'
 import { useGetAvatarItemsQuery } from '../features/avatar/avatarApi'
@@ -118,7 +118,7 @@ export default function Dashboard() {
             <XPBar xp={stats.xpIntoLevel} xpToNext={stats.xpLevelSpan} level={stats.level} earnHint className="max-w-md" />
           </div>
           <div className="flex gap-4">
-            <Stat icon={Map} label="Progress" value={stats.overallPercent != null ? `${stats.overallPercent}%` : '—'} />
+            <Stat icon={MapIcon} label="Progress" value={stats.overallPercent != null ? `${stats.overallPercent}%` : '—'} />
             <Stat icon={Coins} label="Coins" value={stats.coins} />
             {/* Only shown once there is a streak to show. A permanent "0 day
                 streak" is a reproach, not encouragement. */}
@@ -192,7 +192,7 @@ export default function Dashboard() {
           <div className="space-y-3">
             <Link to="/map" className="block">
               <Button className="w-full flex items-center justify-center gap-2">
-                <AnimatedIcon icon={Map} size={18} animation="hover" />
+                <AnimatedIcon icon={MapIcon} size={18} animation="hover" />
                 Continue Quest
               </Button>
             </Link>
@@ -234,11 +234,11 @@ export default function Dashboard() {
         {/* Progress map preview */}
         <Card>
           <h2 className="mb-4 game-text flex items-center gap-2 text-xl font-bold">
-            <AnimatedIcon icon={Map} size={20} animation="float" className="text-turmeric" glow />
+            <AnimatedIcon icon={MapIcon} size={20} animation="float" className="text-turmeric" glow />
             Your Map
           </h2>
           {worldProgress.length === 0 ? (
-            <EmptyState icon={Map} title="No worlds yet" message="Worlds will appear as your adventure begins." />
+            <EmptyState icon={MapIcon} title="No worlds yet" message="Worlds will appear as your adventure begins." />
           ) : (
             <div className="space-y-3">
               {worldProgress.slice(0, 3).map((w) => (

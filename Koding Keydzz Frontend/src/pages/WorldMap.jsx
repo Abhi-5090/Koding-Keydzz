@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Lock, ChevronRight, Map } from 'lucide-react'
+import { Lock, ChevronRight, Map as MapIcon } from 'lucide-react'
 import { useGetWorldsQuery, useGetDashboardQuery } from '../features/student/studentApi'
 import { worldVisual } from '../data/worlds'
 import { worldIcon } from '../data/iconMap'
@@ -66,7 +66,7 @@ export default function WorldMap() {
       ) : isError ? (
         <ErrorState onRetry={refetch} />
       ) : worlds.length === 0 ? (
-        <EmptyState icon={Map} title="No worlds yet" message="The kingdom is still being built — check back soon!" />
+        <EmptyState icon={MapIcon} title="No worlds yet" message="The kingdom is still being built — check back soon!" />
       ) : (
         <div className="relative mx-auto max-w-3xl overflow-hidden rounded-3xl border border-k-border bg-gradient-to-b from-card to-malt p-6 sm:p-10">
           <Particles count={18} />

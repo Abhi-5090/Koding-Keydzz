@@ -8,7 +8,7 @@ import {
   Sunset,
   Code,
   Bot,
-  Map,
+  Map as MapIcon,
   Rocket,
   Bug,
   Swords,
@@ -30,13 +30,13 @@ export const WORLD_ICONS = {
   'python-kingdom': Code,
 }
 
-export const worldIcon = (slug) => WORLD_ICONS[slug] || Map
+export const worldIcon = (slug) => WORLD_ICONS[slug] || MapIcon
 
 // Per-game icons keyed by game slug.
 export const GAME_ICONS = {
   'maze-coding': Bot,
   'robot-navigation': Rocket,
-  'treasure-hunt': Map,
+  'treasure-hunt': MapIcon,
   'bug-fix': Bug,
   'space-adventure': Rocket,
   'battle-arena': Swords,

@@ -4,7 +4,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard,
-  Map,
+  Map as MapIcon,
   Code2,
   Gamepad2,
   Brain,
@@ -16,7 +16,7 @@ import {
   KeyRound,
   Building2,
   LogOut,
-  Menu,
+  Menu as MenuIcon,
   Zap,
   GraduationCap,
   Award,
@@ -42,7 +42,7 @@ const NAV = [
   // Directly under the journey: if a teacher has set something, that is what a
   // pupil should be doing before they wander off to the games.
   { to: '/assignments', label: 'My Work', icon: ClipboardList },
-  { to: '/map', label: 'World Map', icon: Map },
+  { to: '/map', label: 'World Map', icon: MapIcon },
   { to: '/play', label: 'Playground', icon: Code2 },
   { to: '/games', label: 'Mini Games', icon: Gamepad2 },
   { to: '/quiz', label: 'Quiz Arena', icon: Brain },
@@ -231,7 +231,7 @@ export default function StudentLayout() {
             className="rounded-lg bg-surface px-3 py-2 text-turmeric lg:hidden"
             aria-label="Open menu"
           >
-            <Menu size={20} />
+            <MenuIcon size={20} />
           </button>
 
           <div className="hidden flex-1 sm:block">

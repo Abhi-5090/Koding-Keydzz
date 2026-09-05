@@ -13,7 +13,7 @@ import {
   Trophy,
   Bell,
   LogOut,
-  Menu,
+  Menu as MenuIcon,
   X,
   Building2,
   Gauge,
@@ -396,7 +396,7 @@ export default function AdminLayout() {
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             className="rounded-lg p-2 text-text-secondary transition-colors duration-150 ease-out hover:text-turmeric active:scale-95 lg:hidden"
           >
-            <AnimatedIcon icon={mobileOpen ? X : Menu} size={20} animation="pop" />
+            <AnimatedIcon icon={mobileOpen ? X : MenuIcon} size={20} animation="pop" />
           </button>
 
           <div className="flex min-w-0 flex-1 items-center justify-end gap-4">

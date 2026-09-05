@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRoutes from './authRoutes.js';
+import { optionalAuth } from '../middlewares/auth.js';
 import guardianRoutes from './guardianRoutes.js';
 import studentRoutes from './studentRoutes.js';
 import courseRoutes from './courseRoutes.js';
@@ -111,9 +112,31 @@ function metricsTokenOk(req) {
   return diff === 0;
 }
 
-router.get('/metrics', async (req, res) => {
-  if (!metricsTokenOk(req)) {
-    return res.status(401).json({ success: false, message: 'Metrics token required' });
+/**
+ * TWO WAYS IN, because there are two kinds of caller.
+ *
+ * A SCRAPER presents `METRICS_TOKEN`. It has no session and never will.
+ *
+ * A PLATFORM OWNER is a signed-in superadmin looking at the System Health panel
+ * in the admin portal. Their browser sends their JWT, not the metrics token —
+ * and it must not be asked to send the metrics token, because that would mean
+ * shipping a server secret to a browser.
+ *
+ * The first version of this guard only accepted the token, so the moment an
+ * operator followed the advice to set `METRICS_TOKEN` in production, the panel
+ * they had been given to read those metrics started answering 401. Setting a
+ * variable to secure an endpoint should not break the product's own use of it.
+ */
+router.get('/metrics', optionalAuth, async (req, res) => {
+  const byToken = metricsTokenOk(req);
+  const bySession = req.user?.role === 'superadmin';
+
+  if (!byToken && !bySession) {
+    return res.status(401).json({
+      success: false,
+      message:
+        'Metrics require the METRICS_TOKEN, or a signed-in platform owner session.',
+    });
   }
 
   const mongoose = (await import('mongoose')).default;

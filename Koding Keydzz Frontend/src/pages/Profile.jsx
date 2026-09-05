@@ -6,7 +6,7 @@ import {
   Zap,
   Coins,
   Award,
-  Map,
+  Map as MapIcon,
   Drama,
   Globe,
   Trophy,
@@ -79,7 +79,7 @@ export default function Profile() {
             <Row label="Total XP" value={stats.xp.toLocaleString()} icon={Zap} iconClass="text-turmeric" />
             <Row label="Coins" value={stats.coins.toLocaleString()} icon={Coins} iconClass="text-accent" />
             <Row label="Badges Earned" value={earned.length} icon={Award} iconClass="text-turmeric" />
-            <Row label="Kingdom Progress" value={`${stats.overallPercent ?? 0}%`} icon={Map} iconClass="text-success" />
+            <Row label="Kingdom Progress" value={`${stats.overallPercent ?? 0}%`} icon={MapIcon} iconClass="text-success" />
           </div>
         </Card>
 
@@ -112,7 +112,7 @@ export default function Profile() {
             World Progress
           </h2>
           {worldProgress.length === 0 ? (
-            <EmptyState icon={Map} title="No progress yet" message="Start a world to see your progress here." />
+            <EmptyState icon={MapIcon} title="No progress yet" message="Start a world to see your progress here." />
           ) : (
             <div className="space-y-3">
               {worldProgress.slice(0, 5).map((w) => (

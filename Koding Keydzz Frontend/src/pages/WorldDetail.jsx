@@ -1,7 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Lock, Sparkles, Play, Gamepad2, Brain, ScrollText, GraduationCap, BookOpen, CheckCircle2, Circle, Map } from 'lucide-react'
+/*
+ * `Map as MapIcon` — NOT a style preference.
+ *
+ * lucide-react exports an icon called `Map`, and importing it under that name
+ * SHADOWS THE GLOBAL `Map` CONSTRUCTOR for the whole module. Any `new Map()`
+ * further down then tries to construct a React component and throws
+ * `TypeError: Map is not a constructor` — which, minified, reads as
+ * `te is not a constructor` and points at a `useMemo` with no obvious cause.
+ *
+ * That exact bug took out every world page: the crash was caught by the route
+ * error boundary, which reported it as "the connection dropped", so it looked
+ * like a network fault rather than a name collision.
+ *
+ * Aliased in the other files too, even where nothing constructs a Map today —
+ * the landmine is that adding one later fails somewhere unrelated-looking.
+ */
+import { ArrowLeft, ArrowRight, Lock, Sparkles, Play, Gamepad2, Brain, ScrollText, GraduationCap, BookOpen, CheckCircle2, Circle, Map as MapIcon } from 'lucide-react'
 import { useGetWorldsQuery, useGetDashboardQuery, useGetLessonsQuery, useCompleteLessonMutation } from '../features/student/studentApi'
 import { worldIcon } from '../data/iconMap'
 import { worldTheme, buildLearnList } from '../data/worldThemes'
@@ -436,7 +452,7 @@ export default function WorldDetail() {
                 onClick={() => navigate('/map')}
                 className="flex min-w-0 flex-1 items-center justify-center gap-2 sm:ml-auto sm:flex-none"
               >
-                <AnimatedIcon icon={Map} size={18} animation="hover" className="shrink-0" />
+                <AnimatedIcon icon={MapIcon} size={18} animation="hover" className="shrink-0" />
                 <span className="truncate">Back to World Map</span>
               </Button>
             )}

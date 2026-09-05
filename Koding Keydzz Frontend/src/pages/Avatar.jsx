@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Drama, Shirt, Crown, PawPrint, Sparkles, Image, Lock, Coins, Check, Backpack } from 'lucide-react'
+import { Drama, Shirt, Crown, PawPrint, Sparkles, Image as ImageIcon, Lock, Coins, Check, Backpack } from 'lucide-react'
 import { AVATAR_SLOTS, RARITIES, EQUIP_FIELD_BY_SLOT, decorateAvatarItem } from '../data/avatarItems'
 import {
   useGetAvatarItemsQuery,
@@ -24,7 +24,7 @@ const SLOT_ICON = {
   accessory: Crown,
   pet: PawPrint,
   effect: Sparkles,
-  background: Image,
+  background: ImageIcon,
 }
 
 // Convert the backend avatar field map into a wardrobe-slot -> itemKey map.

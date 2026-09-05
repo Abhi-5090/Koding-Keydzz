@@ -40,6 +40,40 @@ process.env.NODE_ENV = 'test';
 process.env.BCRYPT_COST = process.env.BCRYPT_COST || '10';
 
 /**
+ * THE SUITE RUNS AGAINST A KNOWN CONFIGURATION, NOT THE DEVELOPER'S.
+ *
+ * `src/config/env.js` calls `dotenv.config()`, so every variable in a personal
+ * `.env` reaches the tests. That is fine for a database URL and fatal for
+ * anything that changes BEHAVIOUR: an operator setting `METRICS_TOKEN` to
+ * secure their own deployment made `observability.test.js` fail on a machine
+ * where nothing about observability had changed — the endpoint simply started
+ * answering 401.
+ *
+ * A test suite whose result depends on an untracked file is not a test suite.
+ * So the behaviour-changing variables are neutralised here, and any test that
+ * needs one sets it explicitly for itself and restores it afterwards (see
+ * metricsAccess.test.js and passwordReset.test.js).
+ */
+/*
+ * SET EMPTY, never `delete`.
+ *
+ * `dotenv.config()` runs when `src/config/env.js` is first imported — AFTER
+ * this file — and it skips any key already present in `process.env` but
+ * happily fills in one that is absent. So deleting a variable here does not
+ * neutralise it; it hands dotenv permission to put the developer's value back.
+ *
+ * An empty string counts as present, so dotenv leaves it alone, and every
+ * consumer treats it as unset because they all test truthiness.
+ */
+process.env.METRICS_TOKEN = '';
+process.env.MAIL_TRANSPORT = '';
+process.env.SMTP_HOST = '';
+// An ENUM in the schema, so it takes its real default rather than an empty
+// string — which validates as a value and fails startup.
+process.env.ALLOW_STUDENT_SIGNUP = 'false';
+process.env.ALLOW_REMOTE_TEST_DB = '';
+
+/**
  * NEVER let the test suite execute code over the network.
  *
  * `runCode` defaults to CODE_RUNNER='auto', which tries a local interpreter
