@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit'
 import { baseApi } from './api/baseApi'
 import { toastOnError } from './api/toastOnError'
 import { toastOnSuccess } from './api/toastOnSuccess'
+import { resetCacheOnIdentityChange } from './api/resetCacheOnIdentityChange'
 import authReducer from '../features/auth/authSlice'
 import avatarReducer from '../features/avatar/avatarSlice'
 
@@ -26,5 +27,11 @@ export const store = configureStore({
    * never see a single failure.
    */
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(baseApi.middleware, toastOnError, toastOnSuccess),
+    getDefaultMiddleware().concat(
+      baseApi.middleware,
+      toastOnError,
+      toastOnSuccess,
+      // Must come after the api middleware so `resetApiState` reaches it.
+      resetCacheOnIdentityChange
+    ),
 })
