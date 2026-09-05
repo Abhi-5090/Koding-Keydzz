@@ -68,6 +68,9 @@ const NAV_GROUPS = [
   },
   {
     label: 'My school',
+    // Each group carries an icon so a collapsed header reads as a row with a
+    // picture on it, the same shape as the links it hides.
+    icon: School,
     items: [
       { to: '/students', label: 'Students', icon: Users, cap: 'student:read', orgOnly: true },
       { to: '/classrooms', label: 'Classes', icon: School, cap: 'classroom:read', orgOnly: true },
@@ -86,6 +89,7 @@ const NAV_GROUPS = [
   },
   {
     label: 'Platform',
+    icon: Building2,
     items: [
       { to: '/superadmin/orgs', label: 'Schools', icon: Building2, cap: 'org:list_all' },
       { to: '/superadmin/students', label: 'All students', icon: Users, cap: 'org:list_all' },
@@ -96,6 +100,7 @@ const NAV_GROUPS = [
   },
   {
     label: 'Curriculum',
+    icon: BookOpen,
     items: [
       { to: '/worlds', label: 'Worlds', icon: Globe, cap: 'content:read' },
       { to: '/courses', label: 'Courses', icon: BookOpen, cap: 'content:read' },
@@ -150,62 +155,92 @@ function visibleGroups(capabilities, hasOrg) {
 /**
  * ONE COLLAPSIBLE GROUP OF NAVIGATION LINKS.
  *
- * The header is a real <button> with `aria-expanded` and `aria-controls`, not
- * a styled heading: it toggles something, so it has to be reachable by keyboard
- * and announced as a control. A screen reader user otherwise meets a list that
- * has silently lost most of its links.
+ * WHY THE HEIGHT IS A CSS GRID TRANSITION, NOT A FRAMER `height: auto`
+ * --------------------------------------------------------------------
+ * Animating `height: 0 -> auto` makes the browser measure the content on every
+ * frame, and the measured target keeps moving as the rows inside settle — so
+ * the whole column visibly jumps. `grid-template-rows: 0fr -> 1fr` on a
+ * wrapper whose child has `min-height: 0` and `overflow: hidden` gives one
+ * interpolable value and nothing to measure: a single composited transition,
+ * no overshoot, no JavaScript.
  *
- * The ungrouped items at the top (the dashboard) carry no label and are never
- * collapsible — the one destination everybody needs should not be behind a
- * disclosure.
+ * WHY HOVER AND OPEN ARE DIFFERENT COLOURS
+ * ----------------------------------------
+ * Both used to reach for the accent, so hovering an already-open group
+ * re-triggered the colour it already had and the list read as flickering.
+ * Hover is a neutral lift; the accent is reserved for state. One meaning per
+ * colour.
  *
- * The height animation is on a wrapper with `overflow-hidden` rather than on
- * the list itself, so the links inside are not squashed mid-transition; and
- * `prefers-reduced-motion` drops the travel while keeping the state change,
- * because the open/closed state is information, not decoration.
+ * The header is a real <button> carrying `aria-expanded` and `aria-controls`,
+ * because it toggles something — a styled heading would leave a keyboard or
+ * screen-reader user facing a list that had quietly lost most of its links.
+ *
+ * The ungrouped items at the top (the dashboard) are never collapsible: the
+ * one destination everybody needs should not sit behind a disclosure.
  */
-function SidebarGroup({ group, open, onToggle, reduceMotion, children }) {
+function SidebarGroup({ group, open, onToggle, children }) {
   if (!group.label) {
-    return <div className="mb-4">{children}</div>;
+    return <div className="mb-2 space-y-1.5">{children}</div>;
   }
 
   const panelId = `sidebar-group-${group.label.replace(/\s+/g, '-').toLowerCase()}`;
+  const Icon = group.icon;
 
   return (
-    <div className="mb-2">
+    <div className="mb-1">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex w-full items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left text-[0.8rem] font-bold uppercase tracking-[0.1em] text-text-secondary/90 transition-colors duration-200 hover:bg-surface/60 hover:text-text-primary"
+        /*
+          Same padding, gap, radius and type scale as a nav link, so a group
+          header is a row of equal height rather than a small caption. The
+          categories previously read as lesser furniture than the links.
+        */
+        className={`flex w-full items-center gap-3.5 rounded-xl px-4 py-3 text-left text-[0.95rem] font-semibold transition-[background-color,color] duration-200 ease-out ${
+          open
+            ? 'bg-turmeric/15 text-turmeric'
+            : 'text-text-secondary hover:bg-surface/70 hover:text-text-primary'
+        }`}
       >
-        <span className="truncate">{group.label}</span>
-        <motion.span
+        {/*
+          A PLAIN INLINE SPAN, mirroring the link's icon markup — not a flex
+          box. A link's inline span measures ~26.8px around a 20px glyph
+          because the line box carries descender space; `flex items-center`
+          collapses it to exactly 20px, which left the header four pixels
+          shorter than the rows it sits above. Matching padding and font size
+          was not enough — the rows have to be built the same way.
+        */}
+        <span className="shrink-0">
+          {Icon ? <AnimatedIcon icon={Icon} size={20} animation="none" /> : null}
+        </span>
+        <span className="min-w-0 flex-1 truncate">{group.label}</span>
+        {/*
+          Rotated by CSS. A transform transition on one property cannot cause a
+          reflow, so it stays smooth while a panel is opening beside it.
+        */}
+        <ChevronRight
+          size={16}
+          strokeWidth={2.4}
           aria-hidden
-          animate={{ rotate: open ? 90 : 0 }}
-          transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }}
-          className="shrink-0"
-        >
-          <ChevronRight size={16} />
-        </motion.span>
+          className={`shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none ${
+            open ? 'rotate-90' : ''
+          }`}
+        />
       </button>
 
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            id={panelId}
-            key="panel"
-            initial={reduceMotion ? false : { height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="pt-1">{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div
+        id={panelId}
+        className={`grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        {/* `min-h-0` is what lets the 0fr row actually collapse. */}
+        <div className="min-h-0 overflow-hidden">
+          <div className="pt-1">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -285,7 +320,6 @@ function SidebarContent({ instance = 'desktop', groups, portalLabel, reduceMotio
             group={group}
             open={openGroup === (group.label || `top-${gi}`)}
             onToggle={() => toggleGroup(group.label || `top-${gi}`)}
-            reduceMotion={reduceMotion}
           >
             <div className="space-y-1.5">
               {group.items.map((item) => (

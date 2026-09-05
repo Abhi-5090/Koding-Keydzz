@@ -203,7 +203,32 @@ export default function WorldDetail() {
    * before this one. `unlocked` and `lockedReason` arrive with the world.
    */
   const locked = world.unlocked === false
-  const learnList = buildLearnList(world.slug, world.topics)
+
+  /**
+   * THE CARDS FOLLOW THE LESSON SEQUENCE, NOT `world.topics`.
+   *
+   * The cards are built from the world's `topics` array while the lock follows
+   * the LESSON `order`. Those are two different lists, and nothing keeps them
+   * in step: a world whose topics were listed in a different order from its
+   * lessons would draw a locked card first and the open one further down,
+   * which reads as "the very first lesson is locked" — the sequence looking
+   * broken when it is only being displayed out of order.
+   *
+   * Sorting by the lesson's own order makes the first card the open one, every
+   * time. Topics with no lesson behind them keep their original position
+   * relative to each other and sit at the end, since there is nothing to
+   * sequence them by.
+   */
+  const learnList = (() => {
+    const built = buildLearnList(world.slug, world.topics)
+    return built
+      .map((item, index) => {
+        const lesson = lessonMap.get(normalizeTopic(item.topic))
+        return { item, index, order: lesson?.order ?? Number.MAX_SAFE_INTEGER }
+      })
+      .sort((a, b) => a.order - b.order || a.index - b.index)
+      .map((entry) => entry.item)
+  })()
 
   // Live "X / N sessions completed" for this world's mastery topics.
   const completedCount = learnList.filter((it) => completed.has(normalizeTopic(it.topic))).length

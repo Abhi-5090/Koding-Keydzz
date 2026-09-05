@@ -67,6 +67,21 @@ export const authApi = baseApi.injectEndpoints({
      * classroom machines this app runs on. Sending the refresh token revokes
      * just this device and leaves the student's other devices signed in.
      */
+    /**
+     * Change your own password.
+     *
+     * Takes the current one as well as the new: a session left open on a
+     * shared classroom machine must not be enough to lock the owner out of
+     * their own account. The server checks it, so this is not a client-side
+     * courtesy.
+     */
+    changePassword: builder.mutation({
+      query: (body) => ({
+        url: '/auth/change-password',
+        method: 'POST',
+        body,
+      }),
+    }),
     logout: builder.mutation({
       query: (refreshToken) => ({
         url: '/auth/logout',
@@ -86,4 +101,5 @@ export const {
   useGetMeQuery,
   useLazyGetMeQuery,
   useLogoutMutation,
+  useChangePasswordMutation,
 } = authApi

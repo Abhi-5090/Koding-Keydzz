@@ -160,4 +160,54 @@ test.describe('the collapsing sidebars', () => {
     expect(await nav.getByRole('button', { expanded: true }).count()).toBe(1);
     console.log('>>> staff sidebar: one group open at a time  OK');
   });
+
+  test('group headers are rows of the same height as the links, with icons', async ({ page, request }) => {
+    /**
+     * The categories used to be small uppercase captions — visually lesser
+     * furniture than the Dashboard row above them, and with no icon. They are
+     * now the same shape as a link, which is the only way a collapsed group
+     * reads as a destination rather than a label.
+     */
+    const pupil = await freshPupil(request);
+    await signInPupil(page, pupil);
+    await dismissOverlays(page);
+    await page.waitForTimeout(1500);
+
+    const nav = page.getByRole('navigation', { name: /main navigation/i }).first();
+    const dashboard = nav.getByRole('link', { name: /dashboard/i }).first();
+    const header = nav.getByRole('button', { expanded: true }).first();
+
+    const linkBox = await dashboard.boundingBox();
+    const headBox = await header.boundingBox();
+    console.log(`>>> row heights: link=${linkBox?.height} groupHeader=${headBox?.height}`);
+
+    expect(linkBox && headBox).toBeTruthy();
+    // Same padding and type scale, so the heights match within a pixel.
+    expect(Math.abs(headBox.height - linkBox.height)).toBeLessThanOrEqual(1);
+
+    // And the header carries an icon, not just a word.
+    expect(await header.locator('svg').count()).toBeGreaterThanOrEqual(2); // icon + chevron
+    console.log('>>> group headers carry an icon and match link height  OK');
+  });
+
+  test('My account holds both Profile and Change password', async ({ page, request }) => {
+    const pupil = await freshPupil(request);
+    await signInPupil(page, pupil);
+    await dismissOverlays(page);
+    await page.waitForTimeout(1200);
+
+    const nav = page.getByRole('navigation', { name: /main navigation/i }).first();
+    await nav.getByRole('button', { name: /my account/i }).click();
+    await page.waitForTimeout(700);
+
+    await expect(nav.getByRole('link', { name: /^Profile$/i })).toBeVisible();
+    await expect(nav.getByRole('link', { name: /change password/i })).toBeVisible();
+
+    // And the page it leads to actually works.
+    await nav.getByRole('link', { name: /change password/i }).click();
+    await expect(page).toHaveURL(/\/change-password/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: /change my password/i })).toBeVisible();
+    await expect(page.getByLabel(/current password/i)).toBeVisible();
+    console.log('>>> My account: Profile + Change password, and the page loads  OK');
+  });
 });

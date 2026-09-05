@@ -54,6 +54,10 @@ const NAV_GROUPS = [
   },
   {
     label: 'Learn',
+    // Every group carries its own icon, so a collapsed header is still a row
+    // with a picture on it rather than a bare word — the same shape as the
+    // Dashboard link above it.
+    icon: GraduationCap,
     items: [
       // First in the group on purpose: a pupil picks a language track, then
       // explores that course's worlds.
@@ -67,6 +71,7 @@ const NAV_GROUPS = [
   },
   {
     label: 'Play',
+    icon: Gamepad2,
     items: [
       { to: '/games', label: 'Mini Games', icon: Gamepad2 },
       { to: '/quiz', label: 'Quiz Arena', icon: Brain },
@@ -75,6 +80,7 @@ const NAV_GROUPS = [
   },
   {
     label: 'Rewards',
+    icon: Trophy,
     items: [
       { to: '/achievements', label: 'Achievements', icon: Trophy },
       // Next to Achievements deliberately: both answer "what have I actually
@@ -86,24 +92,46 @@ const NAV_GROUPS = [
   },
   {
     label: 'My account',
-    items: [{ to: '/profile', label: 'Profile', icon: UserCircle }],
+    icon: UserCircle,
+    items: [
+      { to: '/profile', label: 'Profile', icon: UserCircle },
+      { to: '/change-password', label: 'Change password', icon: KeyRound },
+    ],
   },
 ]
 
 /**
  * ONE COLLAPSIBLE GROUP.
  *
- * The header is a real <button> carrying `aria-expanded` and `aria-controls`,
- * because it toggles something: a styled heading would leave a keyboard or
- * screen-reader user facing a list that had quietly lost most of its links.
+ * WHY THE HEIGHT IS A CSS GRID TRANSITION AND NOT A FRAMER `height: auto`
+ * ----------------------------------------------------------------------
+ * The first version animated `height: 0 -> auto` with Framer Motion. That
+ * forces a layout measurement on every frame, and because the measured target
+ * changes as the rows inside settle, the whole column visibly jumps — the
+ * flicker this replaces.
  *
- * `prefers-reduced-motion` drops the travel but keeps the state change — open
- * and closed is information, not decoration.
+ * `grid-template-rows: 0fr -> 1fr` on a wrapper whose child has `min-height: 0`
+ * and `overflow: hidden` gives the browser a single interpolable value and no
+ * measuring to do. It is one composited transition, it never overshoots, and it
+ * needs no JavaScript at all.
+ *
+ * WHY HOVER AND OPEN USE DIFFERENT COLOURS
+ * ----------------------------------------
+ * They both used to go turmeric. So hovering an already-open group re-triggered
+ * the same colour change, and moving the pointer across the list read as the
+ * sidebar flashing. Hover is now a NEUTRAL lift — brighter text on a raised
+ * surface — and the accent is reserved for state: this group is open, this page
+ * is current. One meaning per colour.
+ *
+ * The header is a real <button> with `aria-expanded` and `aria-controls`,
+ * because it toggles something: a styled heading leaves a keyboard or
+ * screen-reader user facing a list that has quietly lost most of its links.
  */
-function NavGroup({ group, open, onToggle, reduceMotion, children }) {
-  if (!group.label) return <div className="mb-2">{children}</div>
+function NavGroup({ group, open, onToggle, children }) {
+  if (!group.label) return <div className="mb-1 space-y-1">{children}</div>
 
   const panelId = `student-nav-${group.label.replace(/\s+/g, '-').toLowerCase()}`
+  const Icon = group.icon
 
   return (
     <div className="mb-1">
@@ -112,34 +140,64 @@ function NavGroup({ group, open, onToggle, reduceMotion, children }) {
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={panelId}
-        className="game-text flex w-full items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left text-xs font-bold uppercase tracking-[0.1em] text-text-secondary transition-colors duration-200 hover:bg-surface hover:text-turmeric"
+        /*
+          The padding, gap, radius and type scale are the SAME as a nav link's,
+          so a group header is a row of the same height rather than a small
+          caption. That was the visual complaint: the categories read as
+          different, lesser furniture than the Dashboard item.
+        */
+        className={`group/head flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[0.95rem] transition-[background-color,color] duration-200 ease-out ${
+          open
+            ? 'bg-turmeric/15 font-bold text-turmeric'
+            : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+        }`}
       >
-        <span className="truncate">{group.label}</span>
-        <motion.span
+        {/*
+          MIRRORS THE LINK'S ICON MARKUP EXACTLY — a plain inline span, NOT a
+          flex box.
+          
+          This is the whole reason the headers were four pixels shorter. A link
+          wraps its icon in an inline span, so the line box adds descender
+          space and the span measures 26.8px around a 20px glyph. Wrapping the
+          same icon in `flex items-center` collapses it to exactly 20px, and
+          the header came out 46.8px against the link's 50.8px — the
+          categories visibly sitting lower than the Dashboard row.
+          
+          Matching padding and font size was not enough; the rows have to be
+          BUILT the same way.
+        */}
+        <span className="shrink-0">
+          <AnimatedIcon icon={Icon} size={20} animation="none" />
+        </span>
+        {/* `game-text` belongs on the label, as it does on a link — putting it
+            on the button gave the whole row a different typeface. */}
+        <span className="game-text min-w-0 flex-1 truncate">{group.label}</span>
+        {/*
+          Rotated by CSS, not by an animated component: a transform transition
+          on one property cannot cause a reflow, so it stays smooth even while
+          the panel above or below it is opening.
+        */}
+        <ChevronRight
+          size={16}
+          strokeWidth={2.4}
           aria-hidden
-          animate={{ rotate: open ? 90 : 0 }}
-          transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 30 }}
-          className="shrink-0"
-        >
-          <ChevronRight size={16} />
-        </motion.span>
+          className={`shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none ${
+            open ? 'rotate-90' : ''
+          }`}
+        />
       </button>
 
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            id={panelId}
-            key="panel"
-            initial={reduceMotion ? false : { height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={reduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-            className="overflow-hidden"
-          >
-            <div className="space-y-1 pt-1">{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div
+        id={panelId}
+        className={`grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none ${
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        {/* `min-h-0` is what lets the 0fr row actually collapse. */}
+        <div className="min-h-0 overflow-hidden">
+          <div className="space-y-1 pt-1">{children}</div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -265,7 +323,6 @@ export default function StudentLayout() {
             group={group}
             open={openGroup === (group.label || `top-${gi}`)}
             onToggle={() => toggleGroup(group.label || `top-${gi}`)}
-            reduceMotion={reduceMotion}
           >
             {group.items.map((item, i) => (
               <motion.div
@@ -277,11 +334,17 @@ export default function StudentLayout() {
                 <NavLink
                   to={item.to}
                   onClick={() => setMobileOpen(false)}
+                  /*
+                    Hover is a NEUTRAL lift; the accent means state. Hover used
+                    to go turmeric as well, so moving the pointer down the list
+                    lit each row the same colour the active row already had —
+                    which is what made the sidebar look like it was flashing.
+                  */
                   className={({ isActive }) =>
-                    `group flex items-center gap-3 rounded-xl px-4 py-3 text-[0.95rem] transition-[background-color,color,box-shadow] duration-200 ${
+                    `group flex items-center gap-3 rounded-xl px-4 py-3 text-[0.95rem] transition-[background-color,color,box-shadow] duration-200 ease-out ${
                       isActive
                         ? 'bg-turmeric text-malt font-bold shadow-golden-glow'
-                        : 'text-text-secondary hover:bg-surface hover:text-turmeric'
+                        : 'text-text-secondary hover:bg-surface hover:text-text-primary'
                     }`
                   }
                 >
