@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   LayoutDashboard,
   Users,
@@ -62,7 +62,7 @@ const NAV_GROUPS = [
     label: null, // ungrouped, sits at the top
     items: [
       { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, cap: 'student:read', orgOnly: true },
-      { to: '/superadmin', label: 'Platform overview', icon: Gauge, end: true, cap: 'platform:analytics' },
+      { to: '/superadmin', label: 'Dashboard', icon: Gauge, end: true, cap: 'platform:analytics' },
     ],
   },
   {
@@ -125,6 +125,144 @@ function visibleGroups(capabilities, hasOrg) {
   );
 }
 
+/**
+ * The sidebar's contents.
+ *
+ * MODULE-LEVEL ON PURPOSE, not defined inside AdminLayout.
+ *
+ * A component declared inside another component gets a NEW function identity on
+ * every parent render, so React tears the whole subtree down and rebuilds it
+ * rather than updating it. That is wasteful anywhere; here it is fatal, because
+ * the active pill animates via `layoutId` — and a remounted element has no
+ * previous position to travel from, so the indicator would blink between rows
+ * instead of sliding. Everything it needs now arrives as a prop.
+ */
+  /**
+   * `instance` scopes the active-pill's `layoutId`.
+   *
+   * This sidebar is mounted TWICE — once fixed for desktop, once inside the
+   * mobile drawer. Framer animates between every element sharing a `layoutId`,
+   * so a single shared id would make the desktop pill and the drawer pill
+   * treat each other as the same object and fly across the screen between
+   * them. One id per mount keeps each indicator's animation to its own list.
+   */
+function SidebarContent({ instance = 'desktop', groups, portalLabel, reduceMotion, onNavigate, onLogout }) {
+  return (
+    <>
+      <div className="flex items-center gap-3 px-6 py-6">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-turmeric text-malt shadow-glow">
+          <AnimatedIcon icon={KeyRound} size={22} animation="pop" className="text-malt" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate font-heading text-base font-bold leading-tight text-text-primary">
+            Koding Keydzz
+          </p>
+          <p className="truncate text-xs text-text-secondary/70">{portalLabel}</p>
+        </div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 pb-3" aria-label="Main navigation">
+        {groups.map((group, gi) => (
+          <div key={group.label || `top-${gi}`} className="mb-5">
+            {group.label && (
+              <h2 className="px-4 pb-2 pt-2 text-[11px] font-bold uppercase tracking-[0.12em] text-text-secondary/80">
+                {group.label}
+              </h2>
+            )}
+            <div className="space-y-1.5">
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  onClick={onNavigate}
+                  /**
+                   * `relative` and `isolate` matter: the animated pill below is
+                   * absolutely positioned inside this link, and the label and
+                   * icon sit above it on their own stacking context. Without
+                   * isolation the pill's shadow bleeds over the text on the
+                   * frame where it arrives.
+                   */
+                  className={({ isActive }) =>
+                    `group relative isolate flex min-w-0 items-center gap-3.5 rounded-xl px-4 py-3 text-[0.95rem] font-semibold transition-colors duration-200 ease-out active:scale-[0.985] ${
+                      isActive
+                        ? 'text-malt'
+                        : 'text-text-secondary hover:bg-surface/70 hover:text-text-primary'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      {/*
+                        THE SLIDING ACTIVE INDICATOR.
+
+                        Only the ACTIVE item renders this, and every item shares
+                        one `layoutId` within this sidebar instance — so when the
+                        active route changes, Framer sees the same element move
+                        from one row to another and tweens it there. That is what
+                        produces the pill gliding up and down the list instead of
+                        blinking out in one place and in at another.
+
+                        A spring rather than a duration: the distance varies with
+                        how far apart the two items are, and a fixed duration
+                        makes a short hop feel sluggish and a long one feel
+                        rushed. `prefers-reduced-motion` turns the travel off and
+                        leaves the state change, because the indicator still has
+                        to say which page you are on.
+                      */}
+                      {isActive && (
+                        <motion.span
+                          layoutId={`sidebar-active-${instance}`}
+                          aria-hidden="true"
+                          className="absolute inset-0 -z-10 rounded-xl bg-turmeric shadow-glow"
+                          transition={
+                            reduceMotion
+                              ? { duration: 0 }
+                              : { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }
+                          }
+                        />
+                      )}
+                      <AnimatedIcon
+                        icon={item.icon}
+                        size={20}
+                        animation={isActive ? 'pulse' : 'hover'}
+                        glow={isActive}
+                        className={`shrink-0 ${isActive ? 'text-malt' : ''}`}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="border-t border-k-border p-3">
+        {/* Every staff account can now change its own password, so there has to
+            be a way to reach the screen without being forced there. */}
+        <NavLink
+          to="/change-password"
+          onClick={onNavigate}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-text-primary active:scale-[0.98]"
+        >
+          <AnimatedIcon icon={KeyRound} size={18} animation="hover" />
+          Change password
+        </NavLink>
+        <button
+          onClick={onLogout}
+          aria-label="Logout"
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-text-secondary transition-colors duration-150 ease-out hover:bg-error/15 hover:text-error active:scale-[0.98]"
+        >
+          <AnimatedIcon icon={LogOut} size={18} animation="hover" />
+          Logout
+        </button>
+      </div>
+    </>
+  );
+}
+
 export default function AdminLayout() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -134,6 +272,15 @@ export default function AdminLayout() {
   const refreshToken = useSelector((state) => state.auth?.refreshToken);
   const [revokeSession] = useLogoutMutation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  /**
+   * Honours the OS "reduce motion" setting.
+   *
+   * The pill still moves to the right row — the indicator is how a user knows
+   * which page they are on, so it cannot be dropped — but it arrives instantly
+   * instead of travelling. Motion sensitivity is a real accessibility need,
+   * and a decorative slide is exactly the kind of thing it applies to.
+   */
+  const reduceMotion = useReducedMotion();
 
   /**
    * Escape closes the mobile drawer.
@@ -180,84 +327,6 @@ export default function AdminLayout() {
     navigate('/login', { replace: true });
   };
 
-  const SidebarContent = () => (
-    <>
-      <div className="flex items-center gap-3 px-6 py-6">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-turmeric text-malt shadow-glow">
-          <AnimatedIcon icon={KeyRound} size={22} animation="pop" className="text-malt" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate font-heading text-base font-bold leading-tight text-text-primary">
-            Koding Keydzz
-          </p>
-          <p className="truncate text-xs text-text-secondary/70">{portalLabel}</p>
-        </div>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-3 pb-2" aria-label="Main navigation">
-        {groups.map((group, gi) => (
-          <div key={group.label || `top-${gi}`} className="mb-3">
-            {group.label && (
-              <h2 className="px-4 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-wider text-text-secondary/70">
-                {group.label}
-              </h2>
-            )}
-            <div className="space-y-1">
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  onClick={() => setMobileOpen(false)}
-                  className={({ isActive }) =>
-                    `group flex min-w-0 items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out active:scale-[0.98] ${
-                      isActive
-                        ? 'bg-turmeric text-malt shadow-glow'
-                        : 'text-text-secondary hover:bg-surface hover:text-text-primary'
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <AnimatedIcon
-                        icon={item.icon}
-                        size={18}
-                        animation={isActive ? 'pulse' : 'hover'}
-                        glow={isActive}
-                        className={`shrink-0 ${isActive ? 'text-malt' : ''}`}
-                      />
-                      <span className="truncate">{item.label}</span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      <div className="border-t border-k-border p-3">
-        {/* Every staff account can now change its own password, so there has to
-            be a way to reach the screen without being forced there. */}
-        <NavLink
-          to="/change-password"
-          onClick={() => setMobileOpen(false)}
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-text-secondary transition-colors duration-150 ease-out hover:bg-surface hover:text-text-primary active:scale-[0.98]"
-        >
-          <AnimatedIcon icon={KeyRound} size={18} animation="hover" />
-          Change password
-        </NavLink>
-        <button
-          onClick={handleLogout}
-          aria-label="Logout"
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-text-secondary transition-colors duration-150 ease-out hover:bg-error/15 hover:text-error active:scale-[0.98]"
-        >
-          <AnimatedIcon icon={LogOut} size={18} animation="hover" />
-          Logout
-        </button>
-      </div>
-    </>
-  );
 
   return (
     <div className="flex min-h-screen bg-malt">
@@ -277,7 +346,14 @@ export default function AdminLayout() {
 
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-k-border bg-card lg:flex">
-        <SidebarContent />
+        <SidebarContent
+          instance="desktop"
+          groups={groups}
+          portalLabel={portalLabel}
+          reduceMotion={reduceMotion}
+          onNavigate={() => setMobileOpen(false)}
+          onLogout={handleLogout}
+        />
       </aside>
 
       {/* Mobile sidebar */}
@@ -300,7 +376,14 @@ export default function AdminLayout() {
             transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
             className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-k-border bg-card"
           >
-            <SidebarContent />
+            <SidebarContent
+              instance="mobile"
+              groups={groups}
+              portalLabel={portalLabel}
+              reduceMotion={reduceMotion}
+              onNavigate={() => setMobileOpen(false)}
+              onLogout={handleLogout}
+            />
           </motion.aside>
         </div>
       )}

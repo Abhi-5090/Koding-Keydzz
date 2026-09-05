@@ -105,7 +105,19 @@ export default function SuperAdminDashboard() {
         loadingLabel="Loading platform analytics…"
       >
         <div className="space-y-6">
-          {/* ---- Scale ---- */}
+          {/*
+            EIGHT HEADLINE FIGURES, in two rows of four.
+
+            The first four are SCALE — how big the platform is. The second four
+            are USAGE — whether that scale is doing anything. They are split
+            into two rows rather than one block of eight because those are two
+            different questions, and a single eight-across row on a wide screen
+            reads as an undifferentiated wall of numbers.
+
+            The stagger index runs 0-7 straight through, so the entrance reads
+            left-to-right and then down, as one movement.
+          */}
+          {/* ---- Scale: how big is the platform ---- */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatTile
               index={0}
@@ -145,8 +157,158 @@ export default function SuperAdminDashboard() {
             />
           </div>
 
-          {/* ---- Is the platform working at all? Above every trend, because a
-                   missing runtime means exams are silently unmarkable. ---- */}
+          {/* ---- ...and the four that describe how it is being USED ---- */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatTile
+              index={4}
+              label="Quiz pass rate"
+              value={`${d?.learning?.quizPassRate ?? 0}%`}
+              delta={null}
+              direction="flat"
+              hint={`${(d?.learning?.totalQuizAttempts ?? 0).toLocaleString()} attempts`}
+              icon={TrendingUp}
+            />
+            <StatTile
+              index={5}
+              label="Average XP"
+              value={(d?.learning?.avgXp ?? 0).toLocaleString()}
+              delta={null}
+              direction="flat"
+              hint={`median ${(d?.learning?.medianXp ?? 0).toLocaleString()}`}
+              icon={Activity}
+            />
+            <StatTile
+              index={6}
+              label="Curriculum"
+              value={d?.content?.lessons ?? 0}
+              delta={null}
+              direction="flat"
+              hint={`${d?.content?.worlds ?? 0} worlds · ${d?.content?.quizzes ?? 0} quizzes`}
+              icon={BookOpen}
+            />
+            <StatTile
+              index={7}
+              label="Suspended schools"
+              value={d?.tenants?.suspended ?? 0}
+              delta={null}
+              direction="flat"
+              tone="inverse"
+              hint={`${d?.tenants?.active ?? 0} active`}
+              icon={ShieldCheck}
+            />
+          </div>
+          {/* ---- Growth ---- */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <ChartPanel
+              index={0}
+              title="Growth"
+              subtitle="New schools and students per month"
+              help="How many schools and students were added each month over the past year. Two lines on one axis because both are counts of new sign-ups — comparing their shape is the point."
+            >
+              <TrendChart
+                data={(d?.series?.studentGrowth || []).map((row, i) => ({
+                  month: row.month,
+                  students: row.value,
+                  schools: d?.series?.orgGrowth?.[i]?.value ?? 0,
+                }))}
+                xKey="month"
+                series={[
+                  { key: 'students', label: 'New students' },
+                  { key: 'schools', label: 'New schools' },
+                ]}
+                formatX={shortMonth}
+                emptyMessage="No sign-ups recorded yet"
+              />
+            </ChartPanel>
+
+            <ChartPanel
+              index={1}
+              title="Daily activity"
+              subtitle={`Quiz attempts and game levels, last ${days} days`}
+              help="Total learning events per day across every school. Weekday peaks with weekend dips is the normal shape for a school product — a flat weekday means something is wrong."
+            >
+              <TrendChart
+                data={(d?.series?.quizActivity || []).map((row, i) => ({
+                  date: row.date,
+                  quizzes: row.value,
+                  games: d?.series?.gameActivity?.[i]?.value ?? 0,
+                }))}
+                series={[
+                  { key: 'quizzes', label: 'Quiz attempts' },
+                  { key: 'games', label: 'Game levels' },
+                ]}
+                formatX={shortDate}
+                emptyMessage="No activity in this period"
+              />
+            </ChartPanel>
+          </div>
+
+          {/* ---- Engagement quality ---- */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <ChartPanel
+              index={2}
+              title="How often students return"
+              subtitle="Daily, weekly and monthly active students"
+              help="DAU / WAU / MAU are the count of distinct students who used the app in the last day, week and month. 'Stickiness' is daily divided by monthly — above 20% is healthy for a learning product, because pupils typically use it on lesson days rather than daily."
+              height="auto"
+            >
+              <div className="flex flex-col gap-4 py-1">
+                <MeterRow
+                  label="Stickiness (daily ÷ monthly)"
+                  value={d?.engagement?.dauOverMau ?? 0}
+                  sub={`${d?.engagement?.dau ?? 0} of ${d?.engagement?.mau ?? 0} monthly students used it today`}
+                />
+                <MeterRow
+                  label="Weekly reach (weekly ÷ monthly)"
+                  value={d?.engagement?.wauOverMau ?? 0}
+                  sub={`${d?.engagement?.wau ?? 0} active in the last 7 days`}
+                />
+                <MeterRow
+                  label="Share of all students active weekly"
+                  value={d?.engagement?.activeShare ?? 0}
+                  sub={`of ${(d?.kpis?.students?.value ?? 0).toLocaleString()} enrolled`}
+                />
+              </div>
+            </ChartPanel>
+
+            <ChartPanel
+              index={3}
+              title="Schools by plan"
+              subtitle="Contract mix"
+              help="How many schools are on each plan. Trial accounts that never convert are the clearest signal that onboarding needs attention."
+            >
+              <DonutSplit
+                data={d?.tenants?.byPlan || []}
+                centerValue={d?.tenants?.total ?? 0}
+                centerLabel="Schools"
+                emptyMessage="No schools yet"
+              />
+            </ChartPanel>
+
+            <ChartPanel
+              index={4}
+              title="Experience levels"
+              subtitle="All students, platform-wide"
+              help="Students grouped by the level they have reached. A large level-1 group relative to the total suggests many accounts were created but never really used."
+            >
+              <BarBreakdown
+                data={(d?.distributions?.level || []).slice(0, 10)}
+                emptyMessage="No progress yet"
+              />
+            </ChartPanel>
+          </div>
+
+          {/*
+            ---- ACT ON THIS ----
+            Everything above describes how the platform is doing. Everything
+            from here down is something somebody may need to DO, which is why
+            the three sit together: system health, the operational backlog, and
+            the schools at risk of churning.
+
+            System health leads because a missing language runtime means exams
+            are silently unmarkable — the papers still submit, the marks are
+            just quietly withheld.
+          ---- */}
           <SystemHealthPanel />
 
           {/* ---- Platform-wide operations: the marking backlog is the one
@@ -273,107 +435,6 @@ export default function SuperAdminDashboard() {
             </section>
           )}
 
-          {/* ---- Growth ---- */}
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <ChartPanel
-              index={0}
-              title="Growth"
-              subtitle="New schools and students per month"
-              help="How many schools and students were added each month over the past year. Two lines on one axis because both are counts of new sign-ups — comparing their shape is the point."
-            >
-              <TrendChart
-                data={(d?.series?.studentGrowth || []).map((row, i) => ({
-                  month: row.month,
-                  students: row.value,
-                  schools: d?.series?.orgGrowth?.[i]?.value ?? 0,
-                }))}
-                xKey="month"
-                series={[
-                  { key: 'students', label: 'New students' },
-                  { key: 'schools', label: 'New schools' },
-                ]}
-                formatX={shortMonth}
-                emptyMessage="No sign-ups recorded yet"
-              />
-            </ChartPanel>
-
-            <ChartPanel
-              index={1}
-              title="Daily activity"
-              subtitle={`Quiz attempts and game levels, last ${days} days`}
-              help="Total learning events per day across every school. Weekday peaks with weekend dips is the normal shape for a school product — a flat weekday means something is wrong."
-            >
-              <TrendChart
-                data={(d?.series?.quizActivity || []).map((row, i) => ({
-                  date: row.date,
-                  quizzes: row.value,
-                  games: d?.series?.gameActivity?.[i]?.value ?? 0,
-                }))}
-                series={[
-                  { key: 'quizzes', label: 'Quiz attempts' },
-                  { key: 'games', label: 'Game levels' },
-                ]}
-                formatX={shortDate}
-                emptyMessage="No activity in this period"
-              />
-            </ChartPanel>
-          </div>
-
-          {/* ---- Engagement quality ---- */}
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <ChartPanel
-              index={2}
-              title="How often students return"
-              subtitle="Daily, weekly and monthly active students"
-              help="DAU / WAU / MAU are the count of distinct students who used the app in the last day, week and month. 'Stickiness' is daily divided by monthly — above 20% is healthy for a learning product, because pupils typically use it on lesson days rather than daily."
-              height="auto"
-            >
-              <div className="flex flex-col gap-4 py-1">
-                <MeterRow
-                  label="Stickiness (daily ÷ monthly)"
-                  value={d?.engagement?.dauOverMau ?? 0}
-                  sub={`${d?.engagement?.dau ?? 0} of ${d?.engagement?.mau ?? 0} monthly students used it today`}
-                />
-                <MeterRow
-                  label="Weekly reach (weekly ÷ monthly)"
-                  value={d?.engagement?.wauOverMau ?? 0}
-                  sub={`${d?.engagement?.wau ?? 0} active in the last 7 days`}
-                />
-                <MeterRow
-                  label="Share of all students active weekly"
-                  value={d?.engagement?.activeShare ?? 0}
-                  sub={`of ${(d?.kpis?.students?.value ?? 0).toLocaleString()} enrolled`}
-                />
-              </div>
-            </ChartPanel>
-
-            <ChartPanel
-              index={3}
-              title="Schools by plan"
-              subtitle="Contract mix"
-              help="How many schools are on each plan. Trial accounts that never convert are the clearest signal that onboarding needs attention."
-            >
-              <DonutSplit
-                data={d?.tenants?.byPlan || []}
-                centerValue={d?.tenants?.total ?? 0}
-                centerLabel="Schools"
-                emptyMessage="No schools yet"
-              />
-            </ChartPanel>
-
-            <ChartPanel
-              index={4}
-              title="Experience levels"
-              subtitle="All students, platform-wide"
-              help="Students grouped by the level they have reached. A large level-1 group relative to the total suggests many accounts were created but never really used."
-            >
-              <BarBreakdown
-                data={(d?.distributions?.level || []).slice(0, 10)}
-                emptyMessage="No progress yet"
-              />
-            </ChartPanel>
-          </div>
-
           {/* ---- All schools ---- */}
           <section className="k-card overflow-hidden">
             <header className="flex flex-wrap items-start justify-between gap-3 border-b border-k-border p-5">
@@ -461,46 +522,6 @@ export default function SuperAdminDashboard() {
             )}
           </section>
 
-          {/* ---- Learning + content footer ---- */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatTile
-              index={0}
-              label="Quiz pass rate"
-              value={`${d?.learning?.quizPassRate ?? 0}%`}
-              delta={null}
-              direction="flat"
-              hint={`${(d?.learning?.totalQuizAttempts ?? 0).toLocaleString()} attempts`}
-              icon={TrendingUp}
-            />
-            <StatTile
-              index={1}
-              label="Average XP"
-              value={(d?.learning?.avgXp ?? 0).toLocaleString()}
-              delta={null}
-              direction="flat"
-              hint={`median ${(d?.learning?.medianXp ?? 0).toLocaleString()}`}
-              icon={Activity}
-            />
-            <StatTile
-              index={2}
-              label="Curriculum"
-              value={d?.content?.lessons ?? 0}
-              delta={null}
-              direction="flat"
-              hint={`${d?.content?.worlds ?? 0} worlds · ${d?.content?.quizzes ?? 0} quizzes`}
-              icon={BookOpen}
-            />
-            <StatTile
-              index={3}
-              label="Suspended schools"
-              value={d?.tenants?.suspended ?? 0}
-              delta={null}
-              direction="flat"
-              tone="inverse"
-              hint={`${d?.tenants?.active ?? 0} active`}
-              icon={ShieldCheck}
-            />
-          </div>
         </div>
       </QueryState>
     </div>
