@@ -2063,6 +2063,63 @@ async function seed() {
   const lessons = lessonsRes.docs;
   report('Lessons', lessonsRes);
 
+  /**
+   * REMOVE LESSONS THAT THE CURRICULUM NO LONGER CONTAINS.
+   *
+   * THE BUG THIS FIXES
+   * ------------------
+   * Lessons are upserted on `{ world, title }`, so RENAMING a lesson does not
+   * update it — it creates a second one and leaves the original behind. An
+   * upgrade that renamed Coding Forest's lessons from "Variables Basics",
+   * "Inputs Basics", "Outputs Basics" to "Variables", "Stored Values",
+   * "Input", "Output" therefore left the world holding SEVEN lessons: three
+   * orphans and four real ones.
+   *
+   * That is not a tidiness problem, it breaks the ladder. The orphans keep
+   * their old `order` values, so sorting by `{ order, _id }` puts
+   * "Variables Basics" (order 1, and an older id) ahead of "Variables"
+   * (order 1). The first slot — the only one that starts unlocked — is taken
+   * by a lesson that is no longer on any card, and the card a child actually
+   * sees called "Variables" is the SECOND in sequence and renders locked.
+   *
+   * So the first lesson of the first world of the first course appeared
+   * locked, with no way to open it, on any database that had been upgraded
+   * rather than reset.
+   *
+   * WHY DELETING IS SAFE HERE
+   * -------------------------
+   * These documents are not in the authored curriculum any more, so nothing
+   * links to them from the map. A pupil's `completedLessons` may still name
+   * one; those entries are matched by id against the lessons that exist, so a
+   * dangling entry is ignored rather than miscounted. And the whole script is
+   * already behind `assertSafeToRun()`, which refuses to touch anything but a
+   * local development database.
+   */
+  const authoredTitlesByWorld = new Map();
+  for (const doc of lessonDocs) {
+    const key = String(doc.world);
+    if (!authoredTitlesByWorld.has(key)) authoredTitlesByWorld.set(key, new Set());
+    authoredTitlesByWorld.get(key).add(doc.title);
+  }
+
+  let prunedLessons = 0;
+  for (const [worldId, titles] of authoredTitlesByWorld) {
+    const stale = await Lesson.find({
+      world: worldId,
+      title: { $nin: [...titles] },
+    }).select('title');
+    if (stale.length === 0) continue;
+    console.warn(
+      `[seed] removing ${stale.length} lesson(s) no longer in the curriculum: ` +
+        stale.map((l) => JSON.stringify(l.title)).join(', ')
+    );
+    const res = await Lesson.deleteMany({ _id: { $in: stale.map((l) => l._id) } });
+    prunedLessons += res.deletedCount || 0;
+  }
+  if (prunedLessons > 0) {
+    console.log(`Lessons: pruned ${prunedLessons} stale`);
+  }
+
   // Real quizzes across all 5 worlds (~4 per world), with mixed question types.
   const lessonByTitle = new Map(lessons.map((l) => [l.title, l]));
   const lessonsByWorldId = lessons.reduce((map, l) => {

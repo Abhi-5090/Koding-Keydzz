@@ -471,8 +471,25 @@ export default function StudentLayout() {
         </header>
 
         <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8">
-          <AnimatePresence mode="wait">
-            <Outlet />
+          {/*
+            THE KEY IS THE WHOLE POINT.
+
+            `AnimatePresence` decides a child has left by comparing keys. A bare
+            `<Outlet />` is the same element with the same (absent) key on every
+            route, so Framer never saw a change: the exit animation never ran,
+            React swapped the page out in one frame, and the new page animated
+            in from below. That hard swap followed by a slide is what read as
+            flickering.
+
+            Keyed on the pathname, `mode="wait"` plays the outgoing page out
+            before the incoming one starts, and `initial={false}` stops the
+            very first paint animating — arriving on the dashboard should not
+            look like a navigation.
+          */}
+          <AnimatePresence mode="wait" initial={false}>
+            <div key={pathname} className="h-full">
+              <Outlet />
+            </div>
           </AnimatePresence>
         </main>
       </div>

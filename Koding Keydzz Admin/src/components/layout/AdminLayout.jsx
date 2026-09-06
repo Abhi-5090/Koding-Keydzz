@@ -424,6 +424,9 @@ export default function AdminLayout() {
   const refreshToken = useSelector((state) => state.auth?.refreshToken);
   const [revokeSession] = useLogoutMutation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  // The page transition below keys on the route, so the location is read here
+  // rather than only inside the sidebar.
+  const { pathname } = useLocation();
   /**
    * Honours the OS "reduce motion" setting.
    *
@@ -569,7 +572,36 @@ export default function AdminLayout() {
         </header>
 
         <main id="main-content" className="flex-1 p-4 sm:p-6">
-          <Outlet />
+          {/*
+            Staff pages changed with a hard cut — the outgoing page vanished in
+            one frame and the next appeared in the next. Keyed on the pathname
+            so `AnimatePresence` can see one leave and another arrive, with
+            `initial={false}` so landing on the dashboard does not animate as
+            though it were a navigation.
+
+            The exit is deliberately shorter than the entrance: under
+            `mode="wait"` the reader pays for both before anything is legible,
+            so the outgoing page should get out of the way quickly.
+          */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={pathname}
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+              transition={
+                reduceMotion
+                  ? { duration: 0.12 }
+                  : {
+                      duration: 0.3,
+                      ease: [0.23, 1, 0.32, 1],
+                      exit: { duration: 0.16, ease: 'easeIn' },
+                    }
+              }
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

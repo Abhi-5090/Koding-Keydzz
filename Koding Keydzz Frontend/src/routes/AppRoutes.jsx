@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { motion } from 'framer-motion'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import StudentLayout from '../components/layout/StudentLayout'
 import ProtectedRoute from './ProtectedRoute'
@@ -68,8 +69,26 @@ const Zip = lazy(() => import('../pages/games/Zip'))
 const Patches = lazy(() => import('../pages/games/Patches'))
 
 function PageLoader() {
+  /**
+   * THE SPINNER FADES IN LATE, ON PURPOSE.
+   *
+   * Every page is a lazy chunk, so this replaces the whole content area on the
+   * first visit to a route. When the chunk is already cached — which it is
+   * after the first visit, and always is on a fast connection — it mounts and
+   * unmounts within a frame or two, and a full-size spinner appearing and
+   * vanishing that quickly is itself a flicker.
+   *
+   * Delaying the fade means a load that resolves quickly shows nothing at all,
+   * and only a genuinely slow one gets a spinner. The element is still in the
+   * tree from the start, so `role="status"` announces the wait either way.
+   */
   return (
-    <div className="flex h-[60vh] items-center justify-center">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2, delay: 0.25 }}
+      className="flex h-[60vh] items-center justify-center"
+    >
       <div className="flex flex-col items-center gap-4">
         <div
           className="h-12 w-12 animate-spin rounded-full border-4 border-k-border border-t-turmeric"
@@ -78,7 +97,7 @@ function PageLoader() {
         />
         <p className="game-text text-text-secondary">Loading adventure...</p>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
