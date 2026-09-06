@@ -16,18 +16,30 @@ import { World } from '../../src/models/World.js';
 import { Lesson } from '../../src/models/Lesson.js';
 
 /**
- * A RENAMED CURRICULUM MUST NOT LEAVE THE FIRST LESSON LOCKED.
+ * THE FIRST TOPIC IS ALWAYS OPEN — even on a database full of stale content.
  *
  * Lessons are upserted on `{ world, title }`, so renaming one creates a second
  * document instead of updating the first. An upgrade that renamed Coding
- * Forest's lessons left the world holding both sets — and because the orphans
- * kept their old `order` values and had older ObjectIds, one of THEM took the
- * first slot in the sequence.
+ * Forest's lessons left the world holding both sets, and the orphans kept
+ * their old `order` values with older ObjectIds — so one of THEM won the first
+ * slot in the sequence.
  *
  * The first slot is the only one that starts unlocked. So the lesson a child
  * actually sees first, on the first world of the first course, rendered as
- * locked with nothing that could open it. This is what that looks like, and
- * what the fix has to guarantee.
+ * locked with nothing that could ever open it, and the world's lesson count
+ * was inflated past what its cards could deliver so it could never complete.
+ *
+ * Two independent defences, and this file exercises both:
+ *
+ *   1. The ladder now sequences and counts only the lessons a world's TOPICS
+ *      name, so an orphan takes no part in it. This needs no re-seed, which
+ *      matters because the databases with the problem are the ones already
+ *      deployed.
+ *   2. The seed prunes lessons the curriculum no longer contains, so the
+ *      orphans stop accumulating in the first place.
+ *
+ * The fixture is deliberately the broken shape: orphans inserted first, with
+ * colliding order values.
  */
 describe('stale lessons left by a renamed curriculum', () => {
   let org;
@@ -87,20 +99,53 @@ describe('stale lessons left by a renamed curriculum', () => {
   const lessonsFor = () =>
     api().get(`${BASE}/worlds/${world._id}/lessons`).set(auth(pupilToken));
 
-  it('REPRODUCES the fault: with orphans present, "Variables" is not the open lesson', async () => {
+  it('"Variables" IS the open lesson even with the orphans still present', async () => {
     /**
-     * Pinned deliberately. This is the state the reported bug came from, and
-     * if a future change makes it stop happening on its own, that is worth
-     * knowing rather than silently relying on.
+     * THE HEART OF IT. This fixture is a database that was upgraded rather
+     * than reset: three renamed-away lessons sitting alongside the four real
+     * ones, with colliding `order` values and older ObjectIds.
+     *
+     * Before the curriculum filter, an orphan won the first slot — the only
+     * one that starts unlocked — and the first card a child sees rendered
+     * locked with nothing that could open it. The fix does not depend on
+     * anyone re-seeding: a lesson no card points at takes no part in the
+     * ladder, so the first topic is open on the data as it stands.
      */
     const res = await lessonsFor();
     expect(res.status).toBe(200);
 
-    const open = res.body.data.filter((l) => l.unlocked).map((l) => l.title);
-    expect(open).toEqual(['Variables Basics']);
+    const titles = res.body.data.map((l) => l.title);
+    expect(titles, 'orphaned lessons are still being served to the pupil').toEqual([
+      'Variables',
+      'Stored Values',
+      'Input',
+      'Output',
+    ]);
 
-    const variables = res.body.data.find((l) => l.title === 'Variables');
-    expect(variables.unlocked, 'the fault did not reproduce').toBe(false);
+    const open = res.body.data.filter((l) => l.unlocked).map((l) => l.title);
+    expect(open, 'the first lesson is not the only open one').toEqual(['Variables']);
+  });
+
+  it('refuses an orphaned lesson on the write path too', async () => {
+    // It is on no card, so nothing legitimate asks for it — and paying XP for
+    // content the course no longer contains would inflate progress.
+    const orphan = await Lesson.findOne({ world: world._id, title: 'Variables Basics' });
+    const res = await api()
+      .post(`${BASE}/progress/lesson/${orphan._id}/complete`)
+      .set(auth(pupilToken));
+    expect(res.status).toBe(404);
+  });
+
+  it('the world counts only the lessons it teaches, so it can reach 100%', async () => {
+    /**
+     * The second half of the same fault. Orphans inflated the lesson count, so
+     * a world with four cards needed seven completions: finishing every card
+     * left it at 4 of 7, the world never completed, and the next world could
+     * never unlock.
+     */
+    const worlds = await api().get(`${BASE}/worlds`).set(auth(pupilToken));
+    const forest = worlds.body.data.find((w) => w.slug === 'coding-forest');
+    expect(forest.lessonCount, 'orphans are still being counted').toBe(4);
   });
 
   it('once the orphans are gone, "Variables" is the open lesson', async () => {

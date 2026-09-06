@@ -39,6 +39,63 @@ import { lessonRepository } from '../repositories/lessonRepository.js';
  * write path that can advance a pupil goes through the helpers here.
  */
 
+/** Compare a topic label with a lesson title, ignoring case and padding. */
+const normalise = (value) => String(value || '').trim().toLowerCase();
+
+/**
+ * THE LESSONS A WORLD ACTUALLY TEACHES, IN THE ORDER ITS CARDS SHOW THEM.
+ *
+ * WHY THIS FILTER EXISTS
+ * ----------------------
+ * A world's cards come from its `topics` array. Its lessons are separate
+ * documents, upserted on `{ world, title }` — so renaming a lesson creates a
+ * second one and leaves the original behind. A database that was upgraded
+ * rather than reset holds both sets, and those orphans are invisible on screen
+ * while still counting in every calculation:
+ *
+ *   • They took the FIRST slot in the sequence, which is the only one that
+ *     starts unlocked. An orphan sat in it, so the first card a child sees —
+ *     "Variables", the first lesson of the first world of the first course —
+ *     rendered LOCKED with nothing that could open it.
+ *
+ *   • They inflated the lesson count. A world with four cards and three
+ *     orphans needed seven completions to reach 100%, which four cards can
+ *     never deliver, so the world could never be finished and the next world
+ *     could never unlock.
+ *
+ * Filtering to the authored topics fixes both without anyone having to re-seed:
+ * a lesson no card points at simply takes no part in the ladder.
+ *
+ * THE FALLBACK MATTERS
+ * --------------------
+ * If a world has no topics, or none of them match a lesson title, the filter
+ * would empty the world — turning a content mismatch into a world with nothing
+ * in it. So the filter only applies when it actually matches something, and
+ * otherwise the full ordered list is used.
+ */
+export function curriculumLessons(world, lessons) {
+  const topics = Array.isArray(world?.topics) ? world.topics : [];
+  const byTopic = new Map(topics.map((topic, index) => [normalise(topic), index]));
+
+  const matched = lessons.filter((lesson) => byTopic.has(normalise(lesson.title)));
+  if (matched.length === 0) return lessons;
+
+  /**
+   * Ordered by the TOPICS array, because that is the order the cards are drawn
+   * in. Sequencing by `lesson.order` while displaying by topic order lets the
+   * two disagree, and then a locked card appears first and the open one
+   * further down — which reads as the sequence being broken when it is only
+   * being shown out of order.
+   */
+  return matched
+    .slice()
+    .sort(
+      (a, b) =>
+        byTopic.get(normalise(a.title)) - byTopic.get(normalise(b.title)) ||
+        (a.order ?? 0) - (b.order ?? 0)
+    );
+}
+
 /** A pupil's completed-lesson ids as a Set of strings. */
 export function completedLessonIds(user) {
   return new Set((user?.completedLessons || []).map((entry) => String(entry.lesson)));
@@ -51,14 +108,26 @@ export function completedLessonIds(user) {
  * five round trips to render one map. This is one aggregate, and it matters
  * because the map is the screen a child lands on most.
  */
-async function lessonCountsByWorld(worldIds) {
+async function lessonsByWorld(worldIds) {
+  /**
+   * Titles come back as well as ids, because the count has to be of the
+   * lessons the world actually TEACHES — see `curriculumLessons`. Counting
+   * every Lesson document in the world lets orphaned content inflate the
+   * total, and a world whose four cards are all finished then reports 4 of 7
+   * and never completes.
+   */
   const rows = await Lesson.aggregate([
     { $match: { world: { $in: worldIds } } },
-    { $group: { _id: '$world', total: { $sum: 1 }, ids: { $push: '$_id' } } },
+    {
+      $group: {
+        _id: '$world',
+        lessons: { $push: { _id: '$_id', title: '$title', order: '$order' } },
+      },
+    },
   ]);
   const byWorld = new Map();
   for (const row of rows) {
-    byWorld.set(String(row._id), { total: row.total, ids: row.ids.map(String) });
+    byWorld.set(String(row._id), row.lessons);
   }
   return byWorld;
 }
@@ -72,7 +141,7 @@ async function lessonCountsByWorld(worldIds) {
  */
 export async function decorateWorlds(worlds, user) {
   const done = completedLessonIds(user);
-  const counts = await lessonCountsByWorld(worlds.map((w) => w._id));
+  const allLessons = await lessonsByWorld(worlds.map((w) => w._id));
 
   // Worlds arrive ordered; the ladder depends on that order, so it is not
   // re-derived from anything else.
@@ -81,7 +150,8 @@ export async function decorateWorlds(worlds, user) {
 
   return worlds.map((world) => {
     const plain = typeof world.toObject === 'function' ? world.toObject() : { ...world };
-    const entry = counts.get(String(world._id)) || { total: 0, ids: [] };
+    const taught = curriculumLessons(plain, allLessons.get(String(world._id)) || []);
+    const entry = { total: taught.length, ids: taught.map((l) => String(l._id)) };
     const completedCount = entry.ids.filter((id) => done.has(id)).length;
 
     /**
@@ -167,8 +237,33 @@ export async function assertLessonOpen(user, lessonId) {
   const done = completedLessonIds(user);
   if (done.has(String(lesson._id))) return { ok: true, lesson };
 
-  // Every earlier lesson in the same world must be finished.
-  const siblings = await lessonRepository.findByWorld(lesson.world);
+  const world = await worldRepository.findById(lesson.world);
+
+  /**
+   * Every earlier lesson IN THE CURRICULUM must be finished.
+   *
+   * Sequencing over every Lesson document in the world let orphaned content —
+   * a lesson renamed in a later version, whose original was never removed —
+   * sit in front of the real first lesson and block it. Filtering to what the
+   * world actually teaches means the read path and this write path agree about
+   * what "the previous one" is.
+   */
+  const siblings = curriculumLessons(world, await lessonRepository.findByWorld(lesson.world));
+
+  /**
+   * A lesson that is not in the curriculum at all is refused rather than
+   * silently allowed. It is not on any card, so nothing legitimate can be
+   * asking for it, and paying XP for content the course no longer contains
+   * would be a way to inflate progress.
+   */
+  if (!siblings.some((s) => String(s._id) === String(lesson._id))) {
+    return {
+      ok: false,
+      status: 404,
+      message: 'Lesson not found',
+    };
+  }
+
   for (const sibling of siblings) {
     if (String(sibling._id) === String(lesson._id)) break;
     if (!done.has(String(sibling._id))) {
@@ -181,7 +276,6 @@ export async function assertLessonOpen(user, lessonId) {
   }
 
   // And every earlier world in the same course must be finished.
-  const world = await worldRepository.findById(lesson.world);
   if (world?.course) {
     const worlds = await worldRepository.findByCourse(world.course);
     const decorated = await decorateWorlds(worlds, user);
