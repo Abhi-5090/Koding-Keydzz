@@ -10,6 +10,7 @@ import { Question } from '../models/Question.js';
 import { Course } from '../models/Course.js';
 import { COURSES } from '../config/courses.js';
 import { C_WORLDS, C_LESSON_CONTENT, C_QUIZ_BLUEPRINTS } from './cCourse.js';
+import { ALL_LESSON_CONTENT as LESSON_CATALOG } from './lessonCatalog.js';
 import {
   HTML_WORLDS,
   HTML_LESSON_CONTENT,
@@ -801,12 +802,9 @@ const AVATAR_ITEMS = [
  * `buildQuizzes` need no knowledge of which course a world belongs to — a world
  * slug is all they ever look up.
  */
-const ALL_LESSON_CONTENT = {
-  ...lessonContent,
-  ...C_LESSON_CONTENT,
-  ...HTML_LESSON_CONTENT,
-  ...AI_LESSON_CONTENT,
-};
+// Merged in `lessonCatalog.js`, which other scripts can import safely — this
+// file calls `seed()` at the bottom, so importing from it would run a seed.
+const ALL_LESSON_CONTENT = LESSON_CATALOG;
 
 function lessonsForWorld(world) {
   const items = ALL_LESSON_CONTENT[world.slug];
@@ -2129,11 +2127,55 @@ async function seed() {
     return map;
   }, new Map());
   const quizDocs = buildQuizzes(worlds, lessonByTitle, lessonsByWorldId);
+
+  /**
+   * KEYED ON TITLE ALONE — the lesson id must NOT be part of the key.
+   *
+   * It used to be `{ title, lesson }`, which put a FOREIGN KEY in a natural
+   * key. Whenever a lesson was recreated with a new id — which happens
+   * whenever lesson titles change, because lessons are themselves keyed on
+   * title — every quiz's key changed with it, so the upsert matched nothing
+   * and inserted a duplicate beside the original. The original kept pointing
+   * at the deleted lesson.
+   *
+   * The result on a database that had been upgraded a few times: 85 quizzes
+   * for 65 authored titles, with 20 exact-title duplicates whose `lesson` ref
+   * was dangling. Those 20 could not appear in the arena at all — nothing can
+   * list a quiz with no reachable lesson or world — so a fifth of the quizzes
+   * were invisible.
+   *
+   * Blueprint titles are unique across all four courses (65 titles, 65
+   * quizzes), so title alone identifies a quiz and re-running updates its
+   * lesson link in place.
+   */
   const quizzesRes = await upsertMany(Quiz, quizDocs, (q) => ({
     title: q.title,
-    ...(q.lesson ? { lesson: q.lesson } : {}),
   }));
   const quizzes = quizzesRes.docs;
+
+  /**
+   * Remove quizzes the blueprints no longer contain, for the same reason the
+   * lessons are pruned: a renamed quiz would otherwise leave its original
+   * behind, unreachable but still counted in the arena's totals and in every
+   * report of how much content a course has.
+   */
+  const authoredQuizTitles = new Set(quizDocs.map((q) => q.title));
+  const staleQuizzes = await Quiz.find({
+    title: { $nin: [...authoredQuizTitles] },
+  }).select('title');
+  if (staleQuizzes.length > 0) {
+    console.warn(
+      `[seed] removing ${staleQuizzes.length} quiz(zes) no longer in the blueprints: ` +
+        staleQuizzes
+          .slice(0, 8)
+          .map((q) => JSON.stringify(q.title))
+          .join(', ') +
+        (staleQuizzes.length > 8 ? ` …and ${staleQuizzes.length - 8} more` : '')
+    );
+    const res = await Quiz.deleteMany({ _id: { $in: staleQuizzes.map((q) => q._id) } });
+    console.log(`Quizzes: pruned ${res.deletedCount} stale`);
+  }
+
   console.log(
     `Inserted ${quizzes.length} quizzes (across ${worlds.length} worlds).`,
   );

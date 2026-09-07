@@ -39,64 +39,35 @@ import { lessonRepository } from '../repositories/lessonRepository.js';
  * write path that can advance a pupil goes through the helpers here.
  */
 
-/** Compare a topic label with a lesson title, ignoring case and padding. */
-const normalise = (value) => String(value || '').trim().toLowerCase();
-
 /**
- * THE LESSONS A WORLD ACTUALLY TEACHES, IN THE ORDER ITS CARDS SHOW THEM.
+ * WHY THERE IS NO "IS THIS LESSON PART OF THE CURRICULUM?" FILTER HERE.
  *
- * WHY THIS FILTER EXISTS
- * ----------------------
- * A world's cards come from its `topics` array. Its lessons are separate
- * documents, upserted on `{ world, title }` — so renaming a lesson creates a
- * second one and leaves the original behind. A database that was upgraded
- * rather than reset holds both sets, and those orphans are invisible on screen
- * while still counting in every calculation:
+ * There was one, briefly, and it was wrong. It tested a lesson's title against
+ * its world's `topics` array, on the assumption that a card's label equals its
+ * lesson's title. That is true only in Python:
  *
- *   • They took the FIRST slot in the sequence, which is the only one that
- *     starts unlocked. An orphan sat in it, so the first card a child sees —
- *     "Variables", the first lesson of the first world of the first course —
- *     rendered LOCKED with nothing that could open it.
+ *   coding-forest  topics ["Variables", "Stored Values", "Input", "Output"]
+ *                  lessons "Variables", "Stored Values", "Input", "Output"
  *
- *   • They inflated the lesson count. A world with four cards and three
- *     orphans needed seven completions to reach 100%, which four cards can
- *     never deliver, so the world could never be finished and the next world
- *     could never unlock.
+ *   c-workshop     topics ["Your First C Program", "Printing Output", "Compiling"]
+ *                  lessons "Your First C Program", "Printing with printf",
+ *                          "What the Compiler Does"
  *
- * Filtering to the authored topics fixes both without anyone having to re-seed:
- * a lesson no card points at simply takes no part in the ladder.
+ * In C, HTML and AI the topics are short labels and the lessons carry
+ * descriptive titles, deliberately. So the filter matched one lesson of three
+ * and dropped the rest: those fifteen worlds reported a single lesson,
+ * completed after it, and their remaining lessons became unreachable. It
+ * turned a Python data problem into a content bug across three courses.
  *
- * THE FALLBACK MATTERS
- * --------------------
- * If a world has no topics, or none of them match a lesson title, the filter
- * would empty the world — turning a content mismatch into a world with nothing
- * in it. So the filter only applies when it actually matches something, and
- * otherwise the full ordered list is used.
+ * A world's lessons ARE its curriculum. The duplicates that caused the
+ * original fault — stale documents left behind when lessons were renamed —
+ * are removed by the seed, which is the only place that knows which titles are
+ * authored for which world. Ordering is by `{ order, _id }`, with `_id` as the
+ * tiebreak so a world whose lessons all default to `order: 0` still sequences
+ * the same way on every request.
  */
-export function curriculumLessons(world, lessons) {
-  const topics = Array.isArray(world?.topics) ? world.topics : [];
-  const byTopic = new Map(topics.map((topic, index) => [normalise(topic), index]));
 
-  const matched = lessons.filter((lesson) => byTopic.has(normalise(lesson.title)));
-  if (matched.length === 0) return lessons;
-
-  /**
-   * Ordered by the TOPICS array, because that is the order the cards are drawn
-   * in. Sequencing by `lesson.order` while displaying by topic order lets the
-   * two disagree, and then a locked card appears first and the open one
-   * further down — which reads as the sequence being broken when it is only
-   * being shown out of order.
-   */
-  return matched
-    .slice()
-    .sort(
-      (a, b) =>
-        byTopic.get(normalise(a.title)) - byTopic.get(normalise(b.title)) ||
-        (a.order ?? 0) - (b.order ?? 0)
-    );
-}
-
-/** A pupil's completed-lesson ids as a Set of strings. */
+/** A pupil's completed-lesson ids as a Set of strings. *//** A pupil's completed-lesson ids as a Set of strings. */
 export function completedLessonIds(user) {
   return new Set((user?.completedLessons || []).map((entry) => String(entry.lesson)));
 }
@@ -110,11 +81,9 @@ export function completedLessonIds(user) {
  */
 async function lessonsByWorld(worldIds) {
   /**
-   * Titles come back as well as ids, because the count has to be of the
-   * lessons the world actually TEACHES — see `curriculumLessons`. Counting
-   * every Lesson document in the world lets orphaned content inflate the
-   * total, and a world whose four cards are all finished then reports 4 of 7
-   * and never completes.
+   * `order` comes back with the ids so the caller can sequence without a
+   * second query. Titles too, because a caller that needs to name the lesson
+   * blocking another one should not have to fetch it again.
    */
   const rows = await Lesson.aggregate([
     { $match: { world: { $in: worldIds } } },
@@ -150,7 +119,9 @@ export async function decorateWorlds(worlds, user) {
 
   return worlds.map((world) => {
     const plain = typeof world.toObject === 'function' ? world.toObject() : { ...world };
-    const taught = curriculumLessons(plain, allLessons.get(String(world._id)) || []);
+    const taught = (allLessons.get(String(world._id)) || [])
+      .slice()
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a._id).localeCompare(String(b._id)));
     const entry = { total: taught.length, ids: taught.map((l) => String(l._id)) };
     const completedCount = entry.ids.filter((id) => done.has(id)).length;
 
@@ -240,29 +211,11 @@ export async function assertLessonOpen(user, lessonId) {
   const world = await worldRepository.findById(lesson.world);
 
   /**
-   * Every earlier lesson IN THE CURRICULUM must be finished.
-   *
-   * Sequencing over every Lesson document in the world let orphaned content —
-   * a lesson renamed in a later version, whose original was never removed —
-   * sit in front of the real first lesson and block it. Filtering to what the
-   * world actually teaches means the read path and this write path agree about
-   * what "the previous one" is.
+   * Every earlier lesson in the same world must be finished. `findByWorld`
+   * orders by `{ order, _id }`, the same sequence the read path serves, so the
+   * two cannot disagree about what "the previous one" is.
    */
-  const siblings = curriculumLessons(world, await lessonRepository.findByWorld(lesson.world));
-
-  /**
-   * A lesson that is not in the curriculum at all is refused rather than
-   * silently allowed. It is not on any card, so nothing legitimate can be
-   * asking for it, and paying XP for content the course no longer contains
-   * would be a way to inflate progress.
-   */
-  if (!siblings.some((s) => String(s._id) === String(lesson._id))) {
-    return {
-      ok: false,
-      status: 404,
-      message: 'Lesson not found',
-    };
-  }
+  const siblings = await lessonRepository.findByWorld(lesson.world);
 
   for (const sibling of siblings) {
     if (String(sibling._id) === String(lesson._id)) break;

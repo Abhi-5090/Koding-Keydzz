@@ -1,7 +1,7 @@
 import { worldRepository } from '../repositories/worldRepository.js';
 import { lessonRepository } from '../repositories/lessonRepository.js';
 import { ApiError } from '../utils/ApiError.js';
-import { decorateWorlds, decorateLessons, curriculumLessons } from './progressionService.js';
+import { decorateWorlds, decorateLessons } from './progressionService.js';
 
 /**
  * The worlds a pupil may see.
@@ -84,13 +84,11 @@ export async function listLessonsForWorld(worldId, user = null) {
    * document that exists, including ones no card points at, because that is
    * how they find them.
    *
-   * A pupil gets only what the world actually teaches, in card order, with the
-   * sequence applied. Orphaned lessons are excluded rather than hidden: a
-   * lesson renamed in a later version whose original was never removed used to
-   * occupy the first slot — the only one that starts unlocked — so the first
-   * card a child sees rendered locked with nothing that could open it.
+   * A pupil gets the same list with the sequence applied, so the client never
+   * has to work out which topic is next — and cannot get that answer wrong in
+   * the pupil's favour.
    */
-  return user ? decorateLessons(curriculumLessons(world, lessons), user) : lessons;
+  return user ? decorateLessons(lessons, user) : lessons;
 }
 
 export default { listWorlds, listLessonsForWorld };

@@ -16,30 +16,28 @@ import { World } from '../../src/models/World.js';
 import { Lesson } from '../../src/models/Lesson.js';
 
 /**
- * THE FIRST TOPIC IS ALWAYS OPEN — even on a database full of stale content.
+ * STALE LESSONS LEFT BY A RENAMED CURRICULUM, AND WHERE THEY GET REMOVED.
  *
  * Lessons are upserted on `{ world, title }`, so renaming one creates a second
- * document instead of updating the first. An upgrade that renamed Coding
- * Forest's lessons left the world holding both sets, and the orphans kept
- * their old `order` values with older ObjectIds — so one of THEM won the first
- * slot in the sequence.
+ * document instead of updating the first. A database upgraded rather than
+ * reset holds both sets, and the orphans are not inert: they keep their old
+ * `order` values with older ObjectIds, so one of them wins the first slot in
+ * the sequence — the only slot that starts unlocked — and the first topic a
+ * child sees renders locked. They also inflate the world's lesson count past
+ * what its cards can deliver, so the world can never complete.
  *
- * The first slot is the only one that starts unlocked. So the lesson a child
- * actually sees first, on the first world of the first course, rendered as
- * locked with nothing that could ever open it, and the world's lesson count
- * was inflated past what its cards could deliver so it could never complete.
+ * THE REMEDY IS THE SEED, NOT A READ-TIME FILTER.
  *
- * Two independent defences, and this file exercises both:
+ * A read-time filter was tried and reverted. It tested a lesson's title
+ * against its world's `topics`, which holds only in Python: C, HTML and AI
+ * deliberately use short topic labels with descriptive lesson titles
+ * ("Printing Output" vs "Printing with printf"), so the filter matched one
+ * lesson of three and made the other two unreachable across fifteen worlds.
  *
- *   1. The ladder now sequences and counts only the lessons a world's TOPICS
- *      name, so an orphan takes no part in it. This needs no re-seed, which
- *      matters because the databases with the problem are the ones already
- *      deployed.
- *   2. The seed prunes lessons the curriculum no longer contains, so the
- *      orphans stop accumulating in the first place.
- *
- * The fixture is deliberately the broken shape: orphans inserted first, with
- * colliding order values.
+ * The seed is the only place that knows which titles are authored for which
+ * world, so that is where the prune belongs. These tests pin the shape of the
+ * fault, that pruning fixes it, and that the ordering is deterministic even
+ * when `order` values collide — which is what stops the fault being random.
  */
 describe('stale lessons left by a renamed curriculum', () => {
   let org;
@@ -99,53 +97,50 @@ describe('stale lessons left by a renamed curriculum', () => {
   const lessonsFor = () =>
     api().get(`${BASE}/worlds/${world._id}/lessons`).set(auth(pupilToken));
 
-  it('"Variables" IS the open lesson even with the orphans still present', async () => {
+  /** What the seed's prune step does: keep only the authored titles. */
+  const pruneToAuthored = () =>
+    Lesson.deleteMany({
+      world: world._id,
+      title: { $nin: ['Variables', 'Stored Values', 'Input', 'Output'] },
+    });
+
+  it('SHOWS THE FAULT: an orphan takes the first, unlocked slot', async () => {
     /**
-     * THE HEART OF IT. This fixture is a database that was upgraded rather
-     * than reset: three renamed-away lessons sitting alongside the four real
-     * ones, with colliding `order` values and older ObjectIds.
-     *
-     * Before the curriculum filter, an orphan won the first slot — the only
-     * one that starts unlocked — and the first card a child sees rendered
-     * locked with nothing that could open it. The fix does not depend on
-     * anyone re-seeding: a lesson no card points at takes no part in the
-     * ladder, so the first topic is open on the data as it stands.
+     * Pinned so the shape of the problem stays on record. With both sets
+     * present, the lesson a child sees called "Variables" is second in
+     * sequence and therefore locked — with nothing that could open it.
      */
     const res = await lessonsFor();
     expect(res.status).toBe(200);
 
-    const titles = res.body.data.map((l) => l.title);
-    expect(titles, 'orphaned lessons are still being served to the pupil').toEqual([
-      'Variables',
-      'Stored Values',
-      'Input',
-      'Output',
-    ]);
-
     const open = res.body.data.filter((l) => l.unlocked).map((l) => l.title);
-    expect(open, 'the first lesson is not the only open one').toEqual(['Variables']);
+    expect(open).toEqual(['Variables Basics']);
+
+    const variables = res.body.data.find((l) => l.title === 'Variables');
+    expect(variables.unlocked).toBe(false);
   });
 
-  it('refuses an orphaned lesson on the write path too', async () => {
-    // It is on no card, so nothing legitimate asks for it — and paying XP for
-    // content the course no longer contains would inflate progress.
-    const orphan = await Lesson.findOne({ world: world._id, title: 'Variables Basics' });
-    const res = await api()
-      .post(`${BASE}/progress/lesson/${orphan._id}/complete`)
-      .set(auth(pupilToken));
-    expect(res.status).toBe(404);
-  });
-
-  it('the world counts only the lessons it teaches, so it can reach 100%', async () => {
-    /**
-     * The second half of the same fault. Orphans inflated the lesson count, so
-     * a world with four cards needed seven completions: finishing every card
-     * left it at 4 of 7, the world never completed, and the next world could
-     * never unlock.
-     */
+  it('SHOWS THE FAULT: the orphans inflate the world past what its cards can deliver', async () => {
+    // Four cards against seven lessons: finishing every card leaves 4 of 7,
+    // so the world never completes and the next never unlocks.
     const worlds = await api().get(`${BASE}/worlds`).set(auth(pupilToken));
     const forest = worlds.body.data.find((w) => w.slug === 'coding-forest');
-    expect(forest.lessonCount, 'orphans are still being counted').toBe(4);
+    expect(forest.lessonCount).toBe(7);
+  });
+
+  it('the sequence is DETERMINISTIC when order values collide', async () => {
+    /**
+     * The reason the fault presented as random. `order` defaults to 0 and the
+     * orphans collide with the real lessons at 1, 2, 3 — so without a
+     * tiebreak Mongo may return a different sequence per call, and a
+     * different lesson would be the open one each time. `_id` breaks the tie,
+     * which is also authoring order.
+     */
+    const first = (await lessonsFor()).body.data.map((l) => l.title);
+    const second = (await lessonsFor()).body.data.map((l) => l.title);
+    const third = (await lessonsFor()).body.data.map((l) => l.title);
+    expect(second).toEqual(first);
+    expect(third).toEqual(first);
   });
 
   it('once the orphans are gone, "Variables" is the open lesson', async () => {
