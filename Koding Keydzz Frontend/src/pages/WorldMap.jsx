@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Lock, ChevronRight, Map as MapIcon, CheckCircle2 } from 'lucide-react'
+import { Lock, ChevronRight, Map as MapIcon, CheckCircle2, Brain } from 'lucide-react'
 import { useGetCoursesQuery } from '../features/courses/coursesApi'
 import { courseIcon } from '../data/iconMap'
 import PageTransition from '../components/layout/PageTransition'
@@ -28,10 +28,14 @@ const EASE_OUT = [0.23, 1, 0.32, 1]
  * pupil's XP level, so grinding mini-games opened Algorithm Desert to somebody
  * who had never written a line in Coding Forest.
  *
- * So the map is now two screens. This one shows the four realms with the three
+ * So the map is now two screens. This one shows every realm, with the ones
  * ahead plainly locked and told, in a sentence, what opens them. Opening one
  * leads to its worlds, where the rule is the same sentence again: finish the
  * previous one.
+ *
+ * The first realm is Cognitive Games, which has no worlds — four mini-games
+ * instead — so its tile leads to its own screen and carries its own icon
+ * rather than a map pin.
  */
 export default function WorldMap() {
   const navigate = useNavigate()
@@ -48,6 +52,14 @@ export default function WorldMap() {
     if (course.unlocked) navigate(`/map/${course.slug}`)
   }
 
+  /**
+   * A games realm has no worlds, so its tile leads to its own screen. The
+   * route handles the redirect by matching the slug first; this exists so the
+   * icon and the label can differ too — a realm of games should not be drawn
+   * with a map pin.
+   */
+  const iconFor = (course) => (course.kind === 'games' ? Brain : courseIcon(course.slug))
+
   return (
     <PageTransition>
       <div className="mb-6 text-center">
@@ -55,7 +67,8 @@ export default function WorldMap() {
           The <span className="golden-text">Golden Coding Kingdom</span>
         </h1>
         <p className="mt-2 text-text-secondary">
-          Four realms to master, one after another. Choose the one that is open to you.
+          {courses.length} realms to master, one after another. Start with the games, then
+          the code.
         </p>
       </div>
 
@@ -78,7 +91,7 @@ export default function WorldMap() {
               const alignRight = i % 2 === 1
               const highlight = i === highlightIndex
               const tint = course.tint || '#FF602F'
-              const Icon = courseIcon(course.slug)
+              const Icon = iconFor(course)
               const passed = course.status === 'passed'
 
               return (

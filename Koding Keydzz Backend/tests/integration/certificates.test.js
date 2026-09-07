@@ -14,7 +14,7 @@ import { Course } from '../../src/models/Course.js';
 import { Certificate, generateCertificateCode } from '../../src/models/Certificate.js';
 import { CertificateTemplate } from '../../src/models/CertificateTemplate.js';
 import * as certificates from '../../src/services/certificateService.js';
-import { COURSES } from '../../src/config/courses.js';
+import { COURSES, courseBySlug } from '../../src/config/courses.js';
 
 /**
  * CERTIFICATES.
@@ -52,7 +52,7 @@ describe('certificates', () => {
     school = await makeOrg('Springfield Elementary');
     other = await makeOrg('Shelbyville Elementary');
 
-    const spec = COURSES[0];
+    const spec = courseBySlug('python');
     python = await Course.create({
       slug: spec.slug,
       language: spec.language,

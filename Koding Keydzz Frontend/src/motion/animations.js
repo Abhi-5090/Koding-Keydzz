@@ -47,25 +47,80 @@ export function revealIn(target, { y = 18, delay = 0, duration = 0.55, stagger =
     return NOOP
   }
 
+  const els = Array.isArray(target) ? target : [target]
+
+  /**
+   * HIDE SYNCHRONOUSLY, BEFORE THE BROWSER PAINTS.
+   *
+   * THE FLICKER THIS FIXES
+   * ----------------------
+   * `gsap.fromTo` used to set the `opacity: 0` starting state, and it was
+   * only reached inside `loadGsap().then(...)`. GSAP is imported lazily, so
+   * that callback runs at least a frame later — and on the first page that
+   * reveals anything, only after the chunk has been fetched.
+   *
+   * The visible result was content appearing at full opacity, vanishing when
+   * GSAP arrived and snapped it to zero, then fading back in. Worst on the
+   * dashboard immediately after signing in, which is the first screen to use
+   * this and therefore the one that pays for the download.
+   *
+   * The hook that calls this already uses `useLayoutEffect` specifically to
+   * beat the paint — and its comment says so. That reasoning only holds if the
+   * starting state is applied SYNCHRONOUSLY, which is what this does. The
+   * async part is now only the animation, never the hide.
+   */
+  for (const el of els) {
+    if (!el?.style) continue
+    el.style.opacity = '0'
+    el.style.transform = `translateY(${y}px)`
+    el.style.willChange = 'opacity, transform'
+  }
+
   let tween = null
   let cancelled = false
 
+  /**
+   * A SAFETY NET, because hidden content is worse than an unanimated page.
+   *
+   * If the GSAP chunk is slow — a cold cache on a school connection — or never
+   * arrives at all, the elements above are already invisible. This shows them
+   * regardless after a short wait. An entrance animation is a nicety; reading
+   * the lesson is the point.
+   */
+  const fallback = setTimeout(() => {
+    if (!cancelled && !tween) settle(els)
+  }, 600)
+
   loadGsap().then((gsap) => {
-    if (cancelled || !gsap) {
+    if (cancelled) return
+    clearTimeout(fallback)
+    if (!gsap) {
       // GSAP unavailable: show the content rather than leave it hidden.
-      settle(target)
+      settle(els)
       return
     }
     tween = gsap.fromTo(
-      target,
+      els,
       { opacity: 0, y },
-      { opacity: 1, y: 0, duration, delay, stagger, clearProps: 'transform' }
+      {
+        opacity: 1,
+        y: 0,
+        duration,
+        delay,
+        stagger,
+        // `willChange` is a hint, not a permanent state — leaving it set keeps
+        // a compositor layer alive for the life of the page.
+        clearProps: 'transform,willChange',
+      }
     )
   })
 
   return () => {
     cancelled = true
+    clearTimeout(fallback)
     tween?.kill()
+    // Killing mid-flight must not leave the content half-faded.
+    settle(els)
   }
 }
 

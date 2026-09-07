@@ -96,7 +96,17 @@ describe('the course ladder', () => {
       await Course.updateMany({}, { published: true });
       const res = await api().get(`${BASE}/courses`).set(auth(token));
 
+      /**
+       * Cognitive Games leads, and the language courses follow in ladder
+       * order. It was added as realm 1 rather than at 0 because the unlock
+       * chain walks `order` directly and a gap would strand everything after
+       * it — so Python moved to 2, C to 3, HTML to 4 and AI to 5.
+       *
+       * Asserted as the whole list, in order, on purpose: this is the shape of
+       * the ladder, and a change to it should have to be stated here.
+       */
       expect(res.body.data.items.map((c) => c.slug)).toEqual([
+        'cognitive-games',
         'python',
         'c',
         'html',

@@ -139,6 +139,21 @@ export const CAPABILITIES = Object.freeze({
    * for rosters and reports — so `assignment:write` means "may set work", not
    * "may set work for anyone".
    */
+  /**
+   * OPENING A REALM BY HAND.
+   *
+   * Faculty hold it as well as admins: the whole reason the grant exists is
+   * that the teacher standing in front of the class knows a pupil is ready, or
+   * is running the term to a timetable rather than to each child's pace.
+   * Restricting it to admins would put the decision with whoever is furthest
+   * from the pupil.
+   *
+   * A grant only ever ADDS access, and the derived rule still opens a realm a
+   * pupil has earned — so the worst a mistake can do is let somebody start
+   * early, never take away work they have finished.
+   */
+  'realm:grant': [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.FACULTY],
+
   'assignment:read': [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.FACULTY, ROLES.STUDENT],
   'assignment:write': [ROLES.SUPERADMIN, ROLES.ADMIN, ROLES.FACULTY],
 

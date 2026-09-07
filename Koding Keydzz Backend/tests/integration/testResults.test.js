@@ -14,7 +14,7 @@ import { Course } from '../../src/models/Course.js';
 import { Classroom } from '../../src/models/Classroom.js';
 import { CourseProgress } from '../../src/models/CourseProgress.js';
 import { TestAttempt } from '../../src/models/TestAttempt.js';
-import { COURSES } from '../../src/config/courses.js';
+import { COURSES, courseBySlug } from '../../src/config/courses.js';
 
 /**
  * FINAL-TEST RESULTS, for staff — a report, not a register.
@@ -51,7 +51,7 @@ describe('final-test results for staff', () => {
     school = await makeOrg('Springfield Elementary');
     other = await makeOrg('Shelbyville Elementary');
 
-    const spec = COURSES[0];
+    const spec = courseBySlug('python');
     python = await Course.create({
       slug: spec.slug,
       language: spec.language,

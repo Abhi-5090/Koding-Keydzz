@@ -13,7 +13,7 @@ import {
 import { Course } from '../../src/models/Course.js';
 import { Question } from '../../src/models/Question.js';
 import { TestAttempt } from '../../src/models/TestAttempt.js';
-import { COURSES } from '../../src/config/courses.js';
+import { COURSES, courseBySlug } from '../../src/config/courses.js';
 import { BLUEPRINTS } from '../../src/config/finalTest.js';
 
 /**
@@ -51,7 +51,7 @@ describe('the question bank', () => {
     await resetDb();
     school = await makeOrg('Springfield Elementary');
 
-    const spec = COURSES[0];
+    const spec = courseBySlug('python');
     python = await Course.create({
       slug: spec.slug,
       language: spec.language,

@@ -35,6 +35,7 @@ const Courses = lazy(() => import('../pages/Courses'))
 const FinalTest = lazy(() => import('../pages/FinalTest'))
 const WorldMap = lazy(() => import('../pages/WorldMap'))
 const CourseMap = lazy(() => import('../pages/CourseMap'))
+const CognitiveRealm = lazy(() => import('../pages/CognitiveRealm'))
 const ChangePassword = lazy(() => import('../pages/ChangePassword'))
 const WorldDetail = lazy(() => import('../pages/WorldDetail'))
 const Quiz = lazy(() => import('../pages/Quiz'))
@@ -181,7 +182,14 @@ export default function AppRoutes() {
         <Route path="/courses/:slug/final-test" element={<FinalTest />} />
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/map" element={<WorldMap />} />
-        {/* One realm's worlds. `/map` is the four realms; this is inside one. */}
+        {/*
+          The cognitive-games realm has its own screen, ABOVE the generic
+          `:courseSlug` route so it wins the match. It has no worlds — its
+          content is four mini-games — so the world map would render an empty
+          golden path for it.
+        */}
+        <Route path="/map/cognitive-games" element={<CognitiveRealm />} />
+        {/* One realm's worlds. `/map` is the realms; this is inside one. */}
         <Route path="/map/:courseSlug" element={<CourseMap />} />
         <Route path="/world/:slug" element={<WorldDetail />} />
         <Route path="/play" element={<Playground />} />

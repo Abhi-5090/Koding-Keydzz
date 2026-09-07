@@ -24,15 +24,29 @@ import { GAME_CATALOG } from '../src/config/gameCatalog.js';
  */
 
 describe('the ladder is well formed', () => {
-  it('is Python → C → HTML → AI', () => {
-    expect(COURSES.map((c) => c.slug)).toEqual(['python', 'c', 'html', 'ai']);
+  it('is Cognitive Games → Python → C → HTML → AI', () => {
+    /**
+     * The games realm leads. It holds no worlds and no final test — its
+     * content is four mini-games and it is passed by playing them — so it is
+     * the one rung that is not a language, and it comes first because
+     * reasoning comes before syntax.
+     */
+    expect(COURSES.map((c) => c.slug)).toEqual([
+      'cognitive-games',
+      'python',
+      'c',
+      'html',
+      'ai',
+    ]);
   });
 
   it('has contiguous 1-based order with no gaps or duplicates', () => {
     // A gap strands every course after it: the chain asks for order N-1 and
     // finds nothing, so the course never unlocks for anyone.
     const orders = COURSES.map((c) => c.order);
-    expect(orders).toEqual([1, 2, 3, 4]);
+    // 1-based and contiguous. Adding the games realm at 1 is exactly why the
+    // language courses shifted rather than it being inserted at 0.
+    expect(orders).toEqual([1, 2, 3, 4, 5]);
     expect(new Set(orders).size).toBe(orders.length);
   });
 
@@ -75,17 +89,19 @@ describe('the ladder is well formed', () => {
 
 describe('the unlock chain', () => {
   it('opens the first course to everyone', () => {
-    expect(prerequisiteOf('python')).toBeNull();
-    expect(firstCourse().slug).toBe('python');
+    expect(prerequisiteOf('cognitive-games')).toBeNull();
+    expect(firstCourse().slug).toBe('cognitive-games');
   });
 
   it('gates each later course on the one before it', () => {
+    expect(prerequisiteOf('python').slug).toBe('cognitive-games');
     expect(prerequisiteOf('c').slug).toBe('python');
     expect(prerequisiteOf('html').slug).toBe('c');
     expect(prerequisiteOf('ai').slug).toBe('html');
   });
 
   it('walks forwards too, and ends', () => {
+    expect(nextAfter('cognitive-games').slug).toBe('python');
     expect(nextAfter('python').slug).toBe('c');
     expect(nextAfter('html').slug).toBe('ai');
     expect(nextAfter('ai'), 'AI is the last course').toBeNull();
@@ -93,8 +109,8 @@ describe('the unlock chain', () => {
 
   it('every course except the first is reachable from the first', () => {
     // Proves the chain is a single path rather than two disconnected runs.
-    const seen = ['python'];
-    let cursor = 'python';
+    const seen = ['cognitive-games'];
+    let cursor = 'cognitive-games';
     while (nextAfter(cursor)) {
       cursor = nextAfter(cursor).slug;
       seen.push(cursor);

@@ -47,6 +47,8 @@ import {
   courseSlugParamSchema,
   markAnswerSchema,
   attemptParamSchema,
+  realmGrantParams,
+  realmSlugParam,
 } from '../utils/validators.js';
 
 // In-memory storage so we can parse the spreadsheet buffer directly.
@@ -216,6 +218,43 @@ router.get(
   validate({ query: classReportQuerySchema }),
   adminController.getClassReport
 );
+/* ---- Opening a realm by hand -------------------------------------------- */
+
+/**
+ * Who is ready for a realm, and who has been given it.
+ *
+ * `realm:grant` rather than `student:read`: this screen exists to make the
+ * grant decision, and the two should not drift apart — a teacher who can see
+ * the roster here is a teacher who can act on it.
+ */
+/**
+ * `requireOrg` and `withClassroomScope` alongside the capability, mirroring
+ * `readStudents`. Without the scope middleware `req.classroomScope` is unset,
+ * so a teacher would be handed the whole school instead of their own classes.
+ */
+const realmGrants = [requireOrg, requireCapability('realm:grant'), withClassroomScope];
+
+router.get(
+  '/realms/:slug/roster',
+  realmGrants,
+  validate({ params: realmSlugParam }),
+  adminController.getRealmRoster
+);
+
+router.post(
+  '/realms/:slug/grant/:id',
+  realmGrants,
+  validate({ params: realmGrantParams }),
+  adminController.grantRealm
+);
+
+router.delete(
+  '/realms/:slug/grant/:id',
+  realmGrants,
+  validate({ params: realmGrantParams }),
+  adminController.revokeRealm
+);
+
 router.get(
   '/reports/class/export',
   readStudents,

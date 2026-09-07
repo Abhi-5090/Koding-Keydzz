@@ -200,7 +200,19 @@ describe('every course on the ladder can be passed', () => {
 
   /* ---------------------------------------------------------------------- */
 
-  for (const spec of COURSES) {
+  /**
+   * A GAMES REALM SITS NO PAPER, so it is not part of "can this be passed by
+   * sitting the test".
+   *
+   * Cognitive Games has no question bank and no blueprint, by design: it is
+   * passed by finishing the first level of each of its four games, and
+   * `courseReadiness` never reports `finalTestUnlocked` for it. Its own pass
+   * route is covered in `cognitiveRealm.test.js`.
+   *
+   * Filtered on `kind` rather than slug so another realm of the same shape
+   * needs no edit here.
+   */
+  for (const spec of COURSES.filter((c) => c.kind !== 'games')) {
     it(`lets a pupil sit AND PASS the ${spec.slug} final test (${spec.kind} paper)`, async () => {
       const course = await seedCourse(spec);
 
@@ -285,7 +297,8 @@ describe('every course on the ladder can be passed', () => {
      * makes a re-sit a repeat of it.
      */
 
-    for (const spec of COURSES) {
+    // Games realms carry no bank — see the note above.
+  for (const spec of COURSES.filter((c) => c.kind !== 'games')) {
       const bank = QUESTION_BANK[spec.slug] || [];
       for (const section of BLUEPRINTS[spec.kind]) {
         const types = sectionTypes(section);

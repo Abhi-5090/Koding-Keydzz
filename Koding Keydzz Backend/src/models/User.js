@@ -183,6 +183,25 @@ const userSchema = new mongoose.Schema(
     inventory: { type: [String], default: [] },
     achievements: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Achievement' }],
     completedLessons: { type: [progressSchema], default: [] },
+
+    /**
+     * REALMS A MEMBER OF STAFF HAS OPENED BY HAND.
+     *
+     * The ladder normally derives every lock — finish the previous realm and
+     * the next opens — because a stored flag drifts from the thing it is meant
+     * to summarise. This is the deliberate exception: a teacher who knows a
+     * pupil is ready, or who is running a class to a timetable rather than to
+     * each child's pace, needs to be able to say so.
+     *
+     * It only ever ADDS access. The derived rule still opens a realm the pupil
+     * has earned, so removing a grant cannot take away something they have
+     * actually finished — which is what stops a mistaken revoke from erasing
+     * a child's progress.
+     */
+    grantedCourses: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
+      default: [],
+    },
     completedChallenges: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Challenge' }],
     status: {
       type: String,

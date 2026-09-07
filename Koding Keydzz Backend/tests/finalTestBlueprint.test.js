@@ -59,14 +59,30 @@ describe('every blueprint totals exactly 200', () => {
   });
 });
 
-describe('every course maps to a blueprint', () => {
-  it.each(COURSES.map((c) => [c.slug, c.kind]))(
+describe('every course that SITS a paper maps to a blueprint', () => {
+  /**
+   * A games realm is excluded because it sits no paper. Cognitive Games is
+   * passed by finishing the first level of each of its four games, and
+   * `courseReadiness` never reports `finalTestUnlocked` for it — so there is
+   * no blueprint to find and `blueprintFor('games')` throwing is correct
+   * rather than a gap.
+   *
+   * Filtered on `kind` so another realm of the same shape is handled without
+   * this file needing to know its slug.
+   */
+  it.each(COURSES.filter((c) => c.kind !== 'games').map((c) => [c.slug, c.kind]))(
     '%s uses the %s paper',
     (_slug, kind) => {
       expect(() => blueprintFor(kind)).not.toThrow();
       expect(blueprintTotal(kind)).toBe(FINAL_TEST_TOTAL);
     }
   );
+
+  it('has NO blueprint for a games realm, and says so loudly', () => {
+    // The safe failure: better to throw than to draw an empty paper worth
+    // zero and mark a child as having passed it.
+    expect(() => blueprintFor('games')).toThrow(/no final-test blueprint/i);
+  });
 
   it('throws loudly for a course kind with no blueprint', () => {
     // Better than silently drawing an empty paper worth zero.

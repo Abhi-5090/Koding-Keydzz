@@ -10,6 +10,7 @@ import {
   FINAL_TEST_MAX_ATTEMPTS,
   FINAL_TEST_PASS_MARK,
   FINAL_TEST_TOTAL,
+  COGNITIVE_GAME_KEYS,
 } from '../config/courses.js';
 import {
   unlockedTier,
@@ -169,6 +170,42 @@ export function courseGameLevels(courseSlug) {
  * something a child can act on, where a single "87%" is not.
  */
 export async function courseReadiness(user, course) {
+  /**
+   * A GAMES REALM IS MEASURED IN GAMES, AND NEVER OFFERS A FINAL TEST.
+   *
+   * Falling through to the counting below would be actively wrong. Cognitive
+   * Games has no worlds, no lessons and no quizzes, so every strand would be
+   * 0 of 0 — and `complete: done >= total` reads 0 >= 0 as finished. All three
+   * strands complete means `finalTestUnlocked`, so the realm would offer a
+   * paper it has none of, on a pupil's first day, before they had played
+   * anything.
+   *
+   * Its real measure is the four games, which is also what the pupil's
+   * progress bar should show.
+   */
+  if (course.kind === 'games') {
+    const progress = cognitiveGameProgress(user);
+    const done = progress.filter((g) => g.levelsDone > 0).length;
+    const total = progress.length;
+    const strandForGames = {
+      done,
+      total,
+      remaining: Math.max(0, total - done),
+      percent: total === 0 ? 0 : Math.round((done / total) * 100),
+      complete: total > 0 && done >= total,
+    };
+    return {
+      // Named strands are kept so the UI does not need a second shape.
+      lessons: { done: 0, total: 0, remaining: 0, percent: 100, complete: true },
+      quizzes: { done: 0, total: 0, remaining: 0, percent: 100, complete: true },
+      gameLevels: strandForGames,
+      games: progress,
+      percent: strandForGames.percent,
+      // There is no paper for this realm; passing it is playing it.
+      finalTestUnlocked: false,
+    };
+  }
+
   const size = await courseContentSize(course._id);
   const { games, total: gameTotal } = courseGameLevels(course.slug);
 
@@ -236,6 +273,38 @@ export async function courseReadiness(user, course) {
 /* -------------------------------------------------------------------------- */
 
 /**
+ * HAS THIS PUPIL FINISHED THE COGNITIVE GAMES REALM?
+ *
+ * The first level of each of its four games. `gameProgress` records one entry
+ * per (gameKey, levelId) the pupil has completed, so this asks whether each
+ * game has at least one entry — the games number their levels from 1 and a
+ * pupil cannot reach level 2 without finishing level 1, so "any completion"
+ * and "level 1 completed" are the same statement, and asking it that way does
+ * not depend on how a particular game labels its levels.
+ *
+ * Exported because the staff screen shows the same figures it decides on. Two
+ * implementations of "has this child finished the realm?" would eventually
+ * disagree, and the one on the teacher's screen is the one they would trust.
+ */
+export function cognitiveGameProgress(user) {
+  const played = new Map();
+  for (const entry of user?.gameProgress || []) {
+    if (!COGNITIVE_GAME_KEYS.includes(entry.gameKey)) continue;
+    played.set(entry.gameKey, (played.get(entry.gameKey) || 0) + 1);
+  }
+  return COGNITIVE_GAME_KEYS.map((gameKey) => ({
+    gameKey,
+    levelsDone: played.get(gameKey) || 0,
+    started: played.has(gameKey),
+  }));
+}
+
+/** True when every cognitive game has had its first level finished. */
+export function cognitiveRealmComplete(user) {
+  return cognitiveGameProgress(user).every((g) => g.levelsDone > 0);
+}
+
+/**
  * Every published course, with this pupil's standing in each.
  *
  * Returned in ladder order with a derived `status`:
@@ -259,10 +328,36 @@ export async function listCoursesForUser(user) {
   // what makes it impossible for two courses to disagree about it.
   let previousPassed = true; // the first course is always open
 
+  const granted = new Set((user.grantedCourses || []).map(String));
+
   for (const course of courses) {
     const progress = byCourse.get(String(course._id)) || null;
-    const passed = Boolean(progress?.completedAt);
-    const unlocked = previousPassed;
+
+    /**
+     * A GAMES REALM IS PASSED BY PLAYING, not by sitting a paper.
+     *
+     * Cognitive Games has no worlds, no lessons and no final test, so
+     * `completedAt` on CourseProgress — which is written when a final test is
+     * passed — would never be set and the realm would block the whole ladder
+     * for ever. It is passed when the pupil has finished the first level of
+     * each of its games.
+     *
+     * Deliberately the FIRST level and not all of them: the realm is an
+     * on-ramp, not a wall. A child should meet Python in their first session,
+     * having shown they can plan a route and think a move ahead.
+     */
+    const passed =
+      course.kind === 'games'
+        ? cognitiveRealmComplete(user)
+        : Boolean(progress?.completedAt);
+
+    /**
+     * Unlocked by the ladder OR by a member of staff.
+     *
+     * The grant only ever adds: `previousPassed` still opens a realm the pupil
+     * has earned, so a revoke cannot close something they finished.
+     */
+    const unlocked = previousPassed || granted.has(String(course._id));
 
     let status;
     if (passed) status = 'completed';
@@ -288,6 +383,9 @@ export async function listCoursesForUser(user) {
       tint: course.tint,
       kind: course.kind,
       status,
+      // So the pupil's map can say "your teacher opened this" rather than
+      // implying they earned it, and the staff screen can show what it did.
+      grantedByStaff: granted.has(String(course._id)) && !previousPassed,
       unlocked,
       passed,
       startedAt: progress?.startedAt || null,

@@ -1,6 +1,7 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { sendSuccess } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
+import * as realmGrantService from '../services/realmGrantService.js';
 import * as adminService from '../services/adminService.js';
 import { recordAudit, listAudit } from '../services/auditService.js';
 import * as studentBulkService from '../services/studentBulkService.js';
@@ -334,6 +335,42 @@ export const exportClassReport = asyncHandler(async (req, res) => {
 });
 
 /** This school's audit trail. Scoped to the admin's own organization. */
+/* ---- Opening a realm by hand ---------------------------------------------
+ * The grant only ever ADDS access; the derived ladder still opens a realm a
+ * pupil has earned. See services/realmGrantService.js.
+ * ------------------------------------------------------------------------ */
+
+export const getRealmRoster = asyncHandler(async (req, res) => {
+  const data = await realmGrantService.realmRoster({
+    org: req.user.org,
+    // A teacher sees their own classes; an administrator sees the school.
+    scopeIds: await scopeFor(req),
+    slug: req.params.slug,
+  });
+  return sendSuccess(res, data, 'Realm roster');
+});
+
+export const grantRealm = asyncHandler(async (req, res) => {
+  const data = await realmGrantService.grantRealm({
+    pupilId: req.params.id,
+    slug: req.params.slug,
+    org: req.user.org,
+    scopeIds: await scopeFor(req),
+    grantedBy: req.user._id,
+  });
+  return sendSuccess(res, data, 'Realm opened');
+});
+
+export const revokeRealm = asyncHandler(async (req, res) => {
+  const data = await realmGrantService.revokeRealm({
+    pupilId: req.params.id,
+    slug: req.params.slug,
+    org: req.user.org,
+    scopeIds: await scopeFor(req),
+  });
+  return sendSuccess(res, data, 'Realm grant withdrawn');
+});
+
 export const getAuditLog = asyncHandler(async (req, res) => {
   const data = await listAudit({
     org: req.user.org,
@@ -477,6 +514,9 @@ export default {
   getClassReport,
   getQuizReport,
   exportClassReport,
+  getRealmRoster,
+  grantRealm,
+  revokeRealm,
   coursesController,
   lessonsController,
   worldsController,

@@ -15,7 +15,7 @@ import { Question } from '../../src/models/Question.js';
 import { TestAttempt } from '../../src/models/TestAttempt.js';
 import { World } from '../../src/models/World.js';
 import { User } from '../../src/models/User.js';
-import { COURSES } from '../../src/config/courses.js';
+import { COURSES, courseBySlug } from '../../src/config/courses.js';
 import { BLUEPRINTS } from '../../src/config/finalTest.js';
 import {
   originalOptionIndex,
@@ -142,7 +142,7 @@ describe('the final-test draw is genuinely random', () => {
     });
     superToken = (await login(su.email)).accessToken;
 
-    const spec = COURSES[0];
+    const spec = courseBySlug('python');
     python = await Course.create({
       slug: spec.slug,
       language: spec.language,
@@ -345,7 +345,7 @@ describe('the final-test draw is genuinely random', () => {
      * fillblank together. A draw that filtered to one type would still return
      * 20 questions and look correct, while quietly testing half the syllabus.
      */
-    const spec = COURSES[2]; // HTML — a build-paper course
+    const spec = courseBySlug('html'); // HTML — a build-paper course
     const html = await Course.create({
       slug: spec.slug,
       language: spec.language,
@@ -399,7 +399,7 @@ describe('the final-test draw is genuinely random', () => {
       courseSlug: 'python',
       completedAt: new Date(),
     });
-    const c = COURSES[1];
+    const c = courseBySlug('c');
     await Course.create({
       slug: c.slug,
       language: c.language,
@@ -551,7 +551,7 @@ describe('a shuffled paper still marks the pupil correctly', () => {
   beforeEach(async () => {
     await resetDb();
     org = await makeOrg('Springfield Elementary');
-    const spec = COURSES[0];
+    const spec = courseBySlug('python');
     python = await Course.create({
       slug: spec.slug,
       language: spec.language,
@@ -774,7 +774,7 @@ describe('unanswered questions score nothing', () => {
   beforeEach(async () => {
     await resetDb();
     org = await makeOrg('Springfield Elementary');
-    const spec = COURSES[0];
+    const spec = courseBySlug('python');
     python = await Course.create({
       slug: spec.slug,
       language: spec.language,

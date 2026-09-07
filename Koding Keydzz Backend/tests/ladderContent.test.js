@@ -81,9 +81,18 @@ const VOID_ELEMENTS = new Set([
 ]);
 
 describe('the course ladder content', () => {
-  it('covers every course on the ladder except Python (which has its own file)', () => {
+  it('covers every LANGUAGE course on the ladder (Python has its own file)', () => {
+    /**
+     * A games realm is excluded, and that is the point of it: Cognitive Games
+     * has no worlds and no lesson content at all. Its content is four
+     * mini-games that already existed, so there is nothing for this file to
+     * author and nothing for the seed to write.
+     *
+     * Filtered by `kind` rather than by slug so a second games realm added
+     * later is covered without anyone remembering to edit this list.
+     */
     const authored = new Set(['python', ...ALL_COURSES.map((c) => c.slug)]);
-    for (const course of COURSES) {
+    for (const course of COURSES.filter((c) => c.kind !== 'games')) {
       expect(
         authored.has(course.slug),
         `${course.slug} has no authored content`,
@@ -414,6 +423,11 @@ describe('the course ladder content', () => {
      */
     const kindBySlug = Object.fromEntries(COURSES.map((c) => [c.slug, c.kind]));
     expect(kindBySlug).toEqual({
+      // Not a paper at all. A games realm is passed by playing it, so
+      // `courseReadiness` never reports `finalTestUnlocked` for one — which
+      // matters, because a realm with no content otherwise reads as 0-of-0
+      // and therefore complete.
+      'cognitive-games': 'games',
       python: 'code',
       c: 'code',
       html: 'build',

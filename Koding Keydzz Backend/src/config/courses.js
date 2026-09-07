@@ -27,7 +27,25 @@
  */
 
 /** Every language the platform teaches, in ladder order. */
-export const LANGUAGES = ['python', 'c', 'html', 'ai'];
+export const LANGUAGES = ['cognitive', 'python', 'c', 'html', 'ai'];
+
+/**
+ * The games that make up the Cognitive Games realm.
+ *
+ * These four already exist as mini-games; the realm gives them a place in the
+ * ladder rather than being a detour off it. They are language-neutral on
+ * purpose — the realm is about reasoning, sequencing and planning, which is
+ * what a pupil needs before any syntax makes sense.
+ *
+ * Named here rather than in the seed because both the unlock rule and the
+ * staff screen have to agree on the list, and a second copy would drift.
+ */
+export const COGNITIVE_GAME_KEYS = [
+  'treasure-hunt',
+  'space-adventure',
+  'logic-puzzle',
+  'tic-tac-toe',
+];
 
 /**
  * The four courses.
@@ -42,9 +60,37 @@ export const LANGUAGES = ['python', 'c', 'html', 'ai'];
  */
 export const COURSES = [
   {
+    /**
+     * THE FIRST REALM — reasoning before syntax.
+     *
+     * It holds no worlds and no lessons: its content is the four cognitive
+     * games, and it is "passed" when a pupil has finished the first level of
+     * each. So it has no final test either, which is why `kind` is its own
+     * value rather than 'code' or 'build' — those decide how a final paper is
+     * built, and there is no paper here.
+     *
+     * It sits at order 1 and pushed the language courses down one. The ladder
+     * walks `order` directly and the comment above is not decoration: a gap
+     * would strand every course after it, so this could not simply be added
+     * at 0.
+     */
+    slug: 'cognitive-games',
+    language: 'cognitive',
+    order: 1,
+    title: 'Cognitive Games',
+    tagline: 'Think first, then code',
+    description:
+      'Four games that build the habits every programmer needs — planning a ' +
+      'route, spotting a pattern, thinking a move ahead. Finish the first ' +
+      'level of each to unlock Python.',
+    icon: 'brain',
+    tint: '#A78BFA',
+    kind: 'games',
+  },
+  {
     slug: 'python',
     language: 'python',
-    order: 1,
+    order: 2,
     title: 'Python',
     tagline: 'Where every coder starts',
     description:
@@ -57,7 +103,7 @@ export const COURSES = [
   {
     slug: 'c',
     language: 'c',
-    order: 2,
+    order: 3,
     title: 'C Programming',
     tagline: 'Closer to the machine',
     description:
@@ -70,7 +116,7 @@ export const COURSES = [
   {
     slug: 'html',
     language: 'html',
-    order: 3,
+    order: 4,
     title: 'HTML & CSS',
     tagline: 'Build things people can see',
     description:
@@ -83,7 +129,7 @@ export const COURSES = [
   {
     slug: 'ai',
     language: 'ai',
-    order: 4,
+    order: 5,
     title: 'AI & Prompting',
     tagline: 'Work with the new tools',
     description:

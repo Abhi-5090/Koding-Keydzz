@@ -20,7 +20,6 @@ import {
   Zap,
   GraduationCap,
   Award,
-  ClipboardList,
   ChevronRight,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -53,29 +52,33 @@ const NAV_GROUPS = [
     items: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }],
   },
   {
-    label: 'Learn',
+    /**
+     * PLAY SITS ABOVE LEARN.
+     *
+     * The journey now opens with the cognitive-games realm, so playing is
+     * where a pupil starts rather than somewhere they wander off to. The
+     * sidebar should read in the order the course is taken.
+     */
+    label: 'Play',
     // Every group carries its own icon, so a collapsed header is still a row
     // with a picture on it rather than a bare word — the same shape as the
     // Dashboard link above it.
-    icon: GraduationCap,
-    items: [
-      // First in the group on purpose: a pupil picks a language track, then
-      // explores that course's worlds.
-      { to: '/courses', label: 'My Journey', icon: GraduationCap },
-      // Directly under it: if a teacher has set something, that is what a
-      // pupil should be doing before they wander off to the games.
-      { to: '/assignments', label: 'My Work', icon: ClipboardList },
-      { to: '/map', label: 'World Map', icon: MapIcon },
-      { to: '/play', label: 'Playground', icon: Code2 },
-    ],
-  },
-  {
-    label: 'Play',
     icon: Gamepad2,
     items: [
       { to: '/games', label: 'Mini Games', icon: Gamepad2 },
       { to: '/quiz', label: 'Quiz Arena', icon: Brain },
       { to: '/leaderboard', label: 'Leaderboard', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'Learn',
+    icon: GraduationCap,
+    items: [
+      // First in the group on purpose: a pupil picks a language track, then
+      // explores that course's worlds.
+      { to: '/courses', label: 'My Journey', icon: GraduationCap },
+      { to: '/map', label: 'World Map', icon: MapIcon },
+      { to: '/play', label: 'Playground', icon: Code2 },
     ],
   },
   {
@@ -202,6 +205,116 @@ function NavGroup({ group, open, onToggle, children }) {
   )
 }
 
+/**
+ * THE SIDEBAR — A MODULE-SCOPE COMPONENT, WHICH IS THE WHOLE POINT.
+ *
+ * THE FLICKER THIS FIXES
+ * ----------------------
+ * This used to be `const SidebarContent = () => (...)` declared INSIDE
+ * `StudentLayout`. That creates a new function reference on every render, so
+ * React sees a different component TYPE at that position and unmounts the old
+ * tree to mount a fresh one. The entire sidebar — logo, every group, every
+ * link, the logout button — was destroyed and rebuilt, replaying each
+ * entrance animation from `opacity: 0`.
+ *
+ * `StudentLayout` re-renders often: on every route change, on every accordion
+ * toggle, and every time the dashboard, avatar or XP queries return. So the
+ * sidebar flashed on all of those, including the first navigation after
+ * signing in — which is exactly where it was most visible, because three
+ * queries land at once.
+ *
+ * Declared out here it has a stable identity, so React reconciles it instead
+ * of replacing it, and the entrance animation runs once when it actually
+ * mounts. Everything it needs arrives as props; nothing is captured from a
+ * closure that would change on each render.
+ */
+function SidebarContent({
+  orgName,
+  openGroup,
+  toggleGroup,
+  onNavigate,
+  onLogout,
+}) {
+  return (
+
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 px-6 pb-4 pt-6">
+        <AnimatedIcon icon={KeyRound} size={28} animation="float" className="text-turmeric" glow />
+        <div className="min-w-0">
+          <div className="game-text text-lg font-bold leading-tight text-turmeric">Koding Keydzz</div>
+          {orgName && (
+            <div className="flex min-w-0 items-center gap-1 text-xs text-text-secondary" title={orgName}>
+              <Building2 size={12} className="shrink-0" /> <span className="min-w-0 truncate">{orgName}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <nav className="flex-1 px-3 scrollbar-thin overflow-y-auto" aria-label="Main navigation">
+        {NAV_GROUPS.map((group, gi) => (
+          <NavGroup
+            key={group.label || `top-${gi}`}
+            group={group}
+            open={openGroup === (group.label || `top-${gi}`)}
+            onToggle={() => toggleGroup(group.label || `top-${gi}`)}
+          >
+            {group.items.map((item, i) => (
+              <motion.div
+                key={item.to}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: i * 0.04, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <NavLink
+                  to={item.to}
+                  onClick={onNavigate}
+                  /*
+                    Hover is a NEUTRAL lift; the accent means state. Hover used
+                    to go turmeric as well, so moving the pointer down the list
+                    lit each row the same colour the active row already had —
+                    which is what made the sidebar look like it was flashing.
+                  */
+                  className={({ isActive }) =>
+                    `group flex items-center gap-3 rounded-xl px-4 py-3 text-[0.95rem] transition-[background-color,color,box-shadow] duration-200 ease-out ${
+                      isActive
+                        ? 'bg-turmeric text-malt font-bold shadow-golden-glow'
+                        : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span className="transition-transform duration-200 can-hover:group-hover:scale-125">
+                        <AnimatedIcon
+                          icon={item.icon}
+                          size={20}
+                          animation={isActive ? 'pulse' : 'none'}
+                          glow={isActive}
+                        />
+                      </span>
+                      <span className="game-text">{item.label}</span>
+                    </>
+                  )}
+                </NavLink>
+              </motion.div>
+            ))}
+          </NavGroup>
+        ))}
+      </nav>
+
+      <button
+        onClick={onLogout}
+        className="game-text group m-3 flex items-center gap-2 rounded-xl bg-surface px-4 py-3 text-sm text-text-secondary transition-colors hover:bg-error hover:text-white"
+      >
+        <span className="transition-transform group-hover:-translate-x-0.5">
+          <LogOut size={18} />
+        </span>
+        Log Out
+      </button>
+    </div>
+  );
+}
+
 export default function StudentLayout() {
   const { user, token, logout } = useAuth()
   const navigate = useNavigate()
@@ -302,84 +415,6 @@ export default function StudentLayout() {
     navigate('/login')
   }
 
-  const SidebarContent = () => (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 px-6 pb-4 pt-6">
-        <AnimatedIcon icon={KeyRound} size={28} animation="float" className="text-turmeric" glow />
-        <div className="min-w-0">
-          <div className="game-text text-lg font-bold leading-tight text-turmeric">Koding Keydzz</div>
-          {orgName && (
-            <div className="flex min-w-0 items-center gap-1 text-xs text-text-secondary" title={orgName}>
-              <Building2 size={12} className="shrink-0" /> <span className="min-w-0 truncate">{orgName}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <nav className="flex-1 px-3 scrollbar-thin overflow-y-auto" aria-label="Main navigation">
-        {NAV_GROUPS.map((group, gi) => (
-          <NavGroup
-            key={group.label || `top-${gi}`}
-            group={group}
-            open={openGroup === (group.label || `top-${gi}`)}
-            onToggle={() => toggleGroup(group.label || `top-${gi}`)}
-          >
-            {group.items.map((item, i) => (
-              <motion.div
-                key={item.to}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: i * 0.04, ease: [0.23, 1, 0.32, 1] }}
-              >
-                <NavLink
-                  to={item.to}
-                  onClick={() => setMobileOpen(false)}
-                  /*
-                    Hover is a NEUTRAL lift; the accent means state. Hover used
-                    to go turmeric as well, so moving the pointer down the list
-                    lit each row the same colour the active row already had —
-                    which is what made the sidebar look like it was flashing.
-                  */
-                  className={({ isActive }) =>
-                    `group flex items-center gap-3 rounded-xl px-4 py-3 text-[0.95rem] transition-[background-color,color,box-shadow] duration-200 ease-out ${
-                      isActive
-                        ? 'bg-turmeric text-malt font-bold shadow-golden-glow'
-                        : 'text-text-secondary hover:bg-surface hover:text-text-primary'
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <span className="transition-transform duration-200 can-hover:group-hover:scale-125">
-                        <AnimatedIcon
-                          icon={item.icon}
-                          size={20}
-                          animation={isActive ? 'pulse' : 'none'}
-                          glow={isActive}
-                        />
-                      </span>
-                      <span className="game-text">{item.label}</span>
-                    </>
-                  )}
-                </NavLink>
-              </motion.div>
-            ))}
-          </NavGroup>
-        ))}
-      </nav>
-
-      <button
-        onClick={handleLogout}
-        className="game-text group m-3 flex items-center gap-2 rounded-xl bg-surface px-4 py-3 text-sm text-text-secondary transition-colors hover:bg-error hover:text-white"
-      >
-        <span className="transition-transform group-hover:-translate-x-0.5">
-          <LogOut size={18} />
-        </span>
-        Log Out
-      </button>
-    </div>
-  )
-
   return (
     <div className="flex min-h-screen bg-malt">
       {/*
@@ -397,7 +432,13 @@ export default function StudentLayout() {
       </a>
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-k-border bg-card/60 backdrop-blur-md lg:block">
-        <SidebarContent />
+        <SidebarContent
+          orgName={orgName}
+          openGroup={openGroup}
+          toggleGroup={toggleGroup}
+          onNavigate={() => setMobileOpen(false)}
+          onLogout={handleLogout}
+        />
       </aside>
 
       {/* Mobile sidebar */}
@@ -419,7 +460,13 @@ export default function StudentLayout() {
               transition={{ duration: 0.32, ease: [0.32, 0.72, 0, 1] }}
               className="fixed inset-y-0 left-0 z-50 w-64 border-r border-k-border bg-card lg:hidden"
             >
-              <SidebarContent />
+              <SidebarContent
+                orgName={orgName}
+                openGroup={openGroup}
+                toggleGroup={toggleGroup}
+                onNavigate={() => setMobileOpen(false)}
+                onLogout={handleLogout}
+              />
             </motion.aside>
           </>
         )}

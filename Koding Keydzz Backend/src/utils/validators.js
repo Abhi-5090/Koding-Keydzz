@@ -7,6 +7,33 @@ const objectId = z
 
 export const idParam = z.object({ id: objectId });
 
+/**
+ * A realm slug plus a pupil id.
+ *
+ * Both keys have to be declared. Zod strips unknown keys by default and
+ * `validate` assigns the parsed result back over `req.params`, so validating
+ * these routes with `idParam` alone would silently DELETE `slug` — the handler
+ * would then look up a realm called `undefined` and report that it does not
+ * exist.
+ */
+export const realmGrantParams = z.object({
+  slug: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9-]+$/, 'Not a valid realm'),
+  id: objectId,
+});
+
+/** A realm slug on its own, for the roster. */
+export const realmSlugParam = z.object({
+  slug: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9-]+$/, 'Not a valid realm'),
+});
+
 // Two-id params for drilling into a specific student inside a specific org.
 export const orgStudentParams = z.object({ id: objectId, studentId: objectId });
 

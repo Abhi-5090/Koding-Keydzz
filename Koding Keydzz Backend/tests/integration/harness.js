@@ -20,6 +20,7 @@ import { Organization } from '../../src/models/Organization.js';
 import { World } from '../../src/models/World.js';
 import { Lesson } from '../../src/models/Lesson.js';
 import { Quiz } from '../../src/models/Quiz.js';
+import { COGNITIVE_GAME_KEYS } from '../../src/config/courses.js';
 import { AvatarItem } from '../../src/models/AvatarItem.js';
 import { Achievement } from '../../src/models/Achievement.js';
 import { Challenge } from '../../src/models/Challenge.js';
@@ -268,6 +269,22 @@ export async function makeUser({
   username,
   org = null,
   status = 'active',
+  /**
+   * A TEST PUPIL HAS ALREADY DONE THE COGNITIVE GAMES, unless a test says not.
+   *
+   * Cognitive Games is realm 1, so Python is realm 2 and starts locked. Nearly
+   * every suite here is about something further up the ladder — final tests,
+   * certificates, marking, class reports, insights — and each builds a pupil
+   * who is working on Python. Those fixtures were all written when Python was
+   * the first thing anyone could open, and without this every one of them
+   * would be testing a pupil who cannot reach the content under test.
+   *
+   * So the default says what those fixtures mean: a pupil somewhere in the
+   * middle of the course. A suite that is ABOUT the first realm — or about the
+   * gate itself — passes `cognitiveDone: false` and gets a genuinely fresh
+   * pupil.
+   */
+  cognitiveDone = true,
   ...rest
 }) {
   const user = new User({
@@ -281,6 +298,13 @@ export async function makeUser({
   });
   await user.setPassword(PASSWORD);
   await user.save();
+
+  if (role === 'student' && cognitiveDone) {
+    await completeCognitiveRealm(user._id);
+    // Re-read so the caller holds the progress too — several fixtures pass the
+    // returned document straight into a service.
+    return User.findById(user._id);
+  }
 
   return user;
 }
@@ -317,6 +341,41 @@ export async function makeOrg(label) {
 }
 
 /** Log in over the real API and return { accessToken, refreshToken, user }. */
+/**
+ * Mark a pupil as having finished the Cognitive Games realm.
+ *
+ * WHY SO MANY FIXTURES NEED THIS
+ * ------------------------------
+ * Cognitive Games is realm 1, so Python is realm 2 and starts LOCKED. Every
+ * suite whose subject is something further up the ladder — final tests,
+ * certificates, marking, class reports, teaching insights — builds a pupil who
+ * is working on Python, and those fixtures were written when Python was the
+ * first thing anyone could open.
+ *
+ * Calling this is the fixture saying "this pupil has already done the games",
+ * which is both true of any real pupil that far along and far clearer than
+ * quietly leaving the first realm unpublished to sidestep it.
+ *
+ * The realm is passed by having finished the first level of each of its four
+ * games, so that is exactly what this records.
+ */
+export async function completeCognitiveRealm(userId) {
+  await User.updateOne(
+    { _id: userId },
+    {
+      $push: {
+        gameProgress: {
+          $each: COGNITIVE_GAME_KEYS.map((gameKey) => ({
+            gameKey,
+            levelId: '1',
+            stars: 3,
+          })),
+        },
+      },
+    }
+  );
+}
+
 export async function login(identifier, password = PASSWORD) {
   const res = await api()
     .post(`${BASE}/auth/login`)

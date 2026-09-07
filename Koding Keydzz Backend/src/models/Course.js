@@ -51,7 +51,16 @@ const courseSchema = new mongoose.Schema(
      *   'code'  -> coding questions run against hidden test cases
      *   'build' -> tasks graded against a stored expected outcome
      */
-    kind: { type: String, enum: ['code', 'build'], default: 'code' },
+    /**
+     * How the final test is built — and 'games' means there ISN'T one.
+     *
+     * 'code'  -> MCQs + fill-in-blanks + coding questions run against tests
+     * 'build' -> MCQs + fill-in-blanks + tasks graded against a stored outcome
+     * 'games' -> no paper at all. The Cognitive Games realm is passed by
+     *            playing, so a course of this kind is never offered a final
+     *            test and never blocks on one.
+     */
+    kind: { type: String, enum: ['code', 'build', 'games'], default: 'code' },
 
     /**
      * Unpublished courses are hidden from pupils entirely — not shown as

@@ -23,7 +23,7 @@ import { CourseProgress } from '../../src/models/CourseProgress.js';
 import { Question } from '../../src/models/Question.js';
 import { TestAttempt } from '../../src/models/TestAttempt.js';
 import { World } from '../../src/models/World.js';
-import { COURSES } from '../../src/config/courses.js';
+import { COURSES, courseBySlug } from '../../src/config/courses.js';
 import { BLUEPRINTS } from '../../src/config/finalTest.js';
 
 /**
@@ -218,7 +218,7 @@ describe('the final test', () => {
     });
     superToken = (await login(su.email)).accessToken;
 
-    const spec = COURSES[0];
+    const spec = courseBySlug('python');
     python = await Course.create({
       slug: spec.slug,
       language: spec.language,
@@ -592,7 +592,7 @@ describe('the final test', () => {
     beforeEach(async () => {
       await finishCourseContent();
       await stockBank(python._id, 'python');
-      const spec = COURSES[1];
+      const spec = courseBySlug('c');
       await Course.create({
         slug: spec.slug,
         language: spec.language,

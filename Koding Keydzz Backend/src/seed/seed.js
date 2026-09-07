@@ -2000,11 +2000,37 @@ async function seed() {
      * as 0-of-0 to the readiness check, which counts as complete. So this is
      * derived from the seeded content rather than hardcoded per slug.
      */
-    published: SEEDED_COURSE_SLUGS.has(c.slug),
+    /**
+     * A GAMES REALM PUBLISHES WITHOUT WORLDS.
+     *
+     * The rule above derives `published` from whether the seed has worlds for
+     * the slug, which is right for a language course — an empty one reads as
+     * 0-of-0 to the readiness check and would hand out its final test on day
+     * one. Cognitive Games has no worlds BY DESIGN: its content is four
+     * mini-games that already exist, and `courseReadiness` measures it in
+     * games and never offers it a paper. Leaving it unpublished would hide the
+     * first rung of the ladder.
+     */
+    published: c.kind === 'games' || SEEDED_COURSE_SLUGS.has(c.slug),
   }));
-  const coursesRes = await upsertMany(Course, courseDocs, (c) => ({
-    slug: c.slug,
-  }));
+  /**
+   * UPSERTED HIGHEST `order` FIRST, and that is not arbitrary.
+   *
+   * `Course.order` is UNIQUE, and adding the Cognitive Games realm at 1 shifted
+   * every language course down one: Python 1->2, C 2->3, HTML 3->4, AI 4->5.
+   * Applied in the natural order, the very first write would try to give
+   * Python order 2 while C still holds it, and Mongo would reject the whole
+   * re-seed with a duplicate key.
+   *
+   * Descending, each target has just been vacated by the course above it: AI
+   * takes 5 (free), HTML takes 4 (AI's old slot), C takes 3, Python takes 2,
+   * and Cognitive Games takes 1 last of all.
+   */
+  const coursesRes = await upsertMany(
+    Course,
+    [...courseDocs].sort((a, b) => b.order - a.order),
+    (c) => ({ slug: c.slug })
+  );
   const courseBySlugDoc = new Map(coursesRes.docs.map((c) => [c.slug, c]));
 
   /**

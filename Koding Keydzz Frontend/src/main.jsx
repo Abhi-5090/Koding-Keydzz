@@ -5,7 +5,21 @@ import { Provider } from 'react-redux'
 import { store } from './app/store'
 import App from './App'
 import { ToastProvider } from './components/ui/toast/ToastProvider'
+import { preloadGsap } from './motion/gsapCore'
 import './index.css'
+
+/**
+ * Fetch the animation engine during the browser's idle time, right after the
+ * app boots.
+ *
+ * It is imported lazily so it stays out of the initial bundle, which is right
+ * — but that meant the FIRST screen to reveal anything paid for the download
+ * before it could animate, and the dashboard immediately after sign-in is
+ * always that screen. `preloadGsap` waits for an idle moment (or 1.2s), so by
+ * the time a page wants it, it is there. It no-ops under reduced motion, since
+ * nothing will ask for it.
+ */
+preloadGsap()
 
 /**
  * Offline support, registered after first paint.
