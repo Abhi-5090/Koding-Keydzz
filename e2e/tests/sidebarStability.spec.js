@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT_URL, API_URL } from '../playwright.config.js';
 import { dismissOverlays } from './overlays.js';
+import { completeCognitiveRealm } from './pupils.js';
 
 /**
  * THE SIDEBAR MUST NOT BE REBUILT WHILE YOU USE IT.
@@ -29,7 +30,14 @@ async function freshPupil(request) {
     headers: { Authorization: `Bearer ${token}` },
     data: { firstName: 'Stable', lastName: `P${Date.now() % 1000000}`, grade: '5', password: 'Stable@12345' },
   });
-  return { ...(await made.json()).data.student, password: 'Stable@12345' };
+  const pupil = { ...(await made.json()).data.student, password: 'Stable@12345' };
+  /**
+   * Past the first realm, because these tests are about what comes after it.
+   * Cognitive Games holds no worlds, so a brand-new pupil has none at all and
+   * Python is locked. See tests/pupils.js.
+   */
+  await completeCognitiveRealm(request, pupil);
+  return pupil;
 }
 
 /** Stamp the nav element so a later look can tell whether it is the same node. */
@@ -102,8 +110,18 @@ test('the sidebar survives opening a category and changing page', async ({ page,
    * clicked straight for the link and timed out waiting for something
    * correctly collapsed.
    */
-  await nav.getByRole('button', { name: /^learn$/i }).click();
-  await page.waitForTimeout(600);
+  /**
+   * Open Learn only if it is CLOSED. The toggle above clicks the first
+   * collapsed group, which may already be Learn — clicking it again would
+   * close it and hide the link this test is reaching for. That is what the
+   * earlier version did, and it timed out on a link that was correctly
+   * hidden.
+   */
+  const learn = nav.getByRole('button', { name: /^learn$/i });
+  if ((await learn.getAttribute('aria-expanded')) !== 'true') {
+    await learn.click();
+    await page.waitForTimeout(600);
+  }
   await nav.getByRole('link', { name: /world map/i }).click();
   await expect(page).toHaveURL(/\/map/, { timeout: 20_000 });
   await page.waitForTimeout(2500);

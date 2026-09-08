@@ -34,6 +34,7 @@ const ResetPassword = lazy(() => import('../pages/ResetPassword'));
 const TestResults = lazy(() => import('../pages/TestResults'));
 const MarkingQueue = lazy(() => import('../pages/MarkingQueue'));
 const Insights = lazy(() => import('../pages/Insights'));
+const Realms = lazy(() => import('../pages/Realms'))
 const Assignments = lazy(() => import('../pages/Assignments'));
 // Tenancy model: staff (admins + faculty) and classes.
 const Staff = lazy(() => import('../pages/Staff'));
@@ -140,6 +141,7 @@ export default function AppRoutes() {
             report, so `report:class` and the shared capability gate above
             already cover it. */}
         <Route path="/insights" element={<Insights />} />
+        <Route path="/realms" element={<Realms />} />
         {/* Setting work. `assignment:read` covers the page; the write controls
             inside it need `assignment:write`, which the API enforces. */}
         <Route path="/assignments" element={<Assignments />} />

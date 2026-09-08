@@ -59,6 +59,8 @@ export const baseApi = createApi({
   baseQuery: baseQueryWithReauth,
   tagTypes: [
     'Stats',
+    // Who has been given which realm by hand.
+    'Realms',
     'Students',
     'Worlds',
     'Courses',

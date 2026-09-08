@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT_URL, ADMIN_URL, API_URL } from '../playwright.config.js';
 import { dismissOverlays } from './overlays.js';
+import { completeCognitiveRealm } from './pupils.js';
 
 /**
  * THE QUIZ ARENA'S CATEGORIES, AND THE COLLAPSING SIDEBARS.
@@ -25,7 +26,14 @@ async function freshPupil(request) {
     headers: { Authorization: `Bearer ${token}` },
     data: { firstName: 'Arena', lastName: `P${Date.now() % 1000000}`, grade: '5', password: 'Arena@12345' },
   });
-  return { ...(await made.json()).data.student, password: 'Arena@12345' };
+  const pupil = { ...(await made.json()).data.student, password: 'Arena@12345' };
+  /**
+   * Past the first realm, because these tests are about what comes after it.
+   * Cognitive Games holds no worlds, so a brand-new pupil has none at all and
+   * Python is locked. See tests/pupils.js.
+   */
+  await completeCognitiveRealm(request, pupil);
+  return pupil;
 }
 
 async function signInPupil(page, pupil) {
@@ -48,8 +56,15 @@ test.describe('the quiz arena', () => {
     const locked = await page.getByRole('button', { name: /quizzes — locked\./i }).count();
     console.log(`>>> arena: ${open} open, ${locked} locked realms`);
 
-    expect(open + locked, 'the arena does not open on the four realms').toBe(4);
-    expect(open, 'more than the first realm of quizzes was open').toBe(1);
+    /**
+     * FIVE realms now: Cognitive Games leads the ladder. It carries no
+     * quizzes, so the arena lists it with none — the count is of realms, not
+     * of realms-with-content.
+     */
+    expect(open + locked, 'the arena does not list every realm').toBe(5);
+    // The pupil has finished the games, so Cognitive Games AND Python are
+    // open; C, HTML and AI are still behind their final tests.
+    expect(open, 'the wrong number of quiz realms was open').toBe(2);
   });
 
   test('drills into sections, and locks the ones not yet reached', async ({ page, request }) => {
@@ -59,7 +74,13 @@ test.describe('the quiz arena', () => {
     await dismissOverlays(page);
     await page.waitForTimeout(2500);
 
-    await page.getByRole('button', { name: /^Open .* quizzes$/i }).first().click();
+    /**
+     * PYTHON specifically, not "the first open realm". Cognitive Games is now
+     * first and carries no quizzes at all — its content is four mini-games —
+     * so `.first()` opened a realm with nothing in it and the section
+     * assertions below had nothing to find.
+     */
+    await page.getByRole('button', { name: /^Open Python quizzes$/i }).click();
     await page.waitForTimeout(1800);
 
     const body = await page.locator('body').innerText();

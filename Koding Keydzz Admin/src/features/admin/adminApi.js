@@ -186,6 +186,44 @@ export const adminApi = baseApi.injectEndpoints({
      * An organization can have many of both. Creating one returns a
      * one-time password to hand over, since there is no mail provider.
      * ================================================================== */
+    /**
+     * WHO IS READY FOR A REALM, AND WHO HAS BEEN GIVEN IT.
+     *
+     * The figures come from the server, computed by the same function the
+     * unlock rule uses. A count assembled in the client would eventually
+     * disagree with the gate — and this is the screen a teacher would trust,
+     * so it is the worst possible place for the two to drift.
+     */
+    getRealmRoster: builder.query({
+      query: (slug) => `/admin/realms/${slug}/roster`,
+      transformResponse: unwrap,
+      providesTags: (r, e, slug) => [{ type: 'Realms', id: slug }],
+    }),
+
+    /**
+     * Open a realm for one pupil, or withdraw the grant.
+     *
+     * Both invalidate the roster so the row reflects the server rather than an
+     * optimistic guess — a grant that silently failed would otherwise show as
+     * applied, and a teacher would move on believing a child had access.
+     */
+    grantRealm: builder.mutation({
+      query: ({ slug, studentId }) => ({
+        url: `/admin/realms/${slug}/grant/${studentId}`,
+        method: 'POST',
+      }),
+      transformResponse: unwrap,
+      invalidatesTags: (r, e, { slug }) => [{ type: 'Realms', id: slug }],
+    }),
+    revokeRealm: builder.mutation({
+      query: ({ slug, studentId }) => ({
+        url: `/admin/realms/${slug}/grant/${studentId}`,
+        method: 'DELETE',
+      }),
+      transformResponse: unwrap,
+      invalidatesTags: (r, e, { slug }) => [{ type: 'Realms', id: slug }],
+    }),
+
     getStaff: builder.query({
       // arg: { role?: 'admin'|'faculty', search?, page?, limit? }
       query: (params = {}) => ({ url: '/admin/staff', params }),
@@ -697,6 +735,9 @@ export const {
   useGetClassroomAnalyticsQuery,
   useGetClassReportQuery,
   useGetQuizReportQuery,
+  useGetRealmRosterQuery,
+  useGrantRealmMutation,
+  useRevokeRealmMutation,
   useGetStaffQuery,
   useGetStaffMemberQuery,
   useCreateStaffMutation,

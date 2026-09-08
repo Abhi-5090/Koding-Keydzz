@@ -81,6 +81,9 @@ const NAV_GROUPS = [
       { to: '/marking', label: 'Marking queue', icon: PenLine, cap: 'final_test:mark', orgOnly: true },
       { to: '/assignments', label: 'Assignments', icon: ClipboardList, cap: 'assignment:read', orgOnly: true },
       { to: '/insights', label: 'Teaching insights', icon: Lightbulb, cap: 'report:class', orgOnly: true },
+      // Gated on the same capability as the action itself, so a member of
+      // staff who can see this screen is one who can act on it.
+      { to: '/realms', label: 'Realm access', icon: KeyRound, cap: 'realm:grant', orgOnly: true },
       { to: '/staff', label: 'Teachers & admins', icon: GraduationCap, cap: 'staff:read', orgOnly: true },
       { to: '/organization', label: 'School details', icon: Building2, cap: 'audit:org', orgOnly: true },
       { to: '/notifications', label: 'Announcements', icon: Bell, cap: 'announce:class', orgOnly: true },

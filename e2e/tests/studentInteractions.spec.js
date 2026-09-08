@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT_URL, API_URL } from '../playwright.config.js';
 import { dismissOverlays, expectNoOverlay } from './overlays.js';
+import { completeCognitiveRealm } from './pupils.js';
 
 /**
  * WHAT ACTUALLY HAPPENS WHEN A CHILD PRESSES THINGS.
@@ -41,7 +42,14 @@ async function freshPupil(request) {
   });
   const body = await made.json();
   expect(body?.data?.student, `could not create a pupil: ${JSON.stringify(body)}`).toBeTruthy();
-  return { ...body.data.student, password: 'Inter@12345' };
+  const pupil = { ...body.data.student, password: 'Inter@12345' };
+  /**
+   * Past the first realm, because these tests are about what comes after it.
+   * Cognitive Games holds no worlds, so a brand-new pupil has none at all and
+   * Python is locked. See tests/pupils.js.
+   */
+  await completeCognitiveRealm(request, pupil);
+  return pupil;
 }
 
 async function signIn(page, pupil) {
@@ -80,7 +88,14 @@ test.describe('a pupil pressing things', () => {
      * until the next day.
      */
     const before = await serverState(request, pupil);
-    expect(before.xp).toBe(0);
+    /**
+     * The pupil starts with SOME XP, not zero: the fixture walks them past the
+     * cognitive-games realm to reach Python's worlds, and those games award XP
+     * of their own. What matters is that finishing a lesson MOVES the figure —
+     * asserted against `before` further down — not what it happened to be
+     * beforehand. Pinning zero here was testing the fixture, not the lesson.
+     */
+    expect(before.xp, 'the dashboard did not report an XP figure').toBeGreaterThanOrEqual(0);
 
     await signIn(page, pupil);
     await page.goto(`${STUDENT_URL}/world/coding-forest`);

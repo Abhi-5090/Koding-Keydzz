@@ -14,6 +14,12 @@ export default function DataTable({
   searchKeys,
   pageSize = 8,
   emptyMessage = 'No records found.',
+  /**
+   * What the search box filters, for anyone who cannot see the table it sits
+   * above. Defaulted so no caller is forced to think about it, and overridable
+   * so a table of pupils can say "Search students" rather than "Search rows".
+   */
+  searchLabel = 'Search rows',
   toolbar,
 }) {
   const [query, setQuery] = useState('');
@@ -69,7 +75,18 @@ export default function DataTable({
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary/70"
           />
+          {/*
+            `type="search"` and a real label.
+
+            It had neither: a placeholder is not an accessible name, so a
+            screen-reader user met an unlabelled text box on every table in
+            the portal and had nothing to tell them what it filtered. The
+            placeholder also vanishes as soon as anything is typed, which is
+            exactly when a reminder is most useful.
+          */}
           <input
+            type="search"
+            aria-label={searchLabel}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);

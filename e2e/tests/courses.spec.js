@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT_URL, API_URL } from '../playwright.config.js';
+import { completeCognitiveRealm } from './pupils.js';
 import { watchForErrors } from './pageErrors.js';
 
 /**
@@ -48,6 +49,14 @@ test.describe('the course ladder', () => {
 
   test.beforeAll(async ({ request }) => {
     creds = await makeStudent(request, `crs${Date.now()}`);
+    /**
+     * Past the first realm. This suite is about the LANGUAGE courses — their
+     * strand counts, their pass mark, their world map — and a brand-new pupil
+     * is on Cognitive Games, which has no lessons and no quizzes by design. Its
+     * strands are legitimately 0 of 0, which is exactly the shape this suite
+     * exists to catch as a fault when it happens to Python.
+     */
+    await completeCognitiveRealm(request, creds);
   });
 
   test('is offered in the sidebar and shows the pupil\'s track', async ({ page }) => {
@@ -144,13 +153,38 @@ test.describe('the course ladder', () => {
     await signIn(page, creds);
     await page.goto(`${STUDENT_URL}/courses`);
 
-    const start = page.getByRole('button', { name: /^(Start|Continue|Revisit)/ }).first();
-    await expect(start).toBeVisible({ timeout: 20_000 });
+    /**
+     * PYTHON's card, not "the first one".
+     *
+     * Cognitive Games leads the ladder and this pupil has finished it, so the
+     * first card reads "Revisit" and is already `completed`. Clicking that one
+     * navigates to the map perfectly well and then no card says "in progress"
+     * — which looked like the start action failing when it was the test
+     * starting the wrong course.
+     *
+     * The card is located through its heading, so this does not depend on
+     * where Python sits in the ladder.
+     */
+    /**
+     * "Start" identifies Python on its own, so no card-scoping is needed.
+     *
+     * A LOCKED card renders no action at all, and Cognitive Games — finished
+     * by this fixture — reads "Revisit". That leaves exactly one "Start", on
+     * the first course the pupil has not begun.
+     *
+     * An earlier attempt scoped by the card's heading and picked the innermost
+     * matching div, which contains the title and no button — the same mistake
+     * that `.last()` on a `filter({ has })` invites.
+     */
+    const start = page.getByRole('button', { name: /^Start/ });
+    await expect(start, 'no Start control — Python is not the next course').toBeVisible({
+      timeout: 20_000,
+    });
     await start.click();
 
     await expect(page).toHaveURL(/\/map/, { timeout: 30_000 });
 
-    // And the course is now in progress, so returning shows "Continue".
+    // And Python is now in progress, so returning shows "Continue".
     await page.goto(`${STUDENT_URL}/courses`);
     await expect(page.getByText(/in progress/i).first()).toBeVisible({ timeout: 20_000 });
   });

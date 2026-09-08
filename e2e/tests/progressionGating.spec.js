@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT_URL, API_URL } from '../playwright.config.js';
 import { dismissOverlays } from './overlays.js';
+import { completeCognitiveRealm } from './pupils.js';
 
 /**
  * THE LADDER, AS A CHILD MEETS IT.
@@ -27,8 +28,17 @@ async function freshPupil(request) {
   });
   const body = await made.json();
   expect(body?.data?.student, JSON.stringify(body)).toBeTruthy();
-  return { ...body.data.student, password: 'Ladder@12345' };
+  const pupil = { ...body.data.student, password: 'Ladder@12345' };
+  /**
+   * Past the first realm, because these tests are about what comes after it.
+   * Cognitive Games holds no worlds, so a brand-new pupil has none at all and
+   * Python is locked — `GET /worlds` returns `[]` and the first `worlds[0].id`
+   * throws. See tests/pupils.js.
+   */
+  await completeCognitiveRealm(request, pupil);
+  return pupil;
 }
+
 
 async function signIn(page, pupil) {
   await page.goto(`${STUDENT_URL}/login`);
@@ -58,8 +68,17 @@ test.describe('the ladder on screen', () => {
     const locked = await page.getByRole('button', { name: /locked\./i }).count();
 
     console.log(`>>> map: ${open} open, ${locked} locked realms`);
-    expect(open + locked, 'the map does not show four realms').toBe(4);
-    expect(open, 'more than the first realm was open to a brand-new pupil').toBe(1);
+    /**
+     * FIVE realms, and TWO of them open. This suite's pupil has finished the
+     * cognitive games (see the fixture), so Cognitive Games and Python are
+     * both open and C, HTML and AI are behind their final tests.
+     *
+     * The "a brand-new pupil sees exactly one open realm" case belongs to
+     * cognitiveRealm.spec.js, which uses a genuinely fresh account — this
+     * suite is about the worlds and topics inside a realm.
+     */
+    expect(open + locked, 'the map does not show every realm').toBe(5);
+    expect(open, 'the wrong number of realms was open').toBe(2);
     expect(locked).toBe(3);
     expect(await realms.count()).toBeGreaterThan(0);
 
@@ -85,8 +104,13 @@ test.describe('the ladder on screen', () => {
     await dismissOverlays(page);
     await page.waitForTimeout(2000);
 
-    await page.getByRole('button', { name: /^Open the .* realm$/i }).first().click();
-    await page.waitForURL(/\/map\/[a-z-]+/, { timeout: 20_000 });
+    /**
+     * PYTHON, not the first open realm. Cognitive Games leads the ladder and
+     * has no worlds — four mini-games instead — so `.first()` landed on a
+     * realm with nothing to sequence.
+     */
+    await page.getByRole('button', { name: /^Open the Python realm$/i }).click();
+    await page.waitForURL(/\/map\/python/, { timeout: 20_000 });
     await page.waitForTimeout(2000);
 
     const open = await page.getByRole('button', { name: /^Open /i }).count();
@@ -108,8 +132,8 @@ test.describe('the ladder on screen', () => {
     await dismissOverlays(page);
     await page.waitForTimeout(2000);
 
-    await page.getByRole('button', { name: /^Open the .* realm$/i }).first().click();
-    await page.waitForURL(/\/map\/[a-z-]+/, { timeout: 20_000 });
+    await page.getByRole('button', { name: /^Open the Python realm$/i }).click();
+    await page.waitForURL(/\/map\/python/, { timeout: 20_000 });
     await page.getByRole('link', { name: /all realms/i }).click();
     await expect(page).toHaveURL(/\/map$/, { timeout: 15_000 });
     console.log('>>> back out of a realm  OK');

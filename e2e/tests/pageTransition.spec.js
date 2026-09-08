@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { STUDENT_URL, API_URL } from '../playwright.config.js';
 import { dismissOverlays } from './overlays.js';
+import { completeCognitiveRealm } from './pupils.js';
 
 /**
  * NAVIGATION SHOULD HAND OVER, NOT BLINK.
@@ -29,7 +30,14 @@ async function freshPupil(request) {
     headers: { Authorization: `Bearer ${token}` },
     data: { firstName: 'Nav', lastName: `P${Date.now() % 1000000}`, grade: '5', password: 'Nav@12345' },
   });
-  return { ...(await made.json()).data.student, password: 'Nav@12345' };
+  const pupil = { ...(await made.json()).data.student, password: 'Nav@12345' };
+  /**
+   * Past the first realm, because these tests are about what comes after it.
+   * Cognitive Games holds no worlds, so a brand-new pupil has none at all and
+   * Python is locked. See tests/pupils.js.
+   */
+  await completeCognitiveRealm(request, pupil);
+  return pupil;
 }
 
 test('moving between pages never leaves the content area empty', async ({ page, request }) => {
@@ -50,8 +58,16 @@ test('moving between pages never leaves the content area empty', async ({ page, 
   }
 
   const nav = page.getByRole('navigation', { name: /main navigation/i }).first();
-  await nav.getByRole('button', { name: /^play$/i }).click();
-  await page.waitForTimeout(500);
+  /**
+   * Open Play only if it is CLOSED. It is the first labelled group, so it is
+   * open by default — clicking it unconditionally closed it and hid the link
+   * this test then reached for.
+   */
+  const play = nav.getByRole('button', { name: /^play$/i });
+  if ((await play.getAttribute('aria-expanded')) !== 'true') {
+    await play.click();
+    await page.waitForTimeout(500);
+  }
 
   /**
    * Sample the content area across the whole transition. If the old page is
